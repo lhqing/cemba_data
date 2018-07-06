@@ -1,1 +1,1 @@
-.. automodule:: anndata
+.. automodule:: cemba_data
