@@ -8,7 +8,7 @@ import time
 import pandas as pd
 
 qsub_config = configparser.ConfigParser()
-qsub_config.read(os.path.dirname(__file__) + '/config_local.ini')
+qsub_config.read(os.path.dirname(__file__) + '/config_qsub.ini')
 
 
 def default_command_dict(name, error_path, output_path):
