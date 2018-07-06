@@ -11,7 +11,7 @@ Welcome to cemba_data's documentation!
    :caption: Contents:
 
    demo/test.rst
-
+   demo/api.rst
 
 Indices and tables
 ==================
