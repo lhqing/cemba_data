@@ -62,7 +62,7 @@ def split_to_bed(allc_path, context_pattern,
             if max_cov_cutoff is not None:
                 if int(ll[5]) > max_cov_cutoff:
                     continue
-            # bedformat [chrom, start, end, mc, cov]
+            # bed format [chrom, start, end, mc, cov]
             ll[1] = str(int(ll[1]) - 1)  # because bed is 0 based
             bed_line = '\t'.join([ll[0], ll[1], ll[1], ll[4], ll[5]]) + '\n'
             # add "chr" to chrom
@@ -110,8 +110,8 @@ def map_to_region(allc_path, out_path_prefix,
     :return:
     """
     # prepare ALLC bed dict, split ALLC into different contexts
-    # bedformat [chrom, start, end, mc, cov]
-    print('Spliting ALLC')
+    # bed format [chrom, start, end, mc, cov]
+    print('Splitting ALLC')
     # split chromosome and avoid sorting
     allc_bed_path_dict = split_to_bed(allc_path=allc_path,
                                       context_pattern=context_pattern,
@@ -206,11 +206,13 @@ def map_to_region_register_subparser(subparser):
         help="Methylation context pattern, N for ATCG, H for ATC"
     )
 
-    parser_req.add_argument(
+    parser_opt.add_argument(
         "--max_cov_cutoff",
         type=int,
         required=True,
-        help="String indicating the name of output file"
+        default=None,
+        help="Maximum cutoff for coverage in each base, "
+             "e.g. 2 for single cell data, None for bulk seq."
     )
 
     parser_opt.add_argument(
