@@ -1,0 +1,3 @@
+recursive-include cemba_data *.ini
+include LICENSE.txt
+recursive-exclude * __pycache__
