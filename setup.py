@@ -12,7 +12,9 @@ setup(
     long_description=open('README.md').read(),
     include_package_data=True,
     install_requires=['pandas', 'pybedtools'],
-    scripts=["bin/cemba_data"]
+    entry_points={
+        'console_scripts': ['yap=cemba_data.parser:get_common_parser'],
+    }
 )
 
 if __name__ == '__main__':

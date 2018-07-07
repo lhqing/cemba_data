@@ -4,11 +4,12 @@ from functools import partial
 from pybedtools import BedTool, cleanup
 from subprocess import run
 import argparse
+from pandas import Series
 
 
-def split_to_bed(allc_path, context_pattern,
+def split_to_bed(allc_path, context_pattern, genome_size_path,
                  out_path_prefix, max_cov_cutoff=None,
-                 split_chromosome=False, genome_size_path=None,
+                 split_chromosome=False,
                  compression=True, gzip_level=3):
     """
     Split ALLC into bed format, chrom column contain "chr".
@@ -71,6 +72,8 @@ def split_to_bed(allc_path, context_pattern,
                 chrom = 'chr' + ll[0]
             else:
                 chrom = ll[0]
+            if chrom == 'chrL':
+                continue
             # record ALLC chrom order
             if chrom != chrom_order_list[-1]:
                 chrom_order_list.append(chrom)
@@ -86,8 +89,9 @@ def split_to_bed(allc_path, context_pattern,
     for handle in handle_dict.values():
         handle.close()
     with open(out_path_prefix + '.chrom_order', 'w') as f:
-        f.write('\n'.join(chrom_order_list))
-
+        chrom_series = Series(parse_chrom_szie(genome_size_path)).reindex(chrom_order_list).dropna()
+        for chrom, length in chrom_series.iteritems():
+            f.write(f'{chrom}\t{length}\n')
     return path_dict
 
 
@@ -117,7 +121,7 @@ def map_to_region(allc_path, out_path_prefix,
                                       context_pattern=context_pattern,
                                       out_path_prefix=out_path_prefix + '.tmp',
                                       split_chromosome=False,
-                                      genome_size_path=None,
+                                      genome_size_path=genome_size_path,
                                       max_cov_cutoff=max_cov_cutoff,
                                       compression=tmp_compression)
     print('Reading ALLC Bed')
@@ -136,7 +140,7 @@ def map_to_region(allc_path, out_path_prefix,
     for context_name, allc_bed in allc_bed_dict.items():
         for region_name, region_bed in region_bed_dict.items():
             print(f'Map {context_name} ALLC Bed to {region_name} Region Bed')
-            region_bed.map(b=allc_bed, c='4,5', o='sum,sum') \
+            region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=out_path_prefix + '.tmp.chrom_order') \
                 .sort(g=genome_size_path) \
                 .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
                         compressed=True)
@@ -146,6 +150,7 @@ def map_to_region(allc_path, out_path_prefix,
         print('Clean tmp Bed file')
         for path in allc_bed_path_dict.values():
             run(['rm', '-f', path])
+        run(['rm', '-f', out_path_prefix+'.tmp.chrom_order'])
     cleanup()  # pybedtools tmp files
     print('Finish')
     return
