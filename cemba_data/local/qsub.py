@@ -25,22 +25,17 @@ def default_command_dict(name, error_path, output_path):
 
 
 def check_qstat(id_set=None):
-    space_pattern = re.compile(' +')
-    qstat_result = run(['qstat', '-u', qsub_config['USER']['USER_NAME']],
+    qstat_result = run(['qstat', '-u', qsub_config['USER']['USER_NAME'], '|', 'awk', '"{ print $1;}"'],
                        stdout=PIPE, encoding='utf8')
-    qstat_result_lines = qstat_result.stdout.split('\n')[:-1]
-    qstat_data = [space_pattern.split(line) for line in qstat_result_lines]
-    header = qstat_data[0][:-1]
-    qstat_data = qstat_data[2:]
-    qstat_df = pd.DataFrame(qstat_data, columns=header)
-    qstat_df.set_index('job-ID', inplace=True)
+    total_id = qstat_result.stdout.split('\n')
     if id_set is not None:
-        qstat_df = qstat_df.reindex(id_set).dropna(how='all')
-    return qstat_df
+        return [i for i in total_id if i in id_set]
+    else:
+        return total_id
 
 
 class Qsubmitter:
-    def __init__(self, command_file_path, project_name, auto_submit=False):
+    def __init__(self, command_file_path, project_name, auto_submit=False, qacct=False):
         self.command_file_path = command_file_path
         self.project_name = project_name
         self.project_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR'] + '/' + project_name
@@ -55,7 +50,7 @@ class Qsubmitter:
         self.finished_commands = []  # modify this with check_command_finish_status
         self.qsub_failed_commands = []  # modify this with check_command_finish_status
         self.cmd_failed_commands = []  # modify this with check_command_finish_status
-
+        self.check_qacct = qacct  # check qacct is slow if the log is too large, only check it in debugging
         if auto_submit:
             self.submit()
         return
@@ -120,17 +115,16 @@ class Qsubmitter:
 
         # final job check:
         while True:
+            time.sleep(qstat_gap)
             self.check_running_cpu()
             if self.running_cpu == 0:
                 break  # all job finished
-
         self.get_reports()
         return
 
     def check_running_cpu(self):
         print('check running job')
-        cur_qstat_df = check_qstat()
-        cur_running_qsub_id = cur_qstat_df.index
+        cur_running_qsub_id = check_qstat()
 
         # check every running obj
         cur_running_cpu = 0
@@ -138,9 +132,12 @@ class Qsubmitter:
         for command_obj in self.running_commands:
             if command_obj.qsub_id not in cur_running_qsub_id:
                 # command have finished
-                print(command_obj.unique_id, 'qacct')
-                if command_obj.query_qacct() != 0:
-                    raise ValueError('Command not finished but disappeared in qstat')
+                if self.check_qacct:
+                    print(command_obj.unique_id, 'qacct')
+                    if command_obj.query_qacct() != 0:
+                        raise ValueError('Command not finished but disappeared in qstat')
+                else:
+                    command_obj.not_query_qacct()
                 self.check_command_finish_status(command_obj)
             else:
                 cur_running_command.append(command_obj)
@@ -153,10 +150,11 @@ class Qsubmitter:
 
     def check_command_finish_status(self, command_obj):
         self.finished_commands.append(command_obj)
-        if command_obj.qsub_failed:
-            self.qsub_failed_commands.append(command_obj)
-        if command_obj.cmd_failed:
-            self.cmd_failed_commands.append(command_obj)
+        if self.check_qacct:
+            if command_obj.qsub_failed:
+                self.qsub_failed_commands.append(command_obj)
+            if command_obj.cmd_failed:
+                self.cmd_failed_commands.append(command_obj)
         return
 
     def get_reports(self):
@@ -165,17 +163,20 @@ class Qsubmitter:
             summary.write(f'Total Command: {len(self.commands)}\n')
             summary.write(f'Submission Failed Command: {len(self.submission_fail_commands)}\n')
 
-            summary.write(f'Qsub Failed Command: {len(self.qsub_failed_commands)}\n')
-            if len(self.qsub_failed_commands) > 0:
-                with open(self.project_dir + '/qsub_failed_commands.txt', 'w') as f:
-                    f.write('\n'.join(self.qsub_failed_commands))
-                summary.write(f'See qsub failed command id in {self.project_dir}/qsub_failed_commands.txt\n')
+            if self.check_qacct:
+                summary.write(f'Qsub Failed Command: {len(self.qsub_failed_commands)}\n')
+                if len(self.qsub_failed_commands) > 0:
+                    with open(self.project_dir + '/qsub_failed_commands.txt', 'w') as f:
+                        f.write('\n'.join(self.qsub_failed_commands))
+                    summary.write(f'See qsub failed command id in {self.project_dir}/qsub_failed_commands.txt\n')
 
-            summary.write(f'Command Failed Command: {len(self.cmd_failed_commands)}\n')
-            if len(self.cmd_failed_commands) > 0:
-                with open(self.project_dir + '/cmd_failed_commands.txt', 'w') as f:
-                    f.write('\n'.join(self.cmd_failed_commands))
-                summary.write(f'See qsub failed command id in {self.project_dir}/cmd_failed_commands.txt\n')
+                summary.write(f'Command Failed Command: {len(self.cmd_failed_commands)}\n')
+                if len(self.cmd_failed_commands) > 0:
+                    with open(self.project_dir + '/cmd_failed_commands.txt', 'w') as f:
+                        f.write('\n'.join(self.cmd_failed_commands))
+                    summary.write(f'See qsub failed command id in {self.project_dir}/cmd_failed_commands.txt\n')
+            else:
+                summary.write('check_qacct = False, if want to get the finish code for each job, set qacct=True in Qsubmitter')
         return
 
 
@@ -220,11 +221,17 @@ class Command:
         # modify command status if it has been submitted and finished
         if os.path.exists(self.qacct_status_path):
             with open(self.qacct_status_path) as f:
-                self.qacct_status = json.load(f)
+                status_dict = json.load(f)
+                if len(status_dict) > 1:
+                    self.qacct_status = status_dict
+                    self.qsub_id = self.qacct_status['jobnumber']
+                    self.judge_qacct_status()
+                else:  # didn't do qacct
+                    self.qsub_id = status_dict['qsub_id']
+                    # self.qacct_status is still None,
+                    # should run query_qacct to get it
             self.submitted = True
-            self.qsub_id = self.qacct_status['jobnumber']
             self.finish = True
-            self.judge_qacct_status()
         return
 
     def make_script_file(self):
@@ -276,6 +283,12 @@ class Command:
         with open(self.qacct_status_path, 'w') as f:
             json.dump(self.qacct_status, f)
         return 0
+
+    def not_query_qacct(self):
+        self.finish = True
+        # skip qacct, only store the qsub id.
+        with open(self.qacct_status_path, 'w') as f:
+            json.dump({'qsub_id': self.qsub_id}, f)
 
     def judge_qacct_status(self):
         if self.qacct_status['failed'] == '0':
