@@ -2,6 +2,10 @@ import configparser
 import os
 import datetime
 import json
+import pandas as pd
+import h5py
+from numpy import uint32
+from scipy.sparse import lil_matrix
 from .qsub import Qsubmitter, qsub_config
 
 ref_path_config = configparser.ConfigParser()
@@ -78,13 +82,55 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, data_set_name=Non
         json.dump(command_dict_list, f)
 
     # Qsub command list
-    Qsubmitter(command_file_path=command_file_path,
-               project_name=project_name,
-               auto_submit=submit)
-    return Qsubmitter
+    submitter = Qsubmitter(command_file_path=command_file_path,
+                           project_name=project_name,
+                           auto_submit=submit)
+    return submitter
 
 
-def assemble_dataset(cell_meta, region_meta, region_names, cell_region_dir, remove_cell_files=True):
+def assemble_dataset(cell_meta_df, h5_path,
+                     region_meta, region_names,
+                     context_list, cell_region_dir,
+                     remove_cell_files=True):
+    # qc not happen in this func, assume everything is not missing. only use it inside prepare_dataset()
+
+    # 1. open file
+    h5f = h5py.File(h5_path, 'x')  # fail if file exist
+
+    # 2. build region groups, order: regionset, context, cell
+    region_groups = {}
+    for region_name in region_names:
+        region_group = h5f.require_group(region_name)
+        # build context group
+        for context in context_list:
+            context_group = region_group.require_group(context)
+            # bulid cell group
+            for cell in cell_meta_df.index:
+                cell_group = context_group.require_group(cell)
+                add_lil_matrix_to_cell_group(cell_group=cell_group,
+                                             context=context,
+                                             cell_id=cell,
+                                             region_name=region_name,
+                                             cell_region_dir=cell_region_dir)
+
+    # 3. add region meta
+    pass
+
+    # 4. add cell meta
+    pass
+
+    h5f.close()
+    return
+
+
+def add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_name, cell_region_dir):
+    file_path = f'{cell_region_dir}/{cell_id}.{region_name}_{context}.count_table.bed.gz'
+    df = pd.read_table(file_path, header=None, na_values='.')
+    lil_data = lil_matrix(df[[4, 5]].fillna(0).T.values, dtype=uint32)
+    mc, cov = lil_data.data
+    mc_idx, cov_idx = lil_data.rows
+    cell_group.require_dataset('mc', data=[mc, mc_idx], shape=(2, len(mc)), dtype=uint32, compression='gzip')
+    cell_group.require_dataset('cov', data=[cov, cov_idx], shape=(2, len(cov)), dtype=uint32, compression='gzip')
     return
 
 
