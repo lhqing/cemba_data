@@ -35,7 +35,7 @@ def check_qstat(id_set=None):
 
 
 class Qsubmitter:
-    def __init__(self, command_file_path, project_name, auto_submit=False, qacct=False):
+    def __init__(self, command_file_path, project_name, auto_submit=False, qacct=False, resubmit=None):
         self.command_file_path = command_file_path
         self.project_name = project_name
         self.project_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR'] + '/' + project_name
@@ -52,7 +52,7 @@ class Qsubmitter:
         self.cmd_failed_commands = []  # modify this with check_command_finish_status
         self.check_qacct = qacct  # check qacct is slow if the log is too large, only check it in debugging
         if auto_submit:
-            self.submit()
+            self.submit(resubmit)
         return
 
     def parse_command_file(self):

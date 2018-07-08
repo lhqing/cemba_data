@@ -2,11 +2,13 @@ import configparser
 import os
 import datetime
 import json
+import numpy as np
 import pandas as pd
 import h5py
 from numpy import uint32
 from scipy.sparse import lil_matrix
 from .qsub import Qsubmitter, qsub_config
+from subprocess import run
 
 ref_path_config = configparser.ConfigParser()
 ref_path_config.read(os.path.dirname(__file__) + '/config_ref_path.ini')
@@ -16,7 +18,7 @@ def cur_time():
     return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def batch_map_to_region(cell_ids, allc_files, out_dir, genome, data_set_name=None,
+def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None,
                         region_bed_path=None, region_name=None,
                         context_pattern=None, max_cov_cutoff=None,
                         remove_tmp=True, tmp_compression=False,
@@ -27,14 +29,16 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, data_set_name=Non
     qsub_config['RUNNING_DEFAULT']['SUBMISSION_GAP'] = str(submission_gap)
     qsub_config['RUNNING_DEFAULT']['QSTST_GAP'] = str(qstat_gap)
     job_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR']
-    if data_set_name is None:  # if dataset name not provided, use time
-        data_set_name = cur_time()
-    project_name = f'map_to_region_{data_set_name}'
+    if dataset_name is None:  # if dataset name not provided, use time
+        dataset_name = cur_time()
+    project_name = f'map_to_region_{dataset_name}'
     working_job_dir = job_dir + f'/{project_name}'
     command_file_path = working_job_dir + '/command_list.json'
     try:
         os.mkdir(working_job_dir)
     except OSError:
+        print('Note: The job has been submitted before.')
+        print(f'If want to resubmit everything, delete or rename this directory: {working_job_dir}')
         pass
 
     # make refs
@@ -88,42 +92,63 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, data_set_name=Non
     return submitter
 
 
-def assemble_dataset(cell_meta_df, h5_path,
-                     region_meta, region_names,
-                     context_list, cell_region_dir,
-                     remove_cell_files=True):
+def _assemble_dataset(cell_meta_df, out_path,
+                      region_meta_df, region_name,
+                      context_list, cell_region_dir,
+                      remove_cell_files=True):
     # qc not happen in this func, assume everything is not missing. only use it inside prepare_dataset()
+    h5f = h5py.File(out_path, 'x')  # fail if file exist
 
-    # 1. open file
-    h5f = h5py.File(h5_path, 'x')  # fail if file exist
-
-    # 2. build region groups, order: regionset, context, cell
-    region_groups = {}
-    for region_name in region_names:
-        region_group = h5f.require_group(region_name)
+    # build region groups, order: region_set, context, cell
+    for _region_name, _region_meta in zip(region_name, region_meta_df):
+        region_group = h5f.require_group(_region_name)
+        # add region meta
+        add_df2group(region_group, 'region_meta', _region_meta)
         # build context group
         for context in context_list:
             context_group = region_group.require_group(context)
-            # bulid cell group
+            # build cell group
             for cell in cell_meta_df.index:
                 cell_group = context_group.require_group(cell)
                 add_lil_matrix_to_cell_group(cell_group=cell_group,
                                              context=context,
                                              cell_id=cell,
-                                             region_name=region_name,
-                                             cell_region_dir=cell_region_dir)
-
-    # 3. add region meta
-    pass
-
-    # 4. add cell meta
-    pass
+                                             region_name=_region_name,
+                                             cell_region_dir=cell_region_dir,
+                                             remove_cell_files=remove_cell_files)
+    # add cell meta
+    add_df2group(h5f, 'cell_meta', cell_meta_df)
 
     h5f.close()
     return
 
 
-def add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_name, cell_region_dir):
+def add_df2group(h5_group, name, df, compression='gzip'):
+    # save index into col
+    df = df.copy()
+    df.reset_index(drop=False, inplace=True)
+
+    # judge dtype
+    h5_dtype = []
+    for col, col_dt in df.dtypes.iteritems():
+        if col_dt == 'O':
+            h5_dtype.append((col, h5py.special_dtype(vlen=str)))
+        elif col_dt == 'int':
+            h5_dtype.append((col, np.int32))
+        elif col_dt == 'float':
+            h5_dtype.append((col, np.float32))
+        else:
+            h5_dtype.append((col, col_dt))
+    # h5 compound dtype
+    h5_dtype = np.dtype(h5_dtype)
+    h5_data = [tuple(row) for i, row in df.iterrows()]
+
+    h5_group.require_dataset(name, shape=(df.shape[0],), dtype=h5_dtype, compression=compression)
+    h5_group[name][...] = h5_data
+    return
+
+
+def add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_name, cell_region_dir, remove_cell_files):
     file_path = f'{cell_region_dir}/{cell_id}.{region_name}_{context}.count_table.bed.gz'
     df = pd.read_table(file_path, header=None, na_values='.')
     lil_data = lil_matrix(df[[4, 5]].fillna(0).T.values, dtype=uint32)
@@ -131,13 +156,92 @@ def add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_name, cell
     mc_idx, cov_idx = lil_data.rows
     cell_group.require_dataset('mc', data=[mc, mc_idx], shape=(2, len(mc)), dtype=uint32, compression='gzip')
     cell_group.require_dataset('cov', data=[cov, cov_idx], shape=(2, len(cov)), dtype=uint32, compression='gzip')
+
+    if remove_cell_files:
+        run(['rm', '-f', file_path])
     return
 
 
-def prepare_dataset():
+def _parse_bed(file_path):
+    df = pd.read_table(file_path,
+                       header=None,
+                       names=['chrom', 'start', 'end', '_id'],
+                       index_col='_id')
+    return df
+
+
+def parse_cell_meta_df(cell_meta_path, datasets=None, dataset_col=None, index_col='_id'):
+    cell_total_df = pd.read_table(cell_meta_path, header=0, index_col=index_col)
+    if dataset_col is not None and datasets is not None:
+        if isinstance(datasets, str):
+            datasets = [datasets]
+        cell_total_df = cell_total_df[cell_total_df[dataset_col].isin(datasets)]
+    print('Got %d cells from cell meta table.' % cell_total_df.shape[0])
+    return cell_total_df
+
+
+def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='_id',
+                    dataset_col=None, allc_path_col='ALLC_path', select_cells=False,
+                    region_bed_path=None, region_name=None,
+                    context_pattern=None, max_cov_cutoff=None,
+                    total_cpu=50, submission_gap=5, qstat_gap=100):
     # cell df and filter parms (defalut none if df is whole dataset)
     # 1. use batch_map_to_region get all files
     # 2. assemble_dataset to h5 file
     # batch_map_to_region()
     # assemble_dataset()
+
+    generation_note = {'assembly_time': cur_time()}
+
+    # prepare refs, change None in to default from config
+    pass
+
+    # prepare cell meta df, select dataset or not
+    if not select_cells:
+        dataset_col = None
+        print(f'Using all cells from {cell_meta_path}')
+    else:
+        if dataset_col is None:
+            raise ValueError('dataset_col can not be None, when select_cells is True')
+    cell_meta_df = parse_cell_meta_df(cell_meta_path, dataset_name, dataset_col, index_col=cell_id_col)
+    # rename required cols for standard: cell id, dataset, allc path
+    pass
+
+    # remove cell without allc_path
+    cells_no_allc = cell_meta_df[cell_meta_df[allc_path_col].isnull()]
+    cell_meta_df = cell_meta_df[~cell_meta_df[allc_path_col].isnull()]
+    if cells_no_allc.shape[0] > 0:
+        print(f'{cells_no_allc.shape[0]} cell(s) do not have ALLC path, '
+              f'removed from cell meta table, see generation note later.')
+        generation_note['cell without ALLC'] = cells_no_allc.index.tolist()
+        print(f'{cell_meta_df.shape[0]} cells remained.')
+
+    # map to region
+    cell_ids = cell_meta_df[allc_path_col].index.tolist()
+    allc_files = cell_meta_df[allc_path_col].tolist()
+    submitter = batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name,
+                                    region_bed_path=region_bed_path, region_name=region_name,
+                                    context_pattern=context_pattern, max_cov_cutoff=max_cov_cutoff,
+                                    remove_tmp=True, tmp_compression=False,
+                                    total_cpu=total_cpu, submission_gap=submission_gap,
+                                    qstat_gap=qstat_gap, submit=True)
+    # check submitter status before next step
+    pass
+
+    # make h5 file
+    out_path = out_dir + f'/{dataset_name}.h5mc'
+    region_meta_df = [_parse_bed(rp) for rp in region_bed_path]
+    _assemble_dataset(cell_meta_df=cell_meta_df,
+                      out_path=out_path,
+                      region_meta_df=region_meta_df,
+                      region_name=region_name,
+                      context_list=context_pattern,
+                      cell_region_dir=out_dir,
+                      remove_cell_files=True)
+
+    # write generation note to h5mc file
+    # add ref config to generation note
+    # add qsub config to generation note
+    pass
+
     return
