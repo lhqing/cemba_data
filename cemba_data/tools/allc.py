@@ -214,7 +214,7 @@ def map_to_region_register_subparser(subparser):
     parser_opt.add_argument(
         "--max_cov_cutoff",
         type=int,
-        required=True,
+        required=False,
         default=None,
         help="Maximum cutoff for coverage in each base, "
              "e.g. 2 for single cell data, None for bulk seq."

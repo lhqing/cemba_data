@@ -5,7 +5,6 @@ import configparser
 import datetime
 import re
 import time
-import pandas as pd
 
 qsub_config = configparser.ConfigParser()
 qsub_config.read(os.path.dirname(__file__) + '/config_qsub.ini')
@@ -25,12 +24,20 @@ def default_command_dict(name, error_path, output_path):
 
 
 def check_qstat(id_set=None):
-    qstat_result = run(['qstat', '-u', qsub_config['USER']['USER_NAME'], '|', 'awk', '"{ print $1;}"'],
-                       stdout=PIPE, encoding='utf8')
-    total_id = qstat_result.stdout.split('\n')
-    if id_set is not None:
-        return [i for i in total_id if i in id_set]
+    qstat_result_string = run(['qstat', '-u', qsub_config['USER']['USER_NAME']],
+                              stdout=PIPE, encoding='utf8').stdout
+    if 'job-ID' not in qstat_result_string:
+        return []  # qstat print nothing, all job finished
     else:
+        qstat_result_lines = qstat_result_string.split('\n')
+        total_id = []
+        for line in qstat_result_lines:
+            line_id = line.split(' ')[0]
+            if id_set is not None:
+                if line_id in id_set:
+                    total_id.append(line_id)
+            else:
+                total_id.append(line_id)
         return total_id
 
 
@@ -115,6 +122,7 @@ class Qsubmitter:
 
         # final job check:
         while True:
+            print(qstat_gap)
             time.sleep(qstat_gap)
             self.check_running_cpu()
             if self.running_cpu == 0:
@@ -124,8 +132,8 @@ class Qsubmitter:
 
     def check_running_cpu(self):
         print('check running job')
-        cur_running_qsub_id = check_qstat()
-
+        cur_running_qsub_id = check_qstat(self.submitted_qsub_id)
+        print(cur_running_qsub_id)
         # check every running obj
         cur_running_cpu = 0
         cur_running_command = []

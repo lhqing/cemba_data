@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 import h5py
+import inspect
 from numpy import uint32
 from scipy.sparse import lil_matrix
 from .qsub import Qsubmitter, qsub_config
@@ -101,11 +102,13 @@ def _assemble_dataset(cell_meta_df, out_path,
 
     # build region groups, order: region_set, context, cell
     for _region_name, _region_meta in zip(region_name, region_meta_df):
+        print(f'Building {_region_name} group...', end=' ')
         region_group = h5f.require_group(_region_name)
         # add region meta
         add_df2group(region_group, 'region_meta', _region_meta)
         # build context group
         for context in context_list:
+            print(context, end=' ')
             context_group = region_group.require_group(context)
             # build cell group
             for cell in cell_meta_df.index:
@@ -116,7 +119,9 @@ def _assemble_dataset(cell_meta_df, out_path,
                                              region_name=_region_name,
                                              cell_region_dir=cell_region_dir,
                                              remove_cell_files=remove_cell_files)
+        print()
     # add cell meta
+    print('Add cell meta into h5mc')
     add_df2group(h5f, 'cell_meta', cell_meta_df)
 
     h5f.close()
@@ -185,16 +190,22 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                     region_bed_path=None, region_name=None,
                     context_pattern=None, max_cov_cutoff=None,
                     total_cpu=50, submission_gap=5, qstat_gap=100):
-    # cell df and filter parms (defalut none if df is whole dataset)
-    # 1. use batch_map_to_region get all files
-    # 2. assemble_dataset to h5 file
-    # batch_map_to_region()
-    # assemble_dataset()
-
     generation_note = {'assembly_time': cur_time()}
 
     # prepare refs, change None in to default from config
-    pass
+    genome = genome.upper()
+    cell_level_region_set = []
+    cell_level_region_name = []
+    for _region_set, _region_name in zip(ref_path_config['DATA_SELECT']['CELL_LEVEL_MAP'].split(' '),
+                                         ref_path_config['DATA_SELECT']['CELL_LEVEL_MAP_NAME'].split(' ')):
+        cell_level_region_set.append(ref_path_config[genome][_region_set])
+        cell_level_region_name.append(_region_name)
+    if region_bed_path is None:
+        region_bed_path = cell_level_region_set
+    if region_name is None:
+        region_name = cell_level_region_name
+    if context_pattern is None:
+        context_pattern = ref_path_config['DATA_SELECT']['ALLC_CONTEXT'].split(' ')
 
     # prepare cell meta df, select dataset or not
     if not select_cells:
@@ -205,7 +216,13 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
             raise ValueError('dataset_col can not be None, when select_cells is True')
     cell_meta_df = parse_cell_meta_df(cell_meta_path, dataset_name, dataset_col, index_col=cell_id_col)
     # rename required cols for standard: cell id, dataset, allc path
-    pass
+    if dataset_col is None:
+        dataset_col = 'dataset'
+        cell_meta_df['dataset'] = dataset_name
+    cell_meta_df.rename(inplace=True, columns={cell_id_col: '_id',
+                                               dataset_col: 'dataset',
+                                               allc_path_col: 'ALLC_path'})
+    allc_path_col = 'ALLC_path'  # make sure it is the standard name
 
     # remove cell without allc_path
     cells_no_allc = cell_meta_df[cell_meta_df[allc_path_col].isnull()]
@@ -226,7 +243,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                                     total_cpu=total_cpu, submission_gap=submission_gap,
                                     qstat_gap=qstat_gap, submit=True)
     # check submitter status before next step
-    pass
+    print(f'{len(submitter.commands)} jobs finished.')
 
     # make h5 file
     out_path = out_dir + f'/{dataset_name}.h5mc'
@@ -240,8 +257,14 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                       remove_cell_files=True)
 
     # write generation note to h5mc file
-    # add ref config to generation note
-    # add qsub config to generation note
-    pass
+    # add qsub, ref config and function parameters to h5mc
+    with h5py.File(out_path, 'a') as h5f:
+        h5f.attrs['qsub_config'] = json.dumps(dict(qsub_config._sections))
+        h5f.attrs['reference_config'] = json.dumps(dict(ref_path_config._sections))
+        local_var = locals()
+        args = inspect.getfullargspec(prepare_dataset).args
+        arg_dict = {k: str(v) for k, v in local_var.items() if k in args}
+        h5f.attrs['assembly_args'] = json.dumps(arg_dict)
+        h5f.attrs['generation_note'] = json.dumps(generation_note)
 
     return
