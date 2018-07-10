@@ -121,7 +121,7 @@ class Qsubmitter:
                     self.check_running_cpu()
                     if self.running_cpu <= self.total_cpu:
                         break
-            print('Submit job:', command_obj.unique_id)
+            # print('Submit job:', command_obj.unique_id)
             command_obj.submit()
             # gather submitted id and obj
             if command_obj.submission_fail:
