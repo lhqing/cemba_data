@@ -2,8 +2,10 @@ from .utilities import *
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
+from pybedtools.helpers import BEDToolsError
 from subprocess import run
 import argparse
+import os
 from pandas import Series
 
 
@@ -133,24 +135,57 @@ def map_to_region(allc_path, out_path_prefix,
     if len(region_bed_path) != len(region_name):
         raise ValueError('Number of region BED path != Number of region names')
     # input region bed, sort across allc chrom order
-    region_bed_dict = {region_n: BedTool(bed_p).sort(g=out_path_prefix + '.tmp.chrom_order')
+    # chrom_order is in UCSC genome size format,
+    # make a bed format from it and then intersect with bed_p to filter out chromosomes not appear in ALLC
+    with open(out_path_prefix + '.tmp.chrom_order', 'r') as chrom_size, \
+            open(out_path_prefix + '.tmp.chrom_order.bed', 'w') as chrom_bed:
+        for line in chrom_size:
+            ll = line.strip('\n').split('\t')
+            chrom_bed.write('\t'.join([ll[0], '0', ll[1]]) + '\n')
+    allc_chrom_bed = BedTool(out_path_prefix + '.tmp.chrom_order.bed')  # bed file for allc chrom
+    region_bed_dict = {region_n: BedTool(bed_p).intersect(allc_chrom_bed).sort(g=out_path_prefix + '.tmp.chrom_order')
                        for bed_p, region_n in zip(region_bed_path, region_name)}
 
     # bedtools map
     for context_name, allc_bed in allc_bed_dict.items():
         for region_name, region_bed in region_bed_dict.items():
             print(f'Map {context_name} ALLC Bed to {region_name} Region Bed')
-            region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=out_path_prefix + '.tmp.chrom_order') \
-                .sort(g=genome_size_path) \
-                .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
-                        compressed=True)
+            try:
+                region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=out_path_prefix + '.tmp.chrom_order') \
+                    .sort(g=genome_size_path) \
+                    .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
+                            compressed=True)
+            except BEDToolsError:
+                # for some rare cases (10 in 2700),
+                # the gzip bed raise error in bedtools map, but unzip bed works fine.
+                # https://github.com/arq5x/bedtools2/issues/363
+                # not sure why, but try unzip once
+                if tmp_compression:
+                    print('Encounter BEDToolsError')
+                    if os.path.exists(allc_bed_path_dict[context_name]):
+                        # unzip the fine if it haven't
+                        run(['gunzip', allc_bed_path_dict[context_name]])
+                    allc_bed = BedTool(allc_bed_path_dict[context_name][:-3])  # open unzip bed
+                    region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=out_path_prefix + '.tmp.chrom_order') \
+                        .sort(g=genome_size_path) \
+                        .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
+                                compressed=True)
+                    print('Solved BEDToolsError when gunzip the file...')
+                else:
+                    # file already not zipped, some novel error...
+                    raise BEDToolsError
 
     # cleanup the tmp bed files.
     if remove_tmp:
         print('Clean tmp Bed file')
         for path in allc_bed_path_dict.values():
-            run(['rm', '-f', path])
-        run(['rm', '-f', out_path_prefix+'.tmp.chrom_order'])
+            if os.path.exists(path):
+                run(['rm', '-f', path])
+            else:  # bed have been unzipped
+                run(['rm', '-f', path[:-3]])
+        run(['rm', '-f', out_path_prefix + '.tmp.chrom_order'])
+        run(['rm', '-f', out_path_prefix + '.tmp.chrom_order.bed'])
+
     cleanup()  # pybedtools tmp files
     print('Finish')
     return
@@ -208,7 +243,7 @@ def map_to_region_register_subparser(subparser):
         type=str,
         required=True,
         nargs='+',
-        help="Methylation context pattern, N for ATCG, H for ATC"
+        help="Space separated methylation context pattern, N for ATCG, H for ATC"
     )
 
     parser_opt.add_argument(

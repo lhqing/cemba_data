@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import h5py
 import inspect
-from numpy import uint32
+import argparse
+from numpy import uint16, uint32
 from scipy.sparse import lil_matrix
 from .qsub import Qsubmitter, qsub_config
 from subprocess import run
@@ -25,10 +26,6 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None
                         remove_tmp=True, tmp_compression=False,
                         total_cpu=50, submission_gap=5,
                         qstat_gap=100, submit=False):
-    # update qsub_config
-    qsub_config['RUNNING_DEFAULT']['TOTAL_CPU'] = str(total_cpu)
-    qsub_config['RUNNING_DEFAULT']['SUBMISSION_GAP'] = str(submission_gap)
-    qsub_config['RUNNING_DEFAULT']['QSTST_GAP'] = str(qstat_gap)
     job_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR']
     if dataset_name is None:  # if dataset name not provided, use time
         dataset_name = cur_time()
@@ -89,7 +86,8 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None
     # Qsub command list
     submitter = Qsubmitter(command_file_path=command_file_path,
                            project_name=project_name,
-                           auto_submit=submit)
+                           auto_submit=submit, total_cpu=total_cpu,
+                           submission_gap=submission_gap, qstat_gap=qstat_gap)
     return submitter
 
 
@@ -113,12 +111,13 @@ def _assemble_dataset(cell_meta_df, out_path,
             # build cell group
             for cell in cell_meta_df.index:
                 cell_group = context_group.require_group(cell)
-                add_lil_matrix_to_cell_group(cell_group=cell_group,
-                                             context=context,
-                                             cell_id=cell,
-                                             region_name=_region_name,
-                                             cell_region_dir=cell_region_dir,
-                                             remove_cell_files=remove_cell_files)
+                _add_lil_matrix_to_cell_group(cell_group=cell_group,
+                                              context=context,
+                                              cell_id=cell,
+                                              region_meta_df=_region_meta,
+                                              region_name=_region_name,
+                                              cell_region_dir=cell_region_dir,
+                                              remove_cell_files=remove_cell_files)
         print()
     # add cell meta
     print('Add cell meta into h5mc')
@@ -153,15 +152,30 @@ def add_df2group(h5_group, name, df, compression='gzip'):
     return
 
 
-def add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_name, cell_region_dir, remove_cell_files):
+def _add_lil_matrix_to_cell_group(cell_group, context, cell_id, region_meta_df,
+                                  region_name, cell_region_dir, remove_cell_files,
+                                  data_dtype=uint16, index_dtype=uint32):
     file_path = f'{cell_region_dir}/{cell_id}.{region_name}_{context}.count_table.bed.gz'
-    df = pd.read_table(file_path, header=None, na_values='.')
-    lil_data = lil_matrix(df[[4, 5]].fillna(0).T.values, dtype=uint32)
+    df = pd.read_table(file_path, header=None, na_values='.', index_col='_id',
+                       names=['chrom', 'start', 'end', '_id', 'mc', 'cov'])
+    # some region maybe dropped during map
+    # (e.g. if ALLC don't have chrM, the intersect step will trim chrM regions.)
+    # Here make sure every region from region_meta_df is in the index
+    df = df.reindex(region_meta_df.index)
+
+    lil_data = lil_matrix(df[['mc', 'cov']].fillna(0).T.values, dtype=uint32)
     mc, cov = lil_data.data
     mc_idx, cov_idx = lil_data.rows
-    cell_group.require_dataset('mc', data=[mc, mc_idx], shape=(2, len(mc)), dtype=uint32, compression='gzip')
-    cell_group.require_dataset('cov', data=[cov, cov_idx], shape=(2, len(cov)), dtype=uint32, compression='gzip')
 
+    mc_group = cell_group.require_group('mc')
+    mc_group.require_dataset('lil_data', data=mc, shape=(1, len(mc)), dtype=data_dtype, compression='gzip')
+    mc_group.require_dataset('lil_index', data=mc_idx, shape=(1, len(mc_idx)), dtype=index_dtype, compression='gzip')
+    mc_group.attrs['shape'] = (1, df.shape[0])  # the real shape of sparse matrix
+
+    cov_group = cell_group.require_group('cov')
+    cov_group.require_dataset('lil_data', data=cov, shape=(1, len(cov)), dtype=data_dtype, compression='gzip')
+    cov_group.require_dataset('lil_index', data=cov_idx, shape=(1, len(cov_idx)), dtype=index_dtype, compression='gzip')
+    cov_group.attrs['shape'] = (1, df.shape[0])  # the real shape of sparse matrix
     if remove_cell_files:
         run(['rm', '-f', file_path])
     return
@@ -189,7 +203,8 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                     dataset_col=None, allc_path_col='ALLC_path', select_cells=False,
                     region_bed_path=None, region_name=None,
                     context_pattern=None, max_cov_cutoff=None,
-                    total_cpu=50, submission_gap=5, qstat_gap=100):
+                    total_cpu=50, submission_gap=5, qstat_gap=100,
+                    remove_cell_files=True, test=False):
     generation_note = {'assembly_time': cur_time()}
 
     # prepare refs, change None in to default from config
@@ -214,7 +229,14 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
     else:
         if dataset_col is None:
             raise ValueError('dataset_col can not be None, when select_cells is True')
-    cell_meta_df = parse_cell_meta_df(cell_meta_path, dataset_name, dataset_col, index_col=cell_id_col)
+    cell_meta_df = parse_cell_meta_df(cell_meta_path,
+                                      datasets=dataset_name,  # select dataset based on name
+                                      dataset_col=dataset_col,
+                                      index_col=cell_id_col)
+    if test:
+        print('Test=True, use the first 10 cells to do test run...')
+        if cell_meta_df.shape[0] > 10:
+            cell_meta_df = cell_meta_df.iloc[:10, :]
     # rename required cols for standard: cell id, dataset, allc path
     if dataset_col is None:
         dataset_col = 'dataset'
@@ -254,7 +276,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                       region_name=region_name,
                       context_list=context_pattern,
                       cell_region_dir=out_dir,
-                      remove_cell_files=True)
+                      remove_cell_files=remove_cell_files)
 
     # write generation note to h5mc file
     # add qsub, ref config and function parameters to h5mc
@@ -266,5 +288,173 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
         arg_dict = {k: str(v) for k, v in local_var.items() if k in args}
         h5f.attrs['assembly_args'] = json.dumps(arg_dict)
         h5f.attrs['generation_note'] = json.dumps(generation_note)
+
+    return
+
+
+def prepare_dataset_register_subparser(subparser):
+    parser = subparser.add_parser('prepare-dataset',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Prepare region level methylation dataset for "
+                                       "a group of cells defined by a cell metadata table "
+                                       "and several reference region sets defined by BED files. \n"
+                                       "All data will be saved into a .h5mc file, which is a customized hdf5 file.")
+    parser.set_defaults(func=prepare_dataset)
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--cell_meta_path",
+        type=str,
+        required=True,
+        help="Cell metadata table. Format requirement: "
+             "1. Must contain a header line. "
+             "2. Must have these columns (column name can be specified by corresponding parameters): "
+             "   a. cell_id: unique id for each cell; "
+             "   b. ALLC_path: ALLC file path for each cell. Cell without ALLC path will be ignored. "
+             "3. Optional columns: "
+             "   a. dataset: contains the dataset for each cell; "
+             "   b. other cell information. "
+    )
+
+    parser_req.add_argument(
+        "--dataset_name",
+        type=str,
+        required=True,
+        help="Dataset name"
+    )
+
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="Output directory"
+    )
+
+    parser_req.add_argument(
+        "--genome",
+        type=str,
+        required=True,
+        help="Genome used in assembly."
+    )
+
+    parser_opt.add_argument(
+        "--cell_id_col",
+        type=str,
+        required=False,
+        default='_id',
+        help="Name of the cell_id column in cell metadata table."
+             " Must specify if different from default."
+    )
+
+    parser_opt.add_argument(
+        "--dataset_col",
+        type=str,
+        required=False,
+        default='dataset',
+        help="Name of the dataset column in cell metadata table. "
+             "Must specify if different from default."
+    )
+
+    parser_opt.add_argument(
+        "--allc_path_col",
+        type=str,
+        required=False,
+        default='ALLC_path',
+        help="Name of the ALLC_path column in cell metadata table. "
+             "Must specify if different from default."
+    )
+
+    parser_opt.add_argument(
+        "--select_cells",
+        type=str,
+        required=False,
+        default=False,
+        help="If true, will filter cells based on --dataset_name in --dataset_col; \n"
+             "If false, will use all cells from the cell metadata table"
+    )
+
+    parser_opt.add_argument(
+        "--region_bed_path",
+        type=str,
+        required=False,
+        default=None,
+        nargs='+',
+        help="Space separated region BED file paths for ALLC map-to-region function. "
+             "If None, will use default files from config"
+    )
+
+    parser_opt.add_argument(
+        "--region_name",
+        type=str,
+        required=False,
+        default=None,
+        nargs='+',
+        help="Space separated region names corresponding to --region_bed_path. "
+             "If None, will use default names from config"
+    )
+
+    parser_opt.add_argument(
+        "--context_pattern",
+        type=str,
+        required=False,
+        default=None,
+        nargs='+',
+        help="Space separated methylation context pattern, N for ATCG, H for ATC. "
+             "If None, will use default context patterns from config"
+    )
+
+    parser_opt.add_argument(
+        "--max_cov_cutoff",
+        type=int,
+        required=False,
+        default=None,
+        help="Maximum cutoff for coverage in each base, "
+             "e.g. 2 for single cell data, None for bulk seq."
+    )
+
+    parser_opt.add_argument(
+        "--total_cpu",
+        type=int,
+        required=False,
+        default=None,
+        help="Total CPU used in qsub. "
+             "If None, will use default from config"
+    )
+
+    parser_opt.add_argument(
+        "--submission_gap",
+        type=int,
+        required=False,
+        default=None,
+        help="Qsub job submission gap. "
+             "If None, will use default from config"
+    )
+
+    parser_opt.add_argument(
+        "--qstat_gap",
+        type=int,
+        required=False,
+        default=None,
+        help="Qstat query gap. "
+             "If None, will use default from config"
+    )
+
+    parser_opt.add_argument(
+        "--remove_cell_files",
+        type=bool,
+        required=False,
+        default=True,
+        help="Remove cell-region methylation tsv.gz file or not."
+    )
+
+    parser_opt.add_argument(
+        "--test",
+        type=bool,
+        required=False,
+        default=False,
+        help="Test mode, only use the first 10 valid cells to do a test run."
+    )
 
     return

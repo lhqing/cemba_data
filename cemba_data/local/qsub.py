@@ -42,7 +42,9 @@ def check_qstat(id_set=None):
 
 
 class Qsubmitter:
-    def __init__(self, command_file_path, project_name, auto_submit=False, qacct=False, resubmit=None):
+    def __init__(self, command_file_path, project_name,
+                 auto_submit=False, qacct=False, resubmit=None,
+                 total_cpu=None, submission_gap=None, qstat_gap=None):
         self.command_file_path = command_file_path
         self.project_name = project_name
         self.project_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR'] + '/' + project_name
@@ -58,6 +60,20 @@ class Qsubmitter:
         self.qsub_failed_commands = []  # modify this with check_command_finish_status
         self.cmd_failed_commands = []  # modify this with check_command_finish_status
         self.check_qacct = qacct  # check qacct is slow if the log is too large, only check it in debugging
+        self.finish_count = 0
+        if total_cpu is None:
+            self.total_cpu = int(qsub_config['RUNNING_DEFAULT']['TOTAL_CPU'])
+        else:
+            self.total_cpu = total_cpu
+        if submission_gap is None:
+            self.submission_gap = int(qsub_config['RUNNING_DEFAULT']['SUBMISSION_GAP'])
+        else:
+            self.submission_gap = submission_gap
+        if qstat_gap is None:
+            self.qstat_gap = int(qsub_config['RUNNING_DEFAULT']['QSTST_GAP'])
+        else:
+            self.qstat_gap = qstat_gap
+
         if auto_submit:
             self.submit(resubmit)
         return
@@ -74,25 +90,20 @@ class Qsubmitter:
                 n += 1
         return obj_list
 
-    def submit(self,
-               total_cpu=int(qsub_config['RUNNING_DEFAULT']['TOTAL_CPU']),
-               submit_gap=int(qsub_config['RUNNING_DEFAULT']['SUBMISSION_GAP']),
-               qstat_gap=int(qsub_config['RUNNING_DEFAULT']['QSTST_GAP']),
-               resubmit=None):
+    def submit(self, resubmit=None):
         # job submission process:
         for command_obj in self.commands:
-            self.submitted_qsub_id.add(command_obj.qsub_id)
             # judge if command has been submitted
             if command_obj.submitted:
                 if resubmit is None:
-                    print('Skip command:', command_obj.unique_id)
+                    # print('Skip command:', command_obj.unique_id)
                     self.check_command_finish_status(command_obj)
                     continue  # not resubmit command
                 elif resubmit == 'fail':
                     # only resubmit failed command
                     if not command_obj.qsub_failed and not command_obj.cmd_failed:
                         # both a success, the job is success
-                        print('Skip command:', command_obj.unique_id)
+                        # print('Skip command:', command_obj.unique_id)
                         self.check_command_finish_status(command_obj)
                         continue
                     else:
@@ -104,11 +115,11 @@ class Qsubmitter:
                     raise ValueError('resubmit only allow None, fail or all. Got', resubmit)
 
             command_cpu = int(command_obj.qsub_parameter['-pe smp'])
-            if self.running_cpu + command_cpu > total_cpu:
+            if self.running_cpu + command_cpu > self.total_cpu:
                 while True:
-                    time.sleep(qstat_gap)
+                    time.sleep(self.qstat_gap)
                     self.check_running_cpu()
-                    if self.running_cpu <= total_cpu:
+                    if self.running_cpu <= self.total_cpu:
                         break
             print('Submit job:', command_obj.unique_id)
             command_obj.submit()
@@ -117,13 +128,13 @@ class Qsubmitter:
                 self.submission_fail_commands.append(command_obj)
             else:
                 self.running_commands.append(command_obj)
+                self.submitted_qsub_id.add(command_obj.qsub_id)
             self.running_cpu += command_cpu
-            time.sleep(submit_gap)
+            time.sleep(self.submission_gap)
 
         # final job check:
         while True:
-            print(qstat_gap)
-            time.sleep(qstat_gap)
+            time.sleep(self.qstat_gap)
             self.check_running_cpu()
             if self.running_cpu == 0:
                 break  # all job finished
@@ -131,15 +142,17 @@ class Qsubmitter:
         return
 
     def check_running_cpu(self):
+        # TODO: check result in the .error.log to see if there is any error
         print('check running job')
         cur_running_qsub_id = check_qstat(self.submitted_qsub_id)
-        print(cur_running_qsub_id)
         # check every running obj
         cur_running_cpu = 0
         cur_running_command = []
         for command_obj in self.running_commands:
             if command_obj.qsub_id not in cur_running_qsub_id:
                 # command have finished
+                self.finish_count += 1
+
                 if self.check_qacct:
                     print(command_obj.unique_id, 'qacct')
                     if command_obj.query_qacct() != 0:
@@ -150,7 +163,7 @@ class Qsubmitter:
             else:
                 cur_running_command.append(command_obj)
                 cur_running_cpu += int(command_obj.qsub_parameter['-pe smp'])
-
+        print(f'{self.finish_count} / {len(self.commands)} job finished in this submission.')
         self.running_commands = cur_running_command
         # update running cpu
         self.running_cpu = cur_running_cpu
@@ -184,7 +197,9 @@ class Qsubmitter:
                         f.write('\n'.join(self.cmd_failed_commands))
                     summary.write(f'See qsub failed command id in {self.project_dir}/cmd_failed_commands.txt\n')
             else:
-                summary.write('check_qacct = False, if want to get the finish code for each job, set qacct=True in Qsubmitter')
+                summary.write('check_qacct = False, '
+                              'if want to get the finish code for each job, '
+                              'set qacct=True in Qsubmitter')
         return
 
 
