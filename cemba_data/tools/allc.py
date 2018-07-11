@@ -7,12 +7,13 @@ from subprocess import run
 import argparse
 import os
 from pandas import Series
+from .methylpy_utilities import merge_allc_files
 
 
 def split_to_bed(allc_path, context_pattern, genome_size_path,
                  out_path_prefix, max_cov_cutoff=None,
                  split_chromosome=False,
-                 compression=True, gzip_level=3):
+                 compression=False, gzip_level=3):
     """
     Split ALLC into bed format, chrom column contain "chr".
     :param allc_path: Single ALLC file path
@@ -93,7 +94,7 @@ def split_to_bed(allc_path, context_pattern, genome_size_path,
     with open(out_path_prefix + '.chrom_order', 'w') as f:
         chrom_series = Series(parse_chrom_szie(genome_size_path)).reindex(chrom_order_list).dropna()
         for chrom, length in chrom_series.iteritems():
-            f.write(f'{chrom}\t{length}\n')
+            f.write(f'{chrom}\t{int(length)}\n')
     return path_dict
 
 
@@ -178,6 +179,7 @@ def map_to_region(allc_path, out_path_prefix,
     # cleanup the tmp bed files.
     if remove_tmp:
         print('Clean tmp Bed file')
+        print(allc_bed_path_dict)
         for path in allc_bed_path_dict.values():
             if os.path.exists(path):
                 run(['rm', '-f', path])
@@ -271,3 +273,62 @@ def map_to_region_register_subparser(subparser):
         help="Compress tmp file (slower but space efficient) or not"
     )
     return
+
+
+def merge_allc(allc_paths, out_path, cpu, index=False):
+    """
+    Just a wrapper of methylpy merge allc
+    :param allc_paths:
+    :param out_path:
+    :param cpu:
+    :return:
+    """
+    merge_allc_files(allc_paths,
+                     out_path,
+                     num_procs=cpu,
+                     mini_batch=100,
+                     compress_output=True,
+                     skip_snp_info=True,
+                     buffer_line_number=100000, index=index)
+    return
+
+
+def merge_allc_register_subparser(subparser):
+    parser = subparser.add_parser('merge-allc',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Just a wrapper of methylpy merge_allc_files, without doing methylpy's index.")
+    parser.set_defaults(func=merge_allc)
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_paths",
+        type=str,
+        required=True,
+        nargs='+',
+        help="Space separated ALLC paths"
+    )
+
+    parser_req.add_argument(
+        "--out_path",
+        type=str,
+        required=True,
+        help="Output path for the merged ALLC file"
+    )
+
+    parser_opt.add_argument(
+        "--cpu",
+        type=int,
+        required=False,
+        default=1,
+        help="Number of CPUs for merge ALLC, parallel on chrom bins level."
+    )
+
+    parser_opt.add_argument(
+        "--index",
+        type=bool,
+        required=False,
+        default=False,
+        help="methylpy default index, not doing it by default."
+    )

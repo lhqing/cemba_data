@@ -7,6 +7,7 @@ import pandas as pd
 import h5py
 import inspect
 import argparse
+import sys
 from numpy import uint16, uint32
 from scipy.sparse import lil_matrix
 from .qsub import Qsubmitter, qsub_config
@@ -36,8 +37,9 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None
         os.mkdir(working_job_dir)
     except OSError:
         print('Note: The job has been submitted before.')
+        sys.stdout.flush()
         print(f'If want to resubmit everything, delete or rename this directory: {working_job_dir}')
-        pass
+        sys.stdout.flush()
 
     # make refs
     genome = genome.upper()
@@ -101,12 +103,14 @@ def _assemble_dataset(cell_meta_df, out_path,
     # build region groups, order: region_set, context, cell
     for _region_name, _region_meta in zip(region_name, region_meta_df):
         print(f'Building {_region_name} group...', end=' ')
+        sys.stdout.flush()
         region_group = h5f.require_group(_region_name)
         # add region meta
         add_df2group(region_group, 'region_meta', _region_meta)
         # build context group
         for context in context_list:
             print(context, end=' ')
+            sys.stdout.flush()
             context_group = region_group.require_group(context)
             # build cell group
             for cell in cell_meta_df.index:
@@ -119,8 +123,10 @@ def _assemble_dataset(cell_meta_df, out_path,
                                               cell_region_dir=cell_region_dir,
                                               remove_cell_files=remove_cell_files)
         print()
+        sys.stdout.flush()
     # add cell meta
     print('Add cell meta into h5mc')
+    sys.stdout.flush()
     add_df2group(h5f, 'cell_meta', cell_meta_df)
 
     h5f.close()
@@ -196,6 +202,7 @@ def parse_cell_meta_df(cell_meta_path, datasets=None, dataset_col=None, index_co
             datasets = [datasets]
         cell_total_df = cell_total_df[cell_total_df[dataset_col].isin(datasets)]
     print('Got %d cells from cell meta table.' % cell_total_df.shape[0])
+    sys.stdout.flush()
     return cell_total_df
 
 
@@ -226,6 +233,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
     if not select_cells:
         dataset_col = None
         print(f'Using all cells from {cell_meta_path}')
+        sys.stdout.flush()
     else:
         if dataset_col is None:
             raise ValueError('dataset_col can not be None, when select_cells is True')
@@ -235,6 +243,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                                       index_col=cell_id_col)
     if test:
         print('Test=True, use the first 10 cells to do test run...')
+        sys.stdout.flush()
         if cell_meta_df.shape[0] > 10:
             cell_meta_df = cell_meta_df.iloc[:10, :]
     # rename required cols for standard: cell id, dataset, allc path
@@ -252,8 +261,10 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
     if cells_no_allc.shape[0] > 0:
         print(f'{cells_no_allc.shape[0]} cell(s) do not have ALLC path, '
               f'removed from cell meta table, see generation note later.')
+        sys.stdout.flush()
         generation_note['cell without ALLC'] = cells_no_allc.index.tolist()
         print(f'{cell_meta_df.shape[0]} cells remained.')
+        sys.stdout.flush()
 
     # map to region
     cell_ids = cell_meta_df[allc_path_col].index.tolist()
@@ -266,6 +277,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                                     qstat_gap=qstat_gap, submit=True)
     # check submitter status before next step
     print(f'{len(submitter.commands)} jobs finished.')
+    sys.stdout.flush()
 
     # make h5 file
     out_path = out_dir + f'/{dataset_name}.h5mc'

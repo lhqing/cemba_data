@@ -4,6 +4,7 @@ import json
 import configparser
 import datetime
 import re
+import sys
 import time
 
 qsub_config = configparser.ConfigParser()
@@ -108,6 +109,7 @@ class Qsubmitter:
                         continue
                     else:
                         print('Resubmit failed command:', command_obj.unique_id)
+                        sys.stdout.flush()
                 elif resubmit == 'all':
                     # resubmit all command
                     pass
@@ -143,7 +145,8 @@ class Qsubmitter:
 
     def check_running_cpu(self):
         # TODO: check result in the .error.log to see if there is any error
-        print('check running job')
+        print('check running job: ', end='')
+        sys.stdout.flush()
         cur_running_qsub_id = check_qstat(self.submitted_qsub_id)
         # check every running obj
         cur_running_cpu = 0
@@ -155,6 +158,7 @@ class Qsubmitter:
 
                 if self.check_qacct:
                     print(command_obj.unique_id, 'qacct')
+                    sys.stdout.flush()
                     if command_obj.query_qacct() != 0:
                         raise ValueError('Command not finished but disappeared in qstat')
                 else:
@@ -164,6 +168,7 @@ class Qsubmitter:
                 cur_running_command.append(command_obj)
                 cur_running_cpu += int(command_obj.qsub_parameter['-pe smp'])
         print(f'{self.finish_count} / {len(self.commands)} job finished in this submission.')
+        sys.stdout.flush()
         self.running_commands = cur_running_command
         # update running cpu
         self.running_cpu = cur_running_cpu
