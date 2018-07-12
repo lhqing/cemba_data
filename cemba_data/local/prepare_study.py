@@ -2,6 +2,8 @@ import configparser
 import os
 import json
 import pandas as pd
+from functools import reduce
+from operator import add
 from ..data.hdf5 import Dataset
 
 
@@ -28,7 +30,6 @@ def prepare_study(project_name, study_name, cell_list, region,
         cell_id_dict = {i: v.index.tolist() for i, v in dataset_series.groupby(dataset_series)}
     else:
         print('cell_id_dict is passed, will ignore cell_list.')
-
     if dataset_path_dict is not None:
         for k in cell_id_dict.keys():
             if k not in dataset_path_dict:
@@ -48,11 +49,53 @@ def prepare_study(project_name, study_name, cell_list, region,
         except KeyError:
             raise KeyError(f'Dataset {k} not found in dataset_config')
 
+    if isinstance(region, str):
+        region = [region]
+    if isinstance(region_context, str):
+        region_context = [region_context]
 
+    if len(region_context) != len(region):
+        raise ValueError('Region context and region do not match.')
+
+    study = None
+    for _study in _get_study_from_datasets_dif_col(dataset_path_dict,
+                                                   cell_id_dict,
+                                                   region,
+                                                   region_context,
+                                                   coverage_cutoff):
+        if study is None:
+            study = _study
+        else:
+            study = study.region_append(_study)
+
+    # TODO: direct save to the out path
+    return study
+
+
+def prepare_study_register_subparser():
+    # TODO: parser for prepare study
     return
 
 
-def _get_study_from_one_dataset(dataset_path, cell_id_list, region, region_context, coverage_cutoff):
-    ds = Dataset(dataset_path, 'r')
-    ds.get_cells_matrix()
-    yield
+def _get_study_from_datasets_same_col(dataset_path_dict, cell_id_dict, region, region_context, coverage_cutoff):
+    """
+    generator of study with same columns, used for add
+    """
+    for dataset, cell_id_list in cell_id_dict.items():
+        ds_path = dataset_path_dict[dataset]
+        ds = Dataset(ds_path, 'r')
+        study = ds.get_mc_rate(region_name=region,
+                               context=region_context,
+                               cov_cutoff=coverage_cutoff,
+                               cells=cell_id_list)
+        yield study
+
+
+def _get_study_from_datasets_dif_col(dataset_path_dict, cell_id_dict, region, region_context, coverage_cutoff):
+    """
+    generator of study with different columns, used for region_append
+    """
+    for _region, _region_context in zip(region, region_context):
+        yield reduce(add, [study for study in _get_study_from_datasets_same_col(
+            dataset_path_dict, cell_id_dict, _region, _region_context, coverage_cutoff
+        )])
