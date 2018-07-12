@@ -45,7 +45,7 @@ def prepare_study(project_name, study_name, cell_list, region,
             raise KeyError(f'Project name {project_name} not in dataset_config. '
                            f'Available projects are: {CURRENT_PROJECT}.')
         try:
-            dataset_path_dict = {dataset_config[project_name][k] for k in cell_id_dict.keys()}
+            dataset_path_dict = {k: dataset_config[project_name][k] for k in cell_id_dict.keys()}
         except KeyError:
             raise KeyError(f'Dataset {k} not found in dataset_config')
 
@@ -70,6 +70,11 @@ def prepare_study(project_name, study_name, cell_list, region,
 
     # TODO: direct save to the out path
     return study
+
+
+def read_from_ann(ann_path):
+    # TODO: this func should only take ann_path as input, try to get all other info from the hdf5
+    return
 
 
 def prepare_study_register_subparser():
