@@ -11,6 +11,11 @@ qsub_config = configparser.ConfigParser()
 qsub_config.read(os.path.dirname(__file__) + '/config_qsub.ini')
 
 
+def print_config():
+    print(json.dumps(qsub_config._sections, indent=4))
+    return
+
+
 def default_command_dict(name, error_path, output_path):
     command_dict = {'command': None,
                     '-N': name,

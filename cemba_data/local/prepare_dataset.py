@@ -17,6 +17,11 @@ ref_path_config = configparser.ConfigParser()
 ref_path_config.read(os.path.dirname(__file__) + '/config_ref_path.ini')
 
 
+def print_config():
+    print(json.dumps(ref_path_config._sections, indent=4))
+    return
+
+
 def cur_time():
     return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 

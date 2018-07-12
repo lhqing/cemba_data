@@ -88,11 +88,20 @@ class Dataset:
         mc_rate = (mc_pass / cov_pass).astype(np.float32)
         # 0 is different from NA
         mc_rate[mc_rate == 0] = 1e-9  # assign 0 to a small number to be compatible with sparse matrix
+        mc_rate[np.isnan(mc_rate)] = 0  # assign 0 to a small number to be compatible with sparse matrix
+        return Study(csr_matrix(mc_rate), column_index, row_index, cov_cutoff, context, region_name)
 
-        return MethylRate(csr_matrix(mc_rate), column_index, row_index, cov_cutoff, context, region_name)
 
+class Study:
+    """
+    For general analysis, currently I actually used AnnData and scanpy,
+    because I don't think its necessary to rebuild the wheels.
+    Study can be easily transferred into AnnData by .to_ann()
 
-class MethylRate:
+    The reason I write Study is to host some methods that is specific to methylation data.
+    The output file of Study is actually AnnData too,
+    which can also be load as a Study using prepare_study.read_from_ann()
+    """
     def __init__(self, mc_rate_csr, col_idx, row_idx, cov_cutoff, context, region_name):
         # input
         self._mc_rate = mc_rate_csr
@@ -125,7 +134,7 @@ class MethylRate:
         :param obj:
         :return:
         """
-        if not isinstance(obj, MethylRate):
+        if not isinstance(obj, Study):
             raise TypeError(f'Adding MethylRate objects with {type(obj)} is not allowed.')
         if self._col_idx.size != obj._col_idx.size or self._region_name != obj._region_name:
             raise ValueError('Adding MethylRate objects must have same regions')
@@ -142,8 +151,8 @@ class MethylRate:
         if new_row_idx.duplicated().sum() != 0:
             raise ValueError('Concatenated cells have duplicate index.')
 
-        return MethylRate(new_mc_rate, self._col_idx, new_row_idx, self._cov_cutoff,
-                          self._context, self._region_name)
+        return Study(new_mc_rate, self._col_idx, new_row_idx, self._cov_cutoff,
+                     self._context, self._region_name)
 
     def __radd__(self, other):
         return self + other
@@ -156,7 +165,7 @@ class MethylRate:
         :param obj: MethylRate object
         :return:
         """
-        if not isinstance(obj, MethylRate):
+        if not isinstance(obj, Study):
             raise TypeError(f'region_append MethylRate objects with {type(obj)}')
         if not self._row_idx.equals(obj._row_idx):
             raise ValueError('region_append MethylRate objects must have same cells')
@@ -187,8 +196,8 @@ class MethylRate:
         new_context = self._context + obj._context
         new_region_name = self._region_name + obj._region_name
         new_cov_cutoff = self._cov_cutoff + obj._cov_cutoff
-        return MethylRate(new_mc_rate, new_col_idx, self._row_idx, new_cov_cutoff,
-                          new_context, new_region_name)
+        return Study(new_mc_rate, new_col_idx, self._row_idx, new_cov_cutoff,
+                     new_context, new_region_name)
 
     @property
     def value(self):
@@ -235,6 +244,9 @@ class MethylRate:
             uns['cell_na_cutoff'] = self._cell_na_cutoff
             rows['cell_mask'] = self._cell_mask
         return AnnData(self._mc_rate, rows, cols, uns=uns)
+
+    def save(self):
+        return
 
 
 def _get_sparse_na_mask(sparse_arr, axis, cutoff):
