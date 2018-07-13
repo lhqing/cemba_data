@@ -126,7 +126,7 @@ class Study:
     2. _row_dict: id and other information of rows
     3. _col_dict: id and other information of cols
     4. _uns_dict: general information
-
+    
     For general analysis, currently I actually use AnnData and scanpy,
     because I don't think its necessary to rebuild the wheels.
     Study can be easily transferred into AnnData by .to_ann()
@@ -135,6 +135,7 @@ class Study:
     The output file of Study is actually AnnData too,
     which can also be load as a Study using prepare_study.read_from_ann()
 
+    TODO Change col, row dict into dataframe
     TODO Distinguish inplace and copy clearly
     TODO Cooperate with the backed mode, currently everything should be in memory
     """
@@ -214,11 +215,12 @@ class Study:
         # row concatenate main data
         new_mc_rate = vstack([self._mc_rate.tocsr(), obj._mc_rate.tocsr()])
         # concatenate essential elements of row_dict
+        # TODO change this into pd.concat
         new_row_dict = {k: np.concatenate([self._row_dict[k], obj._row_dict[k]])
                         for k in _ROW_DICT_ESSENTIAL_KEYS}
 
         # check new row idx, raise if duplicates found
-        if len(set(new_row_dict['row_names'])) != len(new_row_dict['row_names']):
+        if len(set(new_row_dict['row_names'])) != obj._row_dict['row_names']:
             raise ValueError('Concatenated cells have duplicate index.')
 
         # TODO add warning if row_dict or col_dict or uns_dict contain computed attr
