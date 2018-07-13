@@ -34,5 +34,5 @@ dataset = Dataset(path_to_dataset)
 # read a study
 study = Study(path_to_study)
 ```
-For more information, see the [documentation]((https://cemba-data.readthedocs.io/en/latest)).
+For more information, see the [documentation](https://cemba-data.readthedocs.io/en/latest).
 
