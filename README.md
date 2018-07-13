@@ -31,8 +31,11 @@ from cemba_data.data.dataset import Dataset, Study
 
 # read a dataset
 dataset = Dataset(path_to_dataset)
-# read a study
-study = Study(path_to_study)
+
+# read a study 
+study = Study.from_file(path_to_study)
+# or from data
+study = Study(data, rows_dict, cols_dict, uns_dict, study_name)
 ```
 For more information, see the [documentation](https://cemba-data.readthedocs.io/en/latest).
 

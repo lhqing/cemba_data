@@ -87,7 +87,7 @@ class Dataset:
             return mc_sparse_matrix, cov_sparse_matrix, column_index, row_index
 
     # must used func
-    def get_mc_rate(self, region_name, context, cov_cutoff, cells=None):
+    def get_mc_rate(self, region_name, context, cov_cutoff, cells=None, study_name=None):
         mc_sparse_matrix, cov_sparse_matrix, column_index, row_index = \
             self.get_cells_matrix(region_name, context, cells)
 
@@ -99,14 +99,17 @@ class Dataset:
         mc_rate[mc_rate == 0] = 1e-9  # assign 0 to a small number to be compatible with sparse matrix
         mc_rate[np.isnan(mc_rate)] = 0  # assign 0 to a small number to be compatible with sparse matrix
 
-
+        row_dict = {'row_names': row_index}
+        col_dict = {'col_names': column_index,
+                    'context': [context] * len(column_index),
+                    'cov_cutoff': [cov_cutoff] * len(column_index),
+                    'region_set_name': [region_name] * len(column_index)}
 
         return Study(mc_rate_csr=csr_matrix(mc_rate),
-                     col_idx=column_index,
-                     row_idx=row_index,
-                     cov_cutoff=cov_cutoff,
-                     context=context,
-                     region_name=region_name)
+                     col_dict=col_dict,
+                     row_dict=row_dict,
+                     uns_dict=None,
+                     study_name=study_name)
 
 
 _COL_DICT_ESSENTIAL_KEYS = {'col_names',
@@ -174,7 +177,7 @@ class Study:
                 self._uns_dict = uns_dict
         else:
             # init from path
-
+            print('Init study from file:', file_path)
 
         # for convenience
         self._row_idx = self._row_dict['row_names']
@@ -284,9 +287,9 @@ class Study:
         return
 
     @classmethod
-    def read_from_h5ad(cls, path):
+    def from_file(cls, path):
         # TODO
-        return
+        return cls
 
     @property
     def value(self):
