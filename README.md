@@ -36,3 +36,11 @@ study = Study(path_to_study)
 ```
 For more information, see the [documentation](https://cemba-data.readthedocs.io/en/latest).
 
+## Important Reference
+### Single cell:
+- [scanpy](https://github.com/theislab/scanpy)
+- [AnnData](https://github.com/theislab/anndata)
+### Methylation and Epigenomics:
+- [Methylpy](https://github.com/yupenghe/methylpy)
+- [REPTILE](https://github.com/yupenghe/REPTILE)
+
