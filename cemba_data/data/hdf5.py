@@ -2,12 +2,21 @@ import h5py
 import numpy as np
 import pandas as pd
 import json
+import datetime
 from ast import literal_eval
 from scipy.sparse import csr_matrix, lil_matrix, vstack, hstack
 from anndata import AnnData
 
 
+def cur_time():
+    return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
 class Dataset:
+    # TODO change the general sparse format into csc/csr. lil is no good
+    # TODO learn the implementation of AnnData at this part first
+    # TODO more about HDF5 links and the backed mode
+
     def __init__(self, h5mc_path, mode='r'):
         self.h5f = h5py.File(h5mc_path, mode=mode)
         return
@@ -89,164 +98,32 @@ class Dataset:
         # 0 is different from NA
         mc_rate[mc_rate == 0] = 1e-9  # assign 0 to a small number to be compatible with sparse matrix
         mc_rate[np.isnan(mc_rate)] = 0  # assign 0 to a small number to be compatible with sparse matrix
-        return Study(csr_matrix(mc_rate), column_index, row_index, cov_cutoff, context, region_name)
+
+
+
+        return Study(mc_rate_csr=csr_matrix(mc_rate),
+                     col_idx=column_index,
+                     row_idx=row_index,
+                     cov_cutoff=cov_cutoff,
+                     context=context,
+                     region_name=region_name)
+
+
+_COL_DICT_ESSENTIAL_KEYS = {'col_names',
+                            'cov_cutoff',
+                            'context',
+                            'region_set_name'}
+_ROW_DICT_ESSENTIAL_KEYS = {'row_names'}
 
 
 class Study:
     """
-    For general analysis, currently I actually use AnnData and scanpy,
-    because I don't think its necessary to rebuild the wheels.
-    Study can be easily transferred into AnnData by .to_ann()
+    Study contains 4 major part:
+    1. _mc_rate: mC%
+    2. _row_dict: id and other information of rows
+    3. _col_dict: id and other information of cols
+    4. _uns_dict: general information
 
-    The reason I write Study is to host some methods that is specific to methylation data.
-    The output file of Study is actually AnnData too,
-    which can also be load as a Study using prepare_study.read_from_ann()
-    """
-    def __init__(self, mc_rate_csr, col_idx, row_idx, cov_cutoff, context, region_name):
-        # input
-        self._mc_rate = mc_rate_csr
-        if isinstance(context, str):
-            # only add context suffix when its str (initial study)
-            self._col_idx = col_idx + '_' + context
-        else:
-            self._col_idx = col_idx
-        self._row_idx = row_idx
-
-        # because region_append may cause multiple region names, cov cutoffs or contexts
-        if isinstance(cov_cutoff, list):
-            self._cov_cutoff = cov_cutoff
-        else:
-            self._cov_cutoff = [cov_cutoff]
-        if isinstance(region_name, list):
-            self._region_name = region_name
-        else:
-            self._region_name = [region_name]
-        if isinstance(context, list):
-            self._context = context
-        else:
-            self._context = [context]
-
-        # mask
-        self._cell_mask = None
-        self._cell_na_cutoff = None
-        self._region_mask = None
-        self._region_na_cutoff = None
-
-    def __add__(self, obj):
-        """
-        row (cell) concatenate
-        :param obj:
-        :return:
-        """
-        if not isinstance(obj, Study):
-            raise TypeError(f'Adding MethylRate objects with {type(obj)} is not allowed.')
-        if self._col_idx.size != obj._col_idx.size or self._region_name != obj._region_name:
-            raise ValueError('Adding MethylRate objects must have same regions')
-        if self._cov_cutoff != obj._cov_cutoff:
-            raise ValueError('Adding MethylRate objects with different cov_cutoff:',
-                             self._cov_cutoff, obj._cov_cutoff)
-        if self._context != obj._context:
-            raise ValueError('Adding MethylRate objects with different context:',
-                             self._context, obj._context)
-
-        new_mc_rate = vstack([self._mc_rate.tocsr(), obj._mc_rate.tocsr()])
-        new_row_idx = pd.Series(np.concatenate([self._row_idx, obj._row_idx]))
-        # check new row idx, raise if duplicates found
-        if new_row_idx.duplicated().sum() != 0:
-            raise ValueError('Concatenated cells have duplicate index.')
-
-        return Study(new_mc_rate, self._col_idx, new_row_idx, self._cov_cutoff,
-                     self._context, self._region_name)
-
-    def __radd__(self, other):
-        return self + other
-
-    # add a function that allows region concatenate
-    def region_append(self, obj):
-        """
-        column (region or context) concatenate
-        :param obj: MethylRate object
-        :return:
-        """
-        if not isinstance(obj, Study):
-            raise TypeError(f'region_append MethylRate objects with {type(obj)}')
-        for x, y in zip(self._row_idx, obj._row_idx):
-            if x != y:
-                raise ValueError('region_append MethylRate objects must have same cells')
-        # region append may allow different cov cutoff
-        # if self._cov_cutoff != obj._cov_cutoff:
-        #     raise ValueError('region_append MethylRate objects with different cov_cutoff:',
-        #                      self._cov_cutoff, obj._cov_cutoff)
-        # region append may also allow different context
-        # if self._context != obj._context:
-        #     raise ValueError('region_append MethylRate objects with different context:',
-        #                      self._context, obj._context)
-
-        new_mc_rate = hstack([self._mc_rate.tocsc(), obj._mc_rate.tocsc()])
-        new_col_idx = pd.Series(np.concatenate([self._col_idx, obj._col_idx]))
-
-        # check new col idx, raise if duplicates found
-        if len(set(new_col_idx)) != len(new_col_idx):
-            raise ValueError('Concatenated regions have duplicate names.')
-
-        new_context = self._context + obj._context
-        new_region_name = self._region_name + obj._region_name
-        new_cov_cutoff = self._cov_cutoff + obj._cov_cutoff
-        return Study(new_mc_rate, new_col_idx, self._row_idx, new_cov_cutoff,
-                     new_context, new_region_name)
-
-    @property
-    def value(self):
-        return self._mc_rate
-
-    @property
-    def shape(self):
-        return self._mc_rate.shape
-
-    def filter_cell(self, max_na_rate):
-        self._cell_na_cutoff = max_na_rate
-        if self._region_mask is None:
-            self._cell_mask = _get_sparse_na_mask(self._mc_rate, axis=1, cutoff=max_na_rate)
-        else:
-            self._cell_mask = _get_sparse_na_mask(self._mc_rate[:, np.ravel(self._region_mask)],
-                                                  axis=1, cutoff=max_na_rate)
-        na_rate = '%.1f' % (sum(self._cell_mask) / len(self._cell_mask) * 100)
-        print(f'{sum(self._cell_mask)} cells ({na_rate}%) remained after this cell filter')
-
-    def filter_region(self, max_na_rate):
-        self._region_na_cutoff = max_na_rate
-        if self._cell_mask is None:
-            self._region_mask = _get_sparse_na_mask(self._mc_rate, axis=0, cutoff=max_na_rate)
-        else:
-            self._region_mask = _get_sparse_na_mask(self._mc_rate[np.ravel(self._cell_mask), :],
-                                                    axis=0, cutoff=max_na_rate)
-        na_rate = '%.1f' % (sum(self._region_mask) / len(self._region_mask) * 100)
-        print(f'{sum(self._region_mask)} regions ({na_rate}%) remained after this region filter')
-
-    def reset_filter(self):
-        self._region_mask = None
-        self._region_na_cutoff = None
-        self._cell_mask = None
-        self._cell_na_cutoff = None
-
-    def to_ann(self):
-        rows = {'row_names': self._row_idx}
-        cols = {'col_names': self._col_idx}
-        uns = {}
-        if self._region_na_cutoff is not None:
-            uns['region_na_cutoff'] = self._region_na_cutoff
-            cols['region_mask'] = self._region_mask
-        if self._cell_na_cutoff is not None:
-            uns['cell_na_cutoff'] = self._cell_na_cutoff
-            rows['cell_mask'] = self._cell_mask
-        return AnnData(self._mc_rate, rows, cols, uns=uns)
-
-    def save(self):
-        return
-
-
-class StudyExp:
-    """
     For general analysis, currently I actually use AnnData and scanpy,
     because I don't think its necessary to rebuild the wheels.
     Study can be easily transferred into AnnData by .to_ann()
@@ -254,99 +131,162 @@ class StudyExp:
     The reason I write Study is to host some methods that are specific to methylation data.
     The output file of Study is actually AnnData too,
     which can also be load as a Study using prepare_study.read_from_ann()
+
+    TODO Distinguish inplace and copy clearly
+    TODO Cooperate with the backed mode, currently everything should be in memory
     """
-    def __init__(self, mc_rate_csr, row_dict, col_dict, uns_dict):
-        # input
-        self._mc_rate = mc_rate_csr
-        if isinstance(context, str):
-            # only add context suffix when its str (initial study)
-            self._col_idx = col_idx + '_' + context
-        else:
-            self._col_idx = col_idx
-        self._row_idx = row_idx
 
-        # because region_append may cause multiple region names, cov cutoffs or contexts
-        if isinstance(cov_cutoff, list):
-            self._cov_cutoff = cov_cutoff
-        else:
-            self._cov_cutoff = [cov_cutoff]
-        if isinstance(region_name, list):
-            self._region_name = region_name
-        else:
-            self._region_name = [region_name]
-        if isinstance(context, list):
-            self._context = context
-        else:
-            self._context = [context]
+    def __init__(self, file_path=None, mc_rate_csr=None, col_dict=None, row_dict=None, uns_dict=None, study_name=None):
+        """
+        If col_dict, row_dict, uns_dict provided, use these three directly, ignore corresponding args
+        """
+        if file_path is None:
+            # init from matrix and dicts
 
-        # mask
-        self._cell_mask = None
-        self._cell_na_cutoff = None
-        self._region_mask = None
-        self._region_na_cutoff = None
+            # main data
+            self._mc_rate = mc_rate_csr
+
+            # prepare col_dict
+            # item check of col dict
+            for k in _COL_DICT_ESSENTIAL_KEYS:
+                if k not in col_dict:
+                    raise KeyError(f'{k} not found in col_dict.')
+                else:
+                    if len(col_dict[k]) != mc_rate_csr.shape[1]:
+                        raise ValueError(f'Length of {k} in col_dict is not equal to the cols in data.')
+            self._col_dict = col_dict
+
+            # prepare row dict
+            # item check of row dict
+            for k in _ROW_DICT_ESSENTIAL_KEYS:
+                if k not in row_dict:
+                    raise KeyError(f'{k} not found in row_dict.')
+                else:
+                    if len(row_dict[k]) != mc_rate_csr.shape[0]:
+                        raise ValueError(f'Length of {k} in row_dict is not equal to the rows in data.')
+            self._row_dict = row_dict
+
+            if uns_dict is None:
+                self._uns_dict = {'create_time': cur_time()}
+                if study_name is not None:
+                    self._uns_dict['study_name'] = study_name
+            else:
+                self._uns_dict = uns_dict
+        else:
+            # init from path
+
+
+        # for convenience
+        self._row_idx = self._row_dict['row_names']
+        self._col_idx = self._col_dict['col_names']
 
     def __add__(self, obj):
         """
-        row (cell) concatenate
+        add should only be used in the first step, only take care of the essential attr,
+        computed attr will lose (should because data changed)
+
+        row (cell) concatenate of study.
+        Three things need to be checked before concatenate rows:
+        1. Region names
+        2. Region mc_context
+        3. Region cov_cutoff
+        It make no sense adding cells if these three element is different.
         :param obj:
         :return:
         """
         if not isinstance(obj, Study):
-            raise TypeError(f'Adding MethylRate objects with {type(obj)} is not allowed.')
-        if self._col_idx.size != obj._col_idx.size or self._region_name != obj._region_name:
-            raise ValueError('Adding MethylRate objects must have same regions')
-        if self._cov_cutoff != obj._cov_cutoff:
-            raise ValueError('Adding MethylRate objects with different cov_cutoff:',
-                             self._cov_cutoff, obj._cov_cutoff)
-        if self._context != obj._context:
-            raise ValueError('Adding MethylRate objects with different context:',
-                             self._context, obj._context)
+            raise TypeError(f'Adding Study objects with {type(obj)} is not allowed.')
+        # 1. Region names
+        for x, y in zip(self._col_dict['col_names'], obj._col_dict['col_names']):
+            if x != y:
+                raise ValueError('Study objects must have same regions in same order')
+        # 2. Region mc_context
+        if set(self._col_dict['context']) != set(obj._col_dict['context']):
+            raise ValueError('Adding Study objects with different context.')
+        # 3. Region cov_cutoff
+        if set(self._col_dict['cov_cutoff']) != set(obj._col_dict['cov_cutoff']):
+            raise ValueError('Adding Study objects with different cov_cutoff')
+        # col dict will not changed
 
+        # row concatenate main data
         new_mc_rate = vstack([self._mc_rate.tocsr(), obj._mc_rate.tocsr()])
-        new_row_idx = pd.Series(np.concatenate([self._row_idx, obj._row_idx]))
+        # concatenate essential elements of row_dict
+        new_row_dict = {k: np.concatenate([self._row_dict[k], obj._row_dict[k]])
+                        for k in _ROW_DICT_ESSENTIAL_KEYS}
+
         # check new row idx, raise if duplicates found
-        if new_row_idx.duplicated().sum() != 0:
+        if len(set(new_row_dict['row_names'])) != len(new_row_dict['row_names']):
             raise ValueError('Concatenated cells have duplicate index.')
 
-        return Study(new_mc_rate, self._col_idx, new_row_idx, self._cov_cutoff,
-                     self._context, self._region_name)
+        # TODO add warning if row_dict or col_dict or uns_dict contain computed attr
+
+        return Study(new_mc_rate, col_dict=self._col_dict, row_dict=new_row_dict, uns_dict=None)
 
     def __radd__(self, other):
         return self + other
 
-    # add a function that allows region concatenate
+    def __repr__(self):
+        content = f'Study of {self.shape[0]} cells × {self.shape[1]} regions.\n' \
+                  f'    Col features: {"; ".join(list(self._col_dict.keys()))}\n' \
+                  f'        Region set include: {"; ".join(list(set(self._col_dict["region_set_name"])))}\n' \
+                  f'        mC context include: {"; ".join(list(set(self._col_dict["context"])))}\n' \
+                  f'        coverage cutoff include: {"; ".join(list(set(self._col_dict["cov_cutoff"])))}\n' \
+                  f'    Row features: {"; ".join(list(self._row_dict.keys()))}\n'
+        return content
+
     def region_append(self, obj):
         """
-        column (region or context) concatenate
+        region_append should only be used in the first step, only take care of the essential attr,
+        computed attr will lose (should because data changed)
+
         :param obj: MethylRate object
         :return:
         """
+        # 1. check row
         if not isinstance(obj, Study):
-            raise TypeError(f'region_append MethylRate objects with {type(obj)}')
+            raise TypeError(f'region_append Study objects with {type(obj)}')
         for x, y in zip(self._row_idx, obj._row_idx):
+            # strong check of index
             if x != y:
-                raise ValueError('region_append MethylRate objects must have same cells')
-        # region append may allow different cov cutoff
-        # if self._cov_cutoff != obj._cov_cutoff:
-        #     raise ValueError('region_append MethylRate objects with different cov_cutoff:',
-        #                      self._cov_cutoff, obj._cov_cutoff)
-        # region append may also allow different context
-        # if self._context != obj._context:
-        #     raise ValueError('region_append MethylRate objects with different context:',
-        #                      self._context, obj._context)
+                raise ValueError('Study objects must have same cells in same order')
 
+        # 2. concatenate col
         new_mc_rate = hstack([self._mc_rate.tocsc(), obj._mc_rate.tocsc()])
-        new_col_idx = pd.Series(np.concatenate([self._col_idx, obj._col_idx]))
+        # concatenate essential elements of col_dict
+        new_col_dict = {k: np.concatenate([self._col_dict[k], obj._col_dict[k]])
+                        for k in _COL_DICT_ESSENTIAL_KEYS}
 
-        # check new col idx, raise if duplicates found
-        if len(set(new_col_idx)) != len(new_col_idx):
-            raise ValueError('Concatenated regions have duplicate names.')
+        # check new col idx, warn if duplicates found
+        if len(set(new_col_dict['col_names'])) != len(new_col_dict['col_names']):
+            print('Warning: col_names have duplicates after region_append, '
+                  'use make_col_name_unique() to modify that.')
 
-        new_context = self._context + obj._context
-        new_region_name = self._region_name + obj._region_name
-        new_cov_cutoff = self._cov_cutoff + obj._cov_cutoff
-        return Study(new_mc_rate, new_col_idx, self._row_idx, new_cov_cutoff,
-                     new_context, new_region_name)
+        return Study(new_mc_rate, col_dict=new_col_dict, row_dict=self._row_dict, uns_dict=None)
+
+    def to_ann(self):
+        return AnnData(self._mc_rate, self._row_dict, self._col_dict, uns=self._uns_dict)
+
+    def make_col_name_unique(self, use_key=None):
+        # TODO
+        if use_key is None:
+            # simply add number after dup col_name
+            pass
+        if use_key is not None:
+            # add key items after dup col_name, if still have dup, warn and add number
+            pass
+        return
+
+    def save(self, path, compression, compression_opts):
+        ann = self.to_ann()
+        ann.write(filename=path,
+                  compression=compression,
+                  compression_opts=compression_opts)
+        return
+
+    @classmethod
+    def read_from_h5ad(cls, path):
+        # TODO
+        return
 
     @property
     def value(self):
@@ -356,51 +296,97 @@ class StudyExp:
     def shape(self):
         return self._mc_rate.shape
 
+    @property
+    def cells(self):
+        return self._row_idx
+
+    @property
+    def regions(self):
+        return self._col_idx
+
+    @property
+    def rows(self):
+        return self._row_idx
+
+    @property
+    def columns(self):
+        return self._col_idx
+
+    # Preprocess functions
+
     def filter_cell(self, max_na_rate):
-        self._cell_na_cutoff = max_na_rate
-        if self._region_mask is None:
-            self._cell_mask = _get_sparse_na_mask(self._mc_rate, axis=1, cutoff=max_na_rate)
+        """
+        add row_mask to row_dict under row_na_cutoff,
+        mask is different from view,
+        cell been masked mean to be ignored on any downstream analysis due to low quality.
+        :param max_na_rate:
+        :return:
+        """
+        self._uns_dict['row_na_cutoff'] = max_na_rate
+        if 'col_mask' not in self._col_dict:
+            self._row_dict['row_mask'], _stat = _get_sparse_na_mask(self._mc_rate, axis=1, cutoff=max_na_rate)
         else:
-            self._cell_mask = _get_sparse_na_mask(self._mc_rate[:, np.ravel(self._region_mask)],
-                                                  axis=1, cutoff=max_na_rate)
-        na_rate = '%.1f' % (sum(self._cell_mask) / len(self._cell_mask) * 100)
-        print(f'{sum(self._cell_mask)} cells ({na_rate}%) remained after this cell filter')
+            col_mask = self._col_dict['col_mask']
+            self._row_dict['row_mask'], _stat = _get_sparse_na_mask(self._mc_rate[:, np.ravel(col_mask)],
+                                                                    axis=1, cutoff=max_na_rate)
+        na_rate = '%.1f' % (sum(self._row_dict['row_mask']) / len(self._row_idx) * 100)
+        print(f"{sum(self._row_dict['row_mask'])} cells "
+              f"({na_rate}%, mean={_stat[0]:.2f}, std={_stat[1]:.2f}) remained after this cell filter")
+        return
 
     def filter_region(self, max_na_rate):
-        self._region_na_cutoff = max_na_rate
-        if self._cell_mask is None:
-            self._region_mask = _get_sparse_na_mask(self._mc_rate, axis=0, cutoff=max_na_rate)
+        """
+        add col_mask to col_dict under col_na_cutoff,
+        mask is different from view,
+        cell been masked mean to be ignored on any downstream analysis due to low quality.
+        :param max_na_rate:
+        :return:
+        """
+        self._uns_dict['col_na_cutoff'] = max_na_rate
+        if 'row_mask' not in self._row_dict:
+            self._col_dict['col_mask'], _stat = _get_sparse_na_mask(self._mc_rate, axis=0, cutoff=max_na_rate)
         else:
-            self._region_mask = _get_sparse_na_mask(self._mc_rate[np.ravel(self._cell_mask), :],
-                                                    axis=0, cutoff=max_na_rate)
-        na_rate = '%.1f' % (sum(self._region_mask) / len(self._region_mask) * 100)
-        print(f'{sum(self._region_mask)} regions ({na_rate}%) remained after this region filter')
+            row_mask = self._row_dict['row_mask']
+            self._col_dict['col_mask'], _stat = _get_sparse_na_mask(self._mc_rate[np.ravel(row_mask), :],
+                                                                    axis=0, cutoff=max_na_rate)
+        na_rate = '%.1f' % (sum(self._col_dict['col_mask']) / len(self._col_idx) * 100)
+        print(f"{sum(self._col_dict['col_mask'])} regions "
+              f"({na_rate}%, mean={_stat[0]:.2f}, std={_stat[1]:.2f}) remained after this region filter")
+        return
 
     def reset_filter(self):
-        self._region_mask = None
-        self._region_na_cutoff = None
-        self._cell_mask = None
-        self._cell_na_cutoff = None
+        # use dict remove
+        self._uns_dict.pop("col_na_cutoff", None)
+        self._uns_dict.pop("row_na_cutoff", None)
+        self._row_dict.pop("row_mask", None)
+        self._col_dict.pop("col_mask", None)
+        return
 
-    def to_ann(self):
-        rows = {'row_names': self._row_idx}
-        cols = {'col_names': self._col_idx}
-        uns = {}
-        if self._region_na_cutoff is not None:
-            uns['region_na_cutoff'] = self._region_na_cutoff
-            cols['region_mask'] = self._region_mask
-        if self._cell_na_cutoff is not None:
-            uns['cell_na_cutoff'] = self._cell_na_cutoff
-            rows['cell_mask'] = self._cell_mask
-        return AnnData(self._mc_rate, rows, cols, uns=uns)
+    def normalize_overall_methy(self):
+        # TODO
+        return
 
-    def save(self):
+    def scale(self):
+        # TODO
+        return
+
+    def imputation(self):
+        # TODO
         return
 
 
 def _get_sparse_na_mask(sparse_arr, axis, cutoff):
-    na_mask = np.isnan(sparse_arr.toarray()).sum(axis=axis) / sparse_arr.shape[axis] < cutoff
-    return na_mask
+    """
+    In the sparse matrix, real zero is set to 1e-9, na is set to 0, count 0 is count na
+    :param sparse_arr:
+    :param axis:
+    :param cutoff:
+    :return:
+    """
+    na_rate = 1 - (sparse_arr != 0).sum(axis=axis).A1 / sparse_arr.shape[axis]
+    na_stat = (np.mean(na_rate), np.std(na_rate))
+    na_mask = na_rate < cutoff
+    return na_mask, na_stat
 
 
 def _parse_lil_group(lil_group, sparse_format):
@@ -420,4 +406,3 @@ def _parse_lil_group(lil_group, sparse_format):
         return lil
     else:
         raise NotImplementedError('sparse_format only support coo, csr, csc, lil.')
-

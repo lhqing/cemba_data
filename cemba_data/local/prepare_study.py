@@ -53,9 +53,11 @@ def prepare_study(project_name, study_name, cell_list, region,
         region = [region]
     if isinstance(region_context, str):
         region_context = [region_context]
+    if isinstance(coverage_cutoff, int):
+        coverage_cutoff = [coverage_cutoff]
 
-    if len(region_context) != len(region):
-        raise ValueError('Region context and region do not match.')
+    if len(region_context) != len(region) or len(region_context) != len(coverage_cutoff):
+        raise ValueError('Region context and region and coverage cutoff must have same length.')
 
     study = None
     for _study in _get_study_from_datasets_dif_col(dataset_path_dict,
@@ -100,7 +102,7 @@ def _get_study_from_datasets_dif_col(dataset_path_dict, cell_id_dict, region, re
     """
     generator of study with different columns, used for region_append
     """
-    for _region, _region_context in zip(region, region_context):
+    for _region, _region_context, _coverage_cutoff in zip(region, region_context, coverage_cutoff):
         yield reduce(add, [study for study in _get_study_from_datasets_same_col(
-            dataset_path_dict, cell_id_dict, _region, _region_context, coverage_cutoff
+            dataset_path_dict, cell_id_dict, _region, _region_context, _coverage_cutoff
         )])

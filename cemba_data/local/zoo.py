@@ -7,8 +7,10 @@ more animals are adding...
 
 from .prepare_dataset import ref_path_config
 from .prepare_study import dataset_config
-from multiprocessing import Pool
 import pandas as pd
+import numpy as np
+import collections
+import random
 import functools
 
 
@@ -19,6 +21,7 @@ def _catch_exception(f):
             return f(*args, **kwargs)
         except Exception:
             print('dog is mine, may not work out of lab, plz get your own dog ;)')
+
     return func
 
 
@@ -55,27 +58,52 @@ class _Dog:
     def __init__(self):
         return
 
-    def sample_this(self, obj, rate=None, n=None, axis=None, seed=1994):
+    @staticmethod
+    def sample_this(obj, n=None, frac=None, axis=None, replace=None, weights=None, seed=1994):
         """
         TODO versatile sample function for any array or matrix like data
         """
-        return
+        if frac is None and n is None:
+            raise ValueError(f"frac and n can't be both None")
 
-    def chunk_this(self, obj, bins=None, n=None, axis=None):
+        # must be python iterable object
+        if not isinstance(obj, collections.Iterable):
+            raise TypeError(f"{type(obj)} object is not iterable.")
+
+        if isinstance(obj, (pd.Series, pd.DataFrame)):
+            sample = obj.sample(n=n,
+                                frac=frac,
+                                replace=replace,
+                                weights=weights,
+                                random_state=seed,
+                                axis=axis)
+        elif isinstance(obj, np.ndarray):
+            if len(obj.shape) == 1:
+                # 1D array
+                if frac is not None and n is None:
+                    n = int(obj.size * frac)
+                sample = np.random.choice(obj, size=n, replace=replace, p=weights)
+            else:
+                # TODO nD array
+                print("Out of ability...")
+                return
+        else:
+            if frac is not None and n is None:
+                n = int(len(obj) * frac)
+            if replace:
+                # random choices is with_replacment
+                sample = random.choices(list(obj), weights=weights, k=n)
+            else:
+                sample = random.sample(list(obj), k=n)
+        print(f'Random sample size {len(sample)} for object type {type(obj)}, return type {type(sample)}')
+        return sample
+
+    @staticmethod
+    def chunk_this(obj, bins=None, n=None, axis=None):
         """
         TODO versatile chunk function for any array or matrix like data
         """
         return
-
-    def parallel_this(self, f, cpu):
-        @functools.wraps(f)
-        def func(*args, **kwargs):
-            try:
-                return f(*args, **kwargs)
-            except Exception:
-                print('Dog can not parallel this... Run again see what is wrong...')
-
-        return func
 
 
 dog = _Dog()
