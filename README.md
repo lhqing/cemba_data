@@ -1,4 +1,4 @@
-NOTE: Currently, this pipeline is still under development, I can't promise the API won't change. I will remove this note once I fill confident about the general structure.
+NOTE: Currently, this pipeline is still under development, I can't promise the API won't change. I will remove this note once I feel confident about the general structure.
 
 # CEMBA Data Processing (0.1.1)
 - **Data integration using HDF5**
