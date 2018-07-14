@@ -4,6 +4,7 @@ import datetime
 import inspect
 
 import cemba_data
+# register parser every time add a new func
 from cemba_data.tools.allc import map_to_region_register_subparser
 from cemba_data.tools.allc import merge_allc_register_subparser
 from cemba_data.local.prepare_dataset import prepare_dataset_register_subparser

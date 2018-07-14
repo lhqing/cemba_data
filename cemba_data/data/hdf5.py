@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 import json
 import datetime
+from sklearn.utils import sparsefuncs
+from sklearn.preprocessing import Imputer
 from ast import literal_eval
-from scipy.sparse import csr_matrix, lil_matrix, vstack, hstack
-from anndata import AnnData
+from scipy.sparse import csr_matrix, csc_matrix, issparse, lil_matrix, vstack, hstack
+from anndata import AnnData, read_h5ad
 
 
 def cur_time():
@@ -105,7 +107,7 @@ class Dataset:
                     'cov_cutoff': [cov_cutoff] * len(column_index),
                     'region_set_name': [region_name] * len(column_index)}
 
-        return Study(mc_rate_csr=csr_matrix(mc_rate),
+        return Study(mc_rate=csr_matrix(mc_rate),
                      col_dict=col_dict,
                      row_dict=row_dict,
                      uns_dict=None,
@@ -126,7 +128,7 @@ class Study:
     2. _row_dict: id and other information of rows
     3. _col_dict: id and other information of cols
     4. _uns_dict: general information
-    
+
     For general analysis, currently I actually use AnnData and scanpy,
     because I don't think its necessary to rebuild the wheels.
     Study can be easily transferred into AnnData by .to_ann()
@@ -140,7 +142,7 @@ class Study:
     TODO Cooperate with the backed mode, currently everything should be in memory
     """
 
-    def __init__(self, file_path=None, mc_rate_csr=None, col_dict=None, row_dict=None, uns_dict=None, study_name=None):
+    def __init__(self, file_path=None, mc_rate=None, col_dict=None, row_dict=None, uns_dict=None, study_name=None):
         """
         If col_dict, row_dict, uns_dict provided, use these three directly, ignore corresponding args
         """
@@ -148,7 +150,7 @@ class Study:
             # init from matrix and dicts
 
             # main data
-            self._mc_rate = mc_rate_csr
+            self._mc_rate = mc_rate
 
             # prepare col_dict
             # item check of col dict
@@ -156,7 +158,7 @@ class Study:
                 if k not in col_dict:
                     raise KeyError(f'{k} not found in col_dict.')
                 else:
-                    if len(col_dict[k]) != mc_rate_csr.shape[1]:
+                    if len(col_dict[k]) != mc_rate.shape[1]:
                         raise ValueError(f'Length of {k} in col_dict is not equal to the cols in data.')
             self._col_dict = col_dict
 
@@ -166,7 +168,7 @@ class Study:
                 if k not in row_dict:
                     raise KeyError(f'{k} not found in row_dict.')
                 else:
-                    if len(row_dict[k]) != mc_rate_csr.shape[0]:
+                    if len(row_dict[k]) != mc_rate.shape[0]:
                         raise ValueError(f'Length of {k} in row_dict is not equal to the rows in data.')
             self._row_dict = row_dict
 
@@ -220,12 +222,12 @@ class Study:
                         for k in _ROW_DICT_ESSENTIAL_KEYS}
 
         # check new row idx, raise if duplicates found
-        if len(set(new_row_dict['row_names'])) != obj._row_dict['row_names']:
+        if len(set(new_row_dict['row_names'])) != len(new_row_dict['row_names']):
             raise ValueError('Concatenated cells have duplicate index.')
 
         # TODO add warning if row_dict or col_dict or uns_dict contain computed attr
 
-        return Study(new_mc_rate, col_dict=self._col_dict, row_dict=new_row_dict, uns_dict=None)
+        return Study(mc_rate=new_mc_rate, col_dict=self._col_dict, row_dict=new_row_dict, uns_dict=None)
 
     def __radd__(self, other):
         return self + other
@@ -235,7 +237,7 @@ class Study:
                   f'    Col features: {"; ".join(list(self._col_dict.keys()))}\n' \
                   f'        Region set include: {"; ".join(list(set(self._col_dict["region_set_name"])))}\n' \
                   f'        mC context include: {"; ".join(list(set(self._col_dict["context"])))}\n' \
-                  f'        coverage cutoff include: {"; ".join(list(set(self._col_dict["cov_cutoff"])))}\n' \
+                  f'        coverage cutoff include: {"; ".join(map(str, list(set(self._col_dict["cov_cutoff"]))))}\n' \
                   f'    Row features: {"; ".join(list(self._row_dict.keys()))}\n'
         return content
 
@@ -266,7 +268,7 @@ class Study:
             print('Warning: col_names have duplicates after region_append, '
                   'use make_col_name_unique() to modify that.')
 
-        return Study(new_mc_rate, col_dict=new_col_dict, row_dict=self._row_dict, uns_dict=None)
+        return Study(mc_rate=new_mc_rate, col_dict=new_col_dict, row_dict=self._row_dict, uns_dict=None)
 
     def to_ann(self):
         return AnnData(self._mc_rate, self._row_dict, self._col_dict, uns=self._uns_dict)
@@ -290,8 +292,12 @@ class Study:
 
     @classmethod
     def from_file(cls, path):
-        # TODO
-        return cls
+        ann = read_h5ad(path)  # load everything into memory
+        col_dict = {i: c for i, c in ann.var.iteritems()}
+        col_dict['col_names'] = ann.var.index
+        row_dict = {i: c for i, c in ann.obs.iteritems()}
+        row_dict['row_names'] = ann.obs.index
+        return Study(mc_rate=ann.X, col_dict=col_dict, row_dict=row_dict, uns_dict=ann.uns)
 
     @property
     def value(self):
@@ -367,16 +373,40 @@ class Study:
         self._col_dict.pop("col_mask", None)
         return
 
-    def normalize_overall_methy(self):
-        # TODO
+    def add_row_feature(self, name, data, allow_na=True):
+        row_data = data.reindex(self._row_idx)
+        if not allow_na:
+            if row_data.isnull().sum() != 0:
+                raise ValueError('NA in row feature.')
+        self._row_dict[name] = data
+        return
+
+    def add_col_feature(self, name, data, allow_na=True):
+        col_data = data.reindex(self._col_idx)
+        if not allow_na:
+            if col_data.isnull().sum() != 0:
+                raise ValueError('NA in col feature.')
+        self._col_dict[name] = data
+        return
+
+    def normalize_by_row_feature(self, feature_name):
+        if feature_name not in self._row_dict:
+            raise KeyError(f'{feature_name} not in row_dict')
+        sparsefuncs.inplace_row_scale(self._mc_rate, 1 / self._row_dict[feature_name])
         return
 
     def scale(self):
         # TODO
         return
 
-    def imputation(self):
-        # TODO
+    def imputation(self, missing_values=0, strategy='mean', axis=0, verbose=0, copy=False):
+        # Simple naive imputer
+        Imputer(missing_values=missing_values,  # in mc_rate sparse matrix 0 is NaN, 1e-9 is 0
+                strategy=strategy,
+                axis=axis,  # impute along column
+                verbose=verbose,
+                copy=copy  # inplace imputation
+                ).fit_transform(self._mc_rate)
         return
 
 
@@ -411,3 +441,28 @@ def _parse_lil_group(lil_group, sparse_format):
         return lil
     else:
         raise NotImplementedError('sparse_format only support coo, csr, csc, lil.')
+
+
+def _get_mean_var(X):
+    mean = X.mean(axis=0)
+    if issparse(X):
+        mean_sq = X.multiply(X).mean(axis=0)
+        mean = mean.A1
+        mean_sq = mean_sq.A1
+    else:
+        mean_sq = np.multiply(X, X).mean(axis=0)
+    # enforece R convention (unbiased estimator) for variance
+    var = (mean_sq - mean**2) * (X.shape[0]/(X.shape[0]-1))
+    return mean, var
+
+
+def _combine_mask(key, self_dict, obj_dict):
+    if key in self_dict and key in obj_dict:
+        new_row_mask = [all(l) for l in zip(self_dict[key], obj_dict[key])]
+    elif key in self_dict:
+        new_row_mask = self_dict
+    elif key in obj_dict:
+        new_row_mask = obj_dict
+    else:
+        new_row_mask = None
+    return new_row_mask
