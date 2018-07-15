@@ -274,12 +274,14 @@ class Study:
         return AnnData(self._mc_rate, self._row_dict, self._col_dict, uns=self._uns_dict)
 
     def make_col_name_unique(self, use_key=None):
-        # TODO
         if use_key is None:
             # simply add number after dup col_name
-            pass
+            self._col_dict['col_names'] = self._col_dict['col_names']\
+                                          + '_' + self._col_dict[use_key]
+            self._col_idx = self._col_dict['col_names']
         if use_key is not None:
             # add key items after dup col_name, if still have dup, warn and add number
+            # TODO
             pass
         return
 
@@ -317,11 +319,11 @@ class Study:
 
     @property
     def rows(self):
-        return self._row_idx
+        return self._row_dict
 
     @property
     def columns(self):
-        return self._col_idx
+        return self._col_dict
 
     # Preprocess functions
 
@@ -393,6 +395,7 @@ class Study:
         if feature_name not in self._row_dict:
             raise KeyError(f'{feature_name} not in row_dict')
         sparsefuncs.inplace_row_scale(self._mc_rate, 1 / self._row_dict[feature_name])
+        print(f'mC rate is normalized on each row by {feature_name}, change happened inplace')
         return
 
     def scale(self):
@@ -403,10 +406,12 @@ class Study:
         # Simple naive imputer
         Imputer(missing_values=missing_values,  # in mc_rate sparse matrix 0 is NaN, 1e-9 is 0
                 strategy=strategy,
-                axis=axis,  # impute along column
+                axis=axis,  # 0, along column; 1, along row
                 verbose=verbose,
                 copy=copy  # inplace imputation
                 ).fit_transform(self._mc_rate)
+        print(f'Used sklearn.Imputer to impute by {strategy} along {"column" if axis == 0 else "row"}, '
+              f'change happened inplace')
         return
 
 
