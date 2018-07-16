@@ -11,7 +11,7 @@ setup(
     description='A package for processing and analyzing single cell sequencing data.',
     long_description=open('README.md').read(),
     include_package_data=True,
-    install_requires=['pandas', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn'],
+    install_requires=['pandas', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy'],
     entry_points={
         'console_scripts': ['yap=cemba_data.parser:get_common_parser'],
     }

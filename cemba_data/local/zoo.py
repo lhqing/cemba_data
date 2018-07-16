@@ -42,7 +42,7 @@ class _Cat:
         self.dataset_config = dataset_config
         self.ref_path_config = ref_path_config
 
-        self.mouse_gene_gtf = pd.read_table(ref_path_config['mm10']['GENE_FLAT_GTF'],
+        self.mouse_gene_gtf = pd.read_table(ref_path_config['MM10']['GENE_FLAT_GTF'],
                                             header=0, index_col='gene_id')
         return
 
