@@ -142,45 +142,37 @@ class Study:
     TODO Cooperate with the backed mode, currently everything should be in memory
     """
 
-    def __init__(self, file_path=None, mc_rate=None, col_dict=None, row_dict=None, uns_dict=None, study_name=None):
+    def __init__(self, mc_rate=None, col_dict=None, row_dict=None, uns_dict=None, study_name=None):
         """
         If col_dict, row_dict, uns_dict provided, use these three directly, ignore corresponding args
         """
-        if file_path is None:
-            # init from matrix and dicts
-
-            # main data
-            self._mc_rate = mc_rate
-
-            # prepare col_dict
-            # item check of col dict
-            for k in _COL_DICT_ESSENTIAL_KEYS:
-                if k not in col_dict:
-                    raise KeyError(f'{k} not found in col_dict.')
-                else:
-                    if len(col_dict[k]) != mc_rate.shape[1]:
-                        raise ValueError(f'Length of {k} in col_dict is not equal to the cols in data.')
-            self._col_dict = col_dict
-
-            # prepare row dict
-            # item check of row dict
-            for k in _ROW_DICT_ESSENTIAL_KEYS:
-                if k not in row_dict:
-                    raise KeyError(f'{k} not found in row_dict.')
-                else:
-                    if len(row_dict[k]) != mc_rate.shape[0]:
-                        raise ValueError(f'Length of {k} in row_dict is not equal to the rows in data.')
-            self._row_dict = row_dict
-
-            if uns_dict is None:
-                self._uns_dict = {'create_time': cur_time()}
-                if study_name is not None:
-                    self._uns_dict['study_name'] = study_name
+        # init from matrix and dicts
+        # main data
+        self._mc_rate = mc_rate
+        # prepare col_dict
+        # item check of col dict
+        for k in _COL_DICT_ESSENTIAL_KEYS:
+            if k not in col_dict:
+                raise KeyError(f'{k} not found in col_dict.')
             else:
-                self._uns_dict = uns_dict
+                if len(col_dict[k]) != mc_rate.shape[1]:
+                    raise ValueError(f'Length of {k} in col_dict is not equal to the cols in data.')
+        self._col_dict = col_dict
+        # prepare row dict
+        # item check of row dict
+        for k in _ROW_DICT_ESSENTIAL_KEYS:
+            if k not in row_dict:
+                raise KeyError(f'{k} not found in row_dict.')
+            else:
+                if len(row_dict[k]) != mc_rate.shape[0]:
+                    raise ValueError(f'Length of {k} in row_dict is not equal to the rows in data.')
+        self._row_dict = row_dict
+        if uns_dict is None:
+            self._uns_dict = {'create_time': cur_time()}
+            if study_name is not None:
+                self._uns_dict['study_name'] = study_name
         else:
-            # init from path
-            print('Init study from file:', file_path)
+            self._uns_dict = uns_dict
 
         # for convenience
         self._row_idx = self._row_dict['row_names']
@@ -241,6 +233,33 @@ class Study:
                   f'    Row features: {"; ".join(list(self._row_dict.keys()))}\n'
         return content
 
+    def __getitem__(self, item):
+        cls = type(self)
+
+        row_dict = self._row_dict
+        col_dict = self._col_dict
+        uns_dict = self._uns_dict
+
+        # the row and col dict select
+        if isinstance(item, (slice, list)):
+            row_dict = _slice_dict(self._row_dict, item)
+            data = self._mc_rate[item, :]
+        elif isinstance(item, tuple):
+            # multiple axis
+            if len(item) > 2:
+                raise NotImplementedError('Index have {len(item)} dimensions, only accept 1 or 2')
+            elif len(item) == 2:
+                row_dict = _slice_dict(self._row_dict, item[0])
+                col_dict = _slice_dict(self._col_dict, item[1])
+                data = self._mc_rate.tocsr()[item[0], :]
+                data = data.tocsc()[:, item[1]]
+            else:
+                return self.__getitem__(list(item))
+        else:
+            raise NotImplementedError('Index can not be int yet, should be a slice or list')
+        # the data selection is direct passed to np/scipy
+        return cls(mc_rate=data, col_dict=col_dict, row_dict=row_dict, uns_dict=uns_dict, study_name=None)
+
     def region_append(self, obj):
         """
         region_append should only be used in the first step, only take care of the essential attr,
@@ -274,12 +293,12 @@ class Study:
         return AnnData(self._mc_rate, self._row_dict, self._col_dict, uns=self._uns_dict)
 
     def make_col_name_unique(self, use_key=None):
-        if use_key is None:
+        if use_key is not None:
             # simply add number after dup col_name
             self._col_dict['col_names'] = self._col_dict['col_names']\
                                           + '_' + self._col_dict[use_key]
             self._col_idx = self._col_dict['col_names']
-        if use_key is not None:
+        if use_key is None:
             # add key items after dup col_name, if still have dup, warn and add number
             # TODO
             pass
@@ -471,3 +490,32 @@ def _combine_mask(key, self_dict, obj_dict):
     else:
         new_row_mask = None
     return new_row_mask
+
+
+def _slice_dict(attr_dict, select):
+    # only select row
+    # TODO change this function once change the dict into df
+    df = pd.DataFrame(attr_dict)
+    if isinstance(select, slice):
+        return df.iloc[select, :].to_dict('series')
+    elif isinstance(select, list):
+        if isinstance(select[0], str):
+            return df.loc[select, :].to_dict('series')
+        else:
+            return df.iloc[select, :].to_dict('series')
+    else:
+        raise NotImplementedError(f'Not support select type {type(select)}')
+
+
+def combine_filter(s1, s2, axis=0):
+    if axis in [0, 'row']:
+        f1 = s1.rows['row_mask']
+        f2 = s2.rows['row_mask']
+        filter_bool = [all([x, y]) for x, y in zip(f1, f2)]
+    else:
+        f1 = s1.columns['col_mask']
+        f2 = s2.columns['col_mask']
+        filter_bool = list(np.concatenate([f1, f2]))
+    return [idx for idx, filt in enumerate(filter_bool) if filt]
+
+

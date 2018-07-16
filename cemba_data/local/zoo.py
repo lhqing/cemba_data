@@ -20,7 +20,7 @@ def _catch_exception(f):
         try:
             return f(*args, **kwargs)
         except Exception:
-            print('dog is mine, may not work out of lab, plz get your own dog ;)')
+            print('Cat is mine, may not work out of lab, plz get your own cat ;)')
 
     return func
 
@@ -41,6 +41,9 @@ class _Cat:
     def __init__(self):
         self.dataset_config = dataset_config
         self.ref_path_config = ref_path_config
+
+        self.mouse_gene_gtf = pd.read_table(ref_path_config['mm10']['GENE_FLAT_GTF'],
+                                            header=0, index_col='gene_id')
         return
 
     @_catch_exception
@@ -52,6 +55,17 @@ class _Cat:
     def get_human_snmc_cell_table(self, region_list=None):
         cell_meta_path = self.dataset_config['META_TABLE']['HUMAN_SNMC']
         return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='dataset')
+
+    def get_mouse_gene_name(self, gene_id):
+        if len(gene_id) > 6 and gene_id[:7] == 'ENSMUSG':
+            return self.mouse_gene_gtf.loc[gene_id, 'gene_name']
+        else:
+            # gene name is given, return gene id
+            sub_gene_df = self.mouse_gene_gtf[self.mouse_gene_gtf['gene_name'] == gene_id]
+            if sub_gene_df.shape[0] > 1:
+                print(f'Warning, the {gene_id} have {sub_gene_df.shape[0]} matches in gene table.'
+                      f' Return the 1st one.')
+            return sub_gene_df.index[0]
 
 
 class _Dog:
