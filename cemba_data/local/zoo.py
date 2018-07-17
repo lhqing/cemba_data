@@ -12,6 +12,7 @@ import numpy as np
 import collections
 import random
 import functools
+import operator
 
 
 def _catch_exception(f):
@@ -25,13 +26,17 @@ def _catch_exception(f):
     return func
 
 
-def _get_cell_metadata_df(cell_meta_path, region_list, dataset_col):
+def _get_cell_metadata_df(cell_meta_path, region_list, dataset_col, allc_path_col='ALLC_path'):
     cell_total_df = pd.read_table(cell_meta_path, header=0, index_col='_id')
     if region_list is not None:
         if isinstance(region_list, str):
             region_list = region_list.split(' ')
         region_list = set([i.upper() for i in region_list])
         cell_total_df = cell_total_df[cell_total_df[dataset_col].isin(region_list)]
+    if cell_total_df[allc_path_col].isnull().sum() != 0:
+        print('Cell without ALLC path are removed:',
+              cell_total_df[cell_total_df[allc_path_col].isnull()].index.tolist())
+        cell_total_df.dropna(subset=[allc_path_col], inplace=True)
     print('Got %d cells from cell meta table.' % cell_total_df.shape[0])
     print('Got %d regions from cell meta table.' % cell_total_df[dataset_col].unique().size)
     return cell_total_df
@@ -47,14 +52,16 @@ class _Cat:
         return
 
     @_catch_exception
-    def get_cemba_rs1_cell_table(self, region_list=None):
+    def get_cemba_rs1_cell_table(self, region_list=None, allc_path_col='ALLC_path'):
         cell_meta_path = self.dataset_config['META_TABLE']['CEMBA_RS1_METHY']
-        return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='region')
+        return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='region',
+                                     allc_path_col=allc_path_col)
 
     @_catch_exception
-    def get_human_snmc_cell_table(self, region_list=None):
+    def get_human_snmc_cell_table(self, region_list=None, allc_path_col='ALLC_path'):
         cell_meta_path = self.dataset_config['META_TABLE']['HUMAN_SNMC']
-        return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='dataset')
+        return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='dataset',
+                                     allc_path_col=allc_path_col)
 
     def get_mouse_gene_name(self, gene_id):
         if len(gene_id) > 6 and gene_id[:7] == 'ENSMUSG':
@@ -119,6 +126,6 @@ class _Dog:
         """
         return
 
-
+    
 dog = _Dog()
 cat = _Cat()
