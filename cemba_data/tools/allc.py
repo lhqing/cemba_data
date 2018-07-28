@@ -7,7 +7,7 @@ from subprocess import run
 import argparse
 import os
 from pandas import Series
-from .methylpy_utilities import merge_allc_files
+from .methylpy_utilities import merge_allc_files, convert_allc_to_bigwig
 
 
 def split_to_bed(allc_path, context_pattern, genome_size_path,
@@ -275,28 +275,97 @@ def map_to_region_register_subparser(subparser):
     return
 
 
-def merge_allc(allc_paths, out_path, cpu, index=False):
+def merge_allc(allc_paths, out_path, cpu=1,
+               path_list=True, index=False,
+               get_mcg=True, cg_pattern='CGN'):
     """
     Just a wrapper of methylpy merge allc
     :param allc_paths:
     :param out_path:
     :param cpu:
+    :param path_list:
+    :param index:
+    :param get_mcg:
+    :param cg_pattern:
     :return:
     """
-    merge_allc_files(allc_paths,
-                     out_path,
-                     num_procs=cpu,
-                     mini_batch=100,
-                     compress_output=True,
-                     skip_snp_info=True,
-                     buffer_line_number=100000, index=index)
+    if path_list:
+        with open(allc_paths[0]) as f:
+            allc_paths = [i.strip('\n') for i in f.readlines()]
+    if not os.path.exists(out_path+'.gz'):
+        merge_allc_files(allc_paths,
+                         out_path,
+                         num_procs=cpu,
+                         mini_batch=150,
+                         compress_output=False,
+                         skip_snp_info=True,
+                         buffer_line_number=100000,
+                         index=False)
+        # use bgzip and tabix
+        run(['bgzip', out_path])
+
+        if index:
+            run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_path+'.gz'])
+    if get_mcg:
+        extract_mcg(allc_path=out_path+'.gz', out_path=out_path[:-6]+f'{cg_pattern}.tsv.gz', cg_pattern=cg_pattern)
+    return
+
+
+def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern='CGN'):
+    if '.gz' in allc_path[-3:]:
+        opener = partial(gzip.open, mode='rt')
+    else:
+        opener = partial(open, mode='r')
+    writer = partial(gzip.open, mode='wt')
+
+    context_set = parse_mc_pattern(cg_pattern)
+    with opener(allc_path) as allc, \
+            writer(out_path) as out_allc:
+        if header:
+            allc.readline()
+        if merge_strand:
+            prev_line = None
+            cur_chrom = None
+            for line in allc:
+                cur_line = line.strip('\n').split('\t')
+                if cur_line[3] not in context_set:
+                    continue
+                if cur_line[0] != cur_chrom:
+                    if prev_line is not None:
+                        out_allc.write('\t'.join(prev_line) + '\n')
+                    prev_line = cur_line
+                    cur_chrom = cur_line[0]
+                    continue
+                if prev_line is None:
+                    prev_line = cur_line
+                    continue
+                else:
+                    # pos should be continuous, strand should be reverse
+                    if int(prev_line[1]) + 1 == int(cur_line[1]) and prev_line[2] != cur_line[2]:
+                        new_line = prev_line[:4] + [str(int(prev_line[4]) + int(cur_line[4])),
+                                                    str(int(prev_line[5]) + int(cur_line[5])), '1']
+                        out_allc.write('\t'.join(new_line) + '\n')
+                        prev_line = None
+                    # otherwise, only write and update prev_line
+                    else:
+                        out_allc.write('\t'.join(prev_line) + '\n')
+                        prev_line = cur_line
+        else:
+            for line in allc:
+                cur_line = line.strip('\n').split('\t')
+                if cur_line[3] not in context_set:
+                    continue
+                out_allc.write('\t'.join(cur_line)+'\n')
+    print('Extract CG finished:', out_path)
     return
 
 
 def merge_allc_register_subparser(subparser):
     parser = subparser.add_parser('merge-allc',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Just a wrapper of methylpy merge_allc_files, without doing methylpy's index.")
+                                  help="Just a wrapper of methylpy merge_allc_files, "
+                                       "without doing methylpy's index. "
+                                       "But use bgzip and tabix instead")
     parser.set_defaults(func=merge_allc)
 
     parser_req = parser.add_argument_group("Required inputs")
@@ -307,7 +376,8 @@ def merge_allc_register_subparser(subparser):
         type=str,
         required=True,
         nargs='+',
-        help="Space separated ALLC paths"
+        help="Space separated ALLC paths OR a file contains all ALLC paths rows. "
+             "If provide file, set --path_list as True, else, set --path_list as False"
     )
 
     parser_req.add_argument(
@@ -326,9 +396,34 @@ def merge_allc_register_subparser(subparser):
     )
 
     parser_opt.add_argument(
+        "--path_list",
+        type=bool,
+        required=False,
+        default=True,
+        help="indicating the --allc_paths arg is one file contain all ALLC paths (True) "
+             "or a list of ALLC paths (False)."
+    )
+
+    parser_opt.add_argument(
         "--index",
         type=bool,
         required=False,
         default=False,
         help="methylpy default index, not doing it by default."
+    )
+
+    parser_opt.add_argument(
+        "--get_mcg",
+        type=bool,
+        required=False,
+        default=True,
+        help="Generate a CG only, strand merged ALLC file for CG DMR calling."
+    )
+
+    parser_opt.add_argument(
+        "--cg_pattern",
+        type=str,
+        required=False,
+        default='CGN',
+        help="mCG context pattern for --get_mcg."
     )

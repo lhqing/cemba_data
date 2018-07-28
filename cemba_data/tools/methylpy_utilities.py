@@ -357,7 +357,6 @@ def convert_allc_to_bigwig(input_allc_file,
                            min_bin_cov=0,
                            max_site_cov=None,
                            min_site_cov=0,
-                           remove_chr_prefix=True,
                            add_chr_prefix=False
                            ):
     if not isinstance(mc_type, list):
@@ -861,13 +860,6 @@ def merge_allc_files_worker(allc_files,
 
 def get_index_file_name(allc_file):
     return allc_file + ".idx"
-    if allc_file[-4:] == ".tsv":
-        index_file = allc_file[:-4] + ".idx"
-    elif allc_file[-7:] == ".tsv.gz":
-        index_file = allc_file[:-7] + ".idx"
-    else:
-        index_file = allc_file + ".idx"
-    return index_file
 
 
 def index_allc_file_batch(allc_files, num_procs=1, reindex=False):
@@ -887,6 +879,9 @@ def index_allc_file(allc_file, reindex=False):
     index_file = get_index_file_name(allc_file)
     # do not reindex if the index file is available and is complete
     if (not reindex) and os.path.exists(index_file):
+        # do not check completeness
+        return 0
+
         # check index file completeness
         eof_count = 0
         line = False

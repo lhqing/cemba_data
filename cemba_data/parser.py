@@ -8,6 +8,7 @@ import cemba_data
 from cemba_data.tools.allc import map_to_region_register_subparser
 from cemba_data.tools.allc import merge_allc_register_subparser
 from cemba_data.local.prepare_dataset import prepare_dataset_register_subparser
+from cemba_data.local.qsub import qsub_register_subparser
 
 
 def cur_time():

@@ -6,6 +6,7 @@ import datetime
 import re
 import sys
 import time
+import argparse
 
 qsub_config = configparser.ConfigParser()
 qsub_config.read(os.path.dirname(__file__) + '/config_qsub.ini')
@@ -333,3 +334,79 @@ class Command:
         else:
             self.cmd_failed = True
         return
+
+
+def qsub(project_name, command_file_path, total_cpu=None, submission_gap=None, qstat_gap=None):
+    if total_cpu is None:
+        total_cpu = qsub_config['QSUB_DEFAULT']['TOTAL_CPU']
+    if submission_gap is None:
+        submission_gap = qsub_config['QSUB_DEFAULT']['SUBMISSION_GAP']
+    if qstat_gap is None:
+        qstat_gap = qsub_config['QSUB_DEFAULT']['QSTST_GAP']
+
+    job_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR']
+    working_job_dir = job_dir+'/'+project_name
+    try:
+        os.mkdir(working_job_dir)
+    except OSError:
+        print('Note: The job has been submitted before.')
+        print(f'If want to resubmit everything, delete or rename this directory: {working_job_dir}')
+        sys.stdout.flush()
+    run(['cp', command_file_path, working_job_dir])
+
+    submitter = Qsubmitter(command_file_path=command_file_path,
+                           project_name=project_name,
+                           auto_submit=True,
+                           total_cpu=total_cpu,
+                           submission_gap=submission_gap,
+                           qstat_gap=qstat_gap)
+
+    print(f'{len(submitter.commands)} jobs finished.')
+    sys.stdout.flush()
+    return
+
+
+def qsub_register_subparser(subparser):
+    parser = subparser.add_parser('qsub',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="General qsub helper, need to prepare a command dict file")
+    parser.set_defaults(func=qsub)
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--project_name",
+        type=str,
+        required=True,
+        help="Name of the work project"
+    )
+
+    parser_req.add_argument(
+        "--command_file_path",
+        type=str,
+        required=True,
+        help="Path of the command dict file"
+    )
+
+    parser_opt.add_argument(
+        "--total_cpu",
+        type=int,
+        required=False,
+        help="Total CPU in qsub list"
+    )
+
+    parser_opt.add_argument(
+        "--submission_gap",
+        type=int,
+        required=False,
+        help="Submission Gap in qsub list"
+    )
+
+    parser_opt.add_argument(
+        "--qstat_gap",
+        type=int,
+        required=False,
+        help="Qstat check gap in qsub list"
+    )
+    return

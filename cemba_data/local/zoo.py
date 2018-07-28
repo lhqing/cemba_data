@@ -49,6 +49,9 @@ class _Cat:
 
         self.mouse_gene_gtf = pd.read_table(ref_path_config['MM10']['GENE_FLAT_GTF'],
                                             header=0, index_col='gene_id')
+        self.human_gene_gtf = pd.read_table(ref_path_config['HG19']['GENE_FLAT_GTF'],
+                                            header=0, index_col='gene_id')
+
         return
 
     @_catch_exception
@@ -63,11 +66,15 @@ class _Cat:
         return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='dataset',
                                      allc_path_col=allc_path_col)
 
-    def get_mouse_gene_name(self, gene_id):
+    def get_gene_name(self, gene_id, species=None):
         if len(gene_id) > 6 and gene_id[:7] == 'ENSMUSG':
             return self.mouse_gene_gtf.loc[gene_id, 'gene_name']
+        elif len(gene_id) > 4 and gene_id[:4] == 'ENSG':
+            return self.human_gene_gtf.loc[gene_id, 'gene_name']
         else:
             # gene name is given, return gene id
+            if species is None:
+                raise ValueError('Species is None, please specify species when use gene name as input')
             sub_gene_df = self.mouse_gene_gtf[self.mouse_gene_gtf['gene_name'] == gene_id]
             if sub_gene_df.shape[0] > 1:
                 print(f'Warning, the {gene_id} have {sub_gene_df.shape[0]} matches in gene table.'

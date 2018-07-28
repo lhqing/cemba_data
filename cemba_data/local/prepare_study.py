@@ -47,6 +47,7 @@ def prepare_study(project_name, study_name, cell_list, region,
         try:
             dataset_path_dict = {k: dataset_config[project_name][k] for k in cell_id_dict.keys()}
         except KeyError:
+            print(project_name)
             print(cell_id_dict.keys())
             raise KeyError(f'Dataset not found in dataset_config')
 

@@ -53,7 +53,7 @@ def rank_marker_groups(
         use_raw=True,
         groups='all',
         reference='rest',
-        n_genes=100,
+        n_genes=200,
         only_positive=True,
         calc_reverse=True,
         key_added=None,
