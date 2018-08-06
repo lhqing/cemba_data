@@ -275,21 +275,19 @@ def map_to_region_register_subparser(subparser):
     return
 
 
-def merge_allc(allc_paths, out_path, cpu=1,
-               path_list=True, index=False,
+def merge_allc(allc_paths, out_path, cpu=1, index=False,
                get_mcg=True, cg_pattern='CGN'):
     """
     Just a wrapper of methylpy merge allc
     :param allc_paths:
     :param out_path:
     :param cpu:
-    :param path_list:
     :param index:
     :param get_mcg:
     :param cg_pattern:
     :return:
     """
-    if path_list:
+    if len(allc_paths) == 1:
         with open(allc_paths[0]) as f:
             allc_paths = [i.strip('\n') for i in f.readlines()]
     if not os.path.exists(out_path+'.gz'):
@@ -377,7 +375,7 @@ def merge_allc_register_subparser(subparser):
         required=True,
         nargs='+',
         help="Space separated ALLC paths OR a file contains all ALLC paths rows. "
-             "If provide file, set --path_list as True, else, set --path_list as False"
+             "If provide only one path, each row in the file should be a path"
     )
 
     parser_req.add_argument(
@@ -393,15 +391,6 @@ def merge_allc_register_subparser(subparser):
         required=False,
         default=1,
         help="Number of CPUs for merge ALLC, parallel on chrom bins level."
-    )
-
-    parser_opt.add_argument(
-        "--path_list",
-        type=bool,
-        required=False,
-        default=True,
-        help="indicating the --allc_paths arg is one file contain all ALLC paths (True) "
-             "or a list of ALLC paths (False)."
     )
 
     parser_opt.add_argument(
