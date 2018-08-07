@@ -12,7 +12,6 @@ import nrrd
 import os
 import logging
 
-hv.extension('bokeh', 'matplotlib')
 logging.getLogger().setLevel(logging.WARNING)
 
 SLICE_REF_MICRON = {1: 2695, 2: 3290, 3: 3885, 4: 4480, 5: 5075, 6: 5670,
