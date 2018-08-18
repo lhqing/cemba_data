@@ -60,7 +60,8 @@ def pair_plot(data, hue=None, interactive=False, hue_overlay=False,
 
 
 def large_categorical_scatter(x, y, color, data=None, sample=3000, size=5,
-                              height=600, interactive=True, show_legend=False):
+                              height=600, interactive=True, show_legend=False,
+                              plot_kws=None, style_kws=None):
     if interactive:
         # sampling to speed up and prevent over-plotting
         data = sample_data(data, sample)
@@ -68,11 +69,18 @@ def large_categorical_scatter(x, y, color, data=None, sample=3000, size=5,
         value_dimensions = [y]
         data_table = hv.Table(data, key_dimensions, value_dimensions)
 
-        opts_dict = {'Scatter': {'plot': dict(color_index=color,
-                                              width=height,
-                                              height=height,
-                                              show_legend=show_legend),
-                                 'style': dict(size=size)}}
+        if plot_kws is None:
+            plot_kws = {}
+        plot_kws['color_index'] = color
+        plot_kws['width'] = height
+        plot_kws['height'] = height
+        plot_kws['show_legend'] = show_legend
+        if style_kws is None:
+            style_kws = {}
+        style_kws['size'] = size
+
+        opts_dict = {'Scatter': {'plot': plot_kws,
+                                 'style': style_kws}}
         _scatter = data_table.to.scatter(x, y)
         g = _scatter.overlay(color).opts(opts_dict)
     else:

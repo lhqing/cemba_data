@@ -11,19 +11,6 @@ import pandas as pd
 import numpy as np
 import collections
 import random
-import functools
-import operator
-
-
-def _catch_exception(f):
-    @functools.wraps(f)
-    def func(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception:
-            print('Cat is mine, may not work out of lab, plz get your own cat ;)')
-
-    return func
 
 
 def _get_cell_metadata_df(cell_meta_path, region_list, dataset_col, allc_path_col='ALLC_path'):
@@ -54,13 +41,11 @@ class _Cat:
 
         return
 
-    @_catch_exception
     def get_cemba_rs1_cell_table(self, region_list=None, allc_path_col='ALLC_path'):
         cell_meta_path = self.dataset_config['META_TABLE']['CEMBA_RS1_METHY']
         return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='region',
                                      allc_path_col=allc_path_col)
 
-    @_catch_exception
     def get_human_snmc_cell_table(self, region_list=None, allc_path_col='ALLC_path'):
         cell_meta_path = self.dataset_config['META_TABLE']['HUMAN_SNMC']
         return _get_cell_metadata_df(cell_meta_path, region_list, dataset_col='dataset',
