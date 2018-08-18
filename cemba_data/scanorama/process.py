@@ -6,18 +6,19 @@ import sys
 
 MIN_TRANSCRIPTS = 600
 
+
 def load_tab(fname, max_genes=40000):
     if fname.endswith('.gz'):
         opener = gzip.open
     else:
         opener = open
-        
+
     with opener(fname, 'r') as f:
         if fname.endswith('.gz'):
             header = f.readline().decode('utf-8').rstrip().split('\t')
         else:
             header = f.readline().rstrip().split('\t')
-            
+
         cells = header[1:]
         X = np.zeros((len(cells), max_genes))
         genes = []
@@ -28,34 +29,37 @@ def load_tab(fname, max_genes=40000):
                 line = line.decode('utf-8')
             fields = line.rstrip().split('\t')
             genes.append(fields[0])
-            X[:, i] = [ float(f) for f in fields[1:] ]
+            X[:, i] = [float(f) for f in fields[1:]]
     return X[:, range(len(genes))], np.array(cells), np.array(genes)
+
 
 def load_mtx(dname):
     with open(dname + '/matrix.mtx', 'r') as f:
-        f.readline(); f.readline()
+        f.readline();
+        f.readline()
         header = f.readline().rstrip().split()
         n_genes, n_cells = int(header[0]), int(header[1])
 
         X = np.zeros((n_cells, n_genes))
         for line in f:
             fields = line.rstrip().split()
-            X[int(fields[1])-1, int(fields[0])-1] = float(fields[2])
+            X[int(fields[1]) - 1, int(fields[0]) - 1] = float(fields[2])
 
     genes = []
     with open(dname + '/genes.tsv', 'r') as f:
         for line in f:
             fields = line.rstrip().split()
             genes.append(fields[1].upper())
-    assert(len(genes) == n_genes)
+    assert (len(genes) == n_genes)
 
     return X, np.array(genes)
+
 
 def process_tab(fname, min_trans=MIN_TRANSCRIPTS):
     X, cells, genes = load_tab(fname)
 
-    gt_idx = [ i for i, s in enumerate(np.sum(X != 0, axis=1))
-               if s >= min_trans ]
+    gt_idx = [i for i, s in enumerate(np.sum(X != 0, axis=1))
+              if s >= min_trans]
     X = X[gt_idx, :]
     cells = cells[gt_idx]
 
@@ -63,23 +67,25 @@ def process_tab(fname, min_trans=MIN_TRANSCRIPTS):
         cache_prefix = '.'.join(fname.split('.')[:-1])
     elif fname.endswith('.txt.gz'):
         cache_prefix = '.'.join(fname.split('.')[:-2])
-    
+
     cache_fname = cache_prefix + '.npz'
     np.savez(cache_fname, X=X, genes=genes)
 
     return X, cells, genes
 
+
 def process_mtx(dname, min_trans=MIN_TRANSCRIPTS):
     X, genes = load_mtx(dname)
 
-    gt_idx = [ i for i, s in enumerate(np.sum(X != 0, axis=1))
-               if s >= min_trans ]
+    gt_idx = [i for i, s in enumerate(np.sum(X != 0, axis=1))
+              if s >= min_trans]
     X = X[gt_idx, :]
-    
+
     cache_fname = dname + '/tab.npz'
     np.savez(cache_fname, X=X, genes=genes)
 
     return X, genes
+
 
 def load_data(name):
     if os.path.isfile(name + '.npz'):
@@ -94,6 +100,7 @@ def load_data(name):
         sys.stderr.write('Could not find: {}\n'.format(name))
         exit(1)
     return X, genes
+
 
 def load_names(data_names, norm=True, log1p=False, verbose=True):
     # Load datasets.
@@ -118,6 +125,7 @@ def load_names(data_names, norm=True, log1p=False, verbose=True):
 
     return datasets, genes_list, n_cells
 
+
 def merge_datasets(datasets, genes, verbose=True):
     # Find genes in common.
     keep_genes = set()
@@ -140,12 +148,13 @@ def merge_datasets(datasets, genes, verbose=True):
 
         # Do gene filtering.
         gene_sort_idx = np.argsort(uniq_genes)
-        gene_idx = [ idx for idx in gene_sort_idx
-                     if uniq_genes[idx] in keep_genes ]
+        gene_idx = [idx for idx in gene_sort_idx
+                    if uniq_genes[idx] in keep_genes]
         ret_datasets[i] = ret_datasets[i][:, gene_idx]
-        assert(np.array_equal(uniq_genes[gene_idx], ret_genes))
+        assert (np.array_equal(uniq_genes[gene_idx], ret_genes))
 
     return ret_datasets, ret_genes
+
 
 def save_datasets(datasets, genes, data_names, verbose=True,
                   truncate_neg=False):
@@ -160,15 +169,16 @@ def save_datasets(datasets, genes, data_names, verbose=True,
             # Save header.
             of.write('Genes\t')
             of.write('\t'.join(
-                [ 'cell' + str(cell) for cell in range(dataset.shape[0]) ]
+                ['cell' + str(cell) for cell in range(dataset.shape[0])]
             ) + '\n')
 
             for g in range(dataset.shape[1]):
                 of.write(genes[g] + '\t')
                 of.write('\t'.join(
-                    [ str(expr) for expr in dataset[:, g] ]
+                    [str(expr) for expr in dataset[:, g]]
                 ) + '\n')
 
+"""
 if __name__ == '__main__':
     from config import data_names
 
@@ -184,3 +194,4 @@ if __name__ == '__main__':
         else:
             sys.stderr.write('Warning: Could not find {}\n'.format(name))
         print('Successfully processed {}'.format(name))
+"""

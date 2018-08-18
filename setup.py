@@ -4,7 +4,7 @@ cemba_data_version = '0.1.1'
 
 setup(
     name='cemba_data',
-    version='0.1.1',
+    version=cemba_data_version,
     author='Hanqing Liu',
     author_email='hanliu@salk.edu',
     packages=find_packages(),
@@ -12,7 +12,7 @@ setup(
     long_description=open('README.md').read(),
     include_package_data=True,
     install_requires=['pandas', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
-                      'matplotlib', 'seaborn', 'allensdk', 'holoviews', 'IPython'],
+                      'matplotlib', 'seaborn', 'allensdk', 'holoviews', 'IPython', 'annoy', 'fbpca'],
     entry_points={
         'console_scripts': ['yap=cemba_data.parser:get_common_parser'],
     }
