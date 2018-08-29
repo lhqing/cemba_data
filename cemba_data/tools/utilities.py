@@ -1,4 +1,5 @@
 import itertools
+import collections
 
 
 def parse_mc_pattern(pattern):
@@ -19,15 +20,18 @@ def parse_mc_pattern(pattern):
     return context_set
 
 
-def parse_chrom_szie(path):
+def parse_chrom_size(path, add_chr=True):
     """
     return chrom:length dict
     :param path: ucsc chrom.size file
     :return: chrom:length dict
     """
     with open(path) as f:
-        chrom_dict = {}
+        chrom_dict = collections.OrderedDict()
         for line in f:
             chrom, length = line.strip('\n').split('\t')
+            if add_chr:
+                if 'chr' != chrom[:3]:
+                    chrom = 'chr' + chrom
             chrom_dict[chrom] = int(length)
     return chrom_dict
