@@ -120,6 +120,7 @@ def plot_genes(gene_list, ann, s=1, vmin=0.01, vmax=0.99, species='mouse'):
         ax.set_ylabel(f'{base} 2')
     fig.set_size_inches(3 * len(marker_list), 6)
     fig.tight_layout()
+    return fig, axes
 
 
 def anno_gene_ann(gene_ann, compute_ann, cell_meta):

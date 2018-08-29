@@ -26,14 +26,8 @@ def split_to_bed(allc_path, context_pattern, genome_size_path,
     :param gzip_level: compression level, default 3
     :return: Path dict for out put files
     """
-    # check whether chr is in chrom:
-    with gzip.open(allc_path, 'rt') as allc:
-        test_line = allc.readline()
-    add_chr = 'chr' != test_line[:3]
-    cur_chrom = test_line.split('\t')[0]
-    if add_chr:
-        cur_chrom = 'chr' + cur_chrom
-    chrom_order_list = [cur_chrom]
+    chrom_list = set(parse_chrom_szie(genome_size_path).keys())
+    chrom_order_list = []
 
     # prepare context
     if isinstance(context_pattern, str):
@@ -42,7 +36,6 @@ def split_to_bed(allc_path, context_pattern, genome_size_path,
 
     # prepare out path
     if split_chromosome:
-        chrom_list = list(parse_chrom_szie(genome_size_path).keys())
         path_dict = {(c, chrom): out_path_prefix + f'.{c}.{chrom}.bed'
                      for c in context_pattern
                      for chrom in chrom_list}
@@ -59,8 +52,19 @@ def split_to_bed(allc_path, context_pattern, genome_size_path,
     handle_dict = {k: open_func(path) for k, path in path_dict.items()}
 
     # split ALLC
+    first = True
+    add_chr = None
     with gzip.open(allc_path, 'rt') as allc:
         for line in allc:
+            if first:
+                cur_chrom = line.split('\t')[0]
+                add_chr = 'chr' != line[:3]
+                if add_chr:
+                    cur_chrom = 'chr' + cur_chrom
+                if cur_chrom not in chrom_list:
+                    continue
+                chrom_order_list.append(cur_chrom)
+                first = False
             ll = line.split('\t')
             # filter max cov (for single cell data)
             if max_cov_cutoff is not None:
@@ -75,7 +79,7 @@ def split_to_bed(allc_path, context_pattern, genome_size_path,
                 chrom = 'chr' + ll[0]
             else:
                 chrom = ll[0]
-            if chrom == 'chrL':
+            if chrom not in chrom_list:
                 continue
             # record ALLC chrom order
             if chrom != chrom_order_list[-1]:

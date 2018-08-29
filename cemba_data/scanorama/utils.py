@@ -1,11 +1,8 @@
 from fbpca import pca
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 import sys
-mpl.rcParams['figure.figsize'] = [10.0, 9.0]
-mpl.use('Agg')
 
 
 np.random.seed(0)
