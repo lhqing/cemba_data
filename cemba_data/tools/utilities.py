@@ -20,12 +20,14 @@ def parse_mc_pattern(pattern):
     return context_set
 
 
-def parse_chrom_size(path, add_chr=True):
+def parse_chrom_size(path, add_chr=True, remove_chr_list=None):
     """
     return chrom:length dict
     :param path: ucsc chrom.size file
     :return: chrom:length dict
     """
+    if remove_chr_list is None:
+        remove_chr_list = []
     with open(path) as f:
         chrom_dict = collections.OrderedDict()
         for line in f:
@@ -33,5 +35,7 @@ def parse_chrom_size(path, add_chr=True):
             if add_chr:
                 if 'chr' != chrom[:3]:
                     chrom = 'chr' + chrom
+            if chrom in remove_chr_list:
+                continue
             chrom_dict[chrom] = int(length)
     return chrom_dict

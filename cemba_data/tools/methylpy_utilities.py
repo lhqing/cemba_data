@@ -348,7 +348,7 @@ def check_call_mc_dependencies(path_to_samtools="",
 
 def convert_allc_to_bigwig(input_allc_file,
                            output_file,
-                           reference_fasta,
+                           chrom_size_file,
                            mc_type="CGN",
                            bin_size=100,
                            path_to_wigToBigWig="",
@@ -373,18 +373,7 @@ def convert_allc_to_bigwig(input_allc_file,
     chrom_end = {}
 
     # chromosome size
-    try:
-        f = open(reference_fasta + ".fai", 'r')
-    except:
-        print("Reference fasta not indexed. Indexing.")
-        try:
-            subprocess.check_call(shlex.split(path_to_samtools
-                                              + "samtools faidx "
-                                              + reference_fasta))
-            f = open(reference_fasta + ".fai", 'r')
-        except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
-                     + "Please try indexing it manually and running methylpy again.")
+    f = open(chrom_size_file, 'r')
     g = open(output_file + ".chrom_size", 'w')
     for line in f:
         fields = line.split("\t")
@@ -406,6 +395,15 @@ def convert_allc_to_bigwig(input_allc_file,
                 continue
             pos = int(fields[1]) - 1
             if cur_chrom != fields[0] or pos >= bin_end:
+                try:
+                    if fields[0].startswith("chr"):
+                        cur_chrom_end = chrom_end[fields[0]]
+                    else:
+                        cur_chrom_end = chrom_end["chr" + fields[0]]
+                except KeyError:
+                    # chrom not in chrom size file
+                    continue
+
                 if bin_h > 0 and bin_site >= min_bin_sites and bin_h >= min_bin_cov:
                     mc_level = str(float(bin_mc) / float(bin_h))
                     if add_chr_prefix and not cur_chrom.startswith("chr"):
@@ -418,10 +416,7 @@ def convert_allc_to_bigwig(input_allc_file,
                                            str(bin_start),
                                            str(bin_end),
                                            mc_level]) + "\n")
-                if fields[0].startswith("chr"):
-                    cur_chrom_end = chrom_end[fields[0]]
-                else:
-                    cur_chrom_end = chrom_end["chr" + fields[0]]
+
                 if pos >= cur_chrom_end:
                     print_warning("Skip site beyond chromosome boundary: " + line)
                     cur_chrom = fields[0]

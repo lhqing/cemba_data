@@ -11,7 +11,7 @@ from .methylpy_utilities import merge_allc_files
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                         out_path_prefix, max_cov_cutoff=None,
-                        compression=False, gzip_level=2):
+                        compression=False, gzip_level=2, remove_chrm=True):
     """
     Split ALLC into bed format, chrom column contain "chr".
     :param allc_path: Single ALLC file path
@@ -23,7 +23,11 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     :param gzip_level: compression level, default 3
     :return: Path dict for out put files
     """
-    chrom_set = set(parse_chrom_size(genome_size_path).keys())
+    if remove_chrm:
+        remove_chrm = ['chrM']
+    else:
+        remove_chrm = None
+    chrom_set = set(parse_chrom_size(genome_size_path, remove_chr_list=remove_chrm).keys())
 
     # prepare context
     if isinstance(context_pattern, str):
@@ -132,7 +136,9 @@ def map_to_region(allc_path, out_path_prefix,
     # concat bed with ordered chromosome
     tmp_dict = {}
     for c in context_pattern:
-        c_path_list = [allc_bed_path_dict[(c, _chrom)] for _chrom in ref_chrom_dict.keys()]
+        c_path_list = [allc_bed_path_dict[(c, _chrom)]
+                       for _chrom in ref_chrom_dict.keys()
+                       if (c, _chrom) in allc_bed_path_dict]
         cmd = ['cat'] + c_path_list
         concat_bed_path = out_path_prefix + f'.{c}.tmp.total.bed'
         with open(concat_bed_path, 'w') as fh:
@@ -311,6 +317,63 @@ def merge_allc(allc_paths, out_path, cpu=1, index=False,
             run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_path + '.gz'])
     if get_mcg:
         extract_mcg(allc_path=out_path + '.gz', out_path=out_path[:-6] + f'{cg_pattern}.tsv.gz', cg_pattern=cg_pattern)
+    return
+
+
+def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
+    from .methylpy_utilities import convert_allc_to_bigwig
+    convert_allc_to_bigwig(allc_path,
+                           out_path,
+                           chrom_size,
+                           mc_type=mc_type,
+                           bin_size=100,
+                           path_to_wigToBigWig="",
+                           path_to_samtools="",
+                           min_bin_sites=0,
+                           min_bin_cov=0,
+                           max_site_cov=None,
+                           min_site_cov=0,
+                           add_chr_prefix=True
+                           )
+    return
+
+
+def allc_to_bigwig_register_subparser(subparser):
+    parser = subparser.add_parser('allc-to-bigwig',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Just a wrapper of methylpy allc-to-bigwig")
+    parser.set_defaults(func=allc_to_bigwig)
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_path",
+        type=str,
+        required=True,
+        help="ALLC path"
+    )
+    parser_req.add_argument(
+        "--out_path",
+        type=str,
+        required=True,
+        help="Out path"
+    )
+    parser_req.add_argument(
+        "--chrom_size",
+        type=str,
+        required=True,
+        help="UCSC chrom.sizes format indicating genome size. ALLC Chr not in this file will be removed."
+    )
+
+    parser_opt.add_argument(
+        "--mc_type",
+        type=str,
+        required=False,
+        default='CGN',
+        help="mC context pattern to use"
+    )
+
     return
 
 

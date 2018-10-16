@@ -75,9 +75,9 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None
                   f'--region_bed_path {region_bed_path} ' \
                   f'--region_name {region_name} ' \
                   f'--genome_size_path {genome_size_path} ' \
-                  f'--context_pattern {context_pattern} ' \
-                  f'--remove_tmp {remove_tmp} ' \
-                  f'--tmp_compression {tmp_compression} '
+                  f'--context_pattern {context_pattern} '
+        # f'--remove_tmp {remove_tmp} ' \
+        # f'--tmp_compression {tmp_compression} '
         if max_cov_cutoff is not None:
             command += f'--max_cov_cutoff {max_cov_cutoff}'
 

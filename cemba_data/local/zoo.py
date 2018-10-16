@@ -60,7 +60,12 @@ class _Cat:
             # gene name is given, return gene id
             if species is None:
                 raise ValueError('Species is None, please specify species when use gene name as input')
-            sub_gene_df = self.mouse_gene_gtf[self.mouse_gene_gtf['gene_name'] == gene_id]
+            if species.lower() in ['mouse', 'm', 'mm10']:
+                sub_gene_df = self.mouse_gene_gtf[self.mouse_gene_gtf['gene_name'] == gene_id]
+            elif species.lower() in ['human', 'h', 'hg19', 'hg38']:
+                sub_gene_df = self.mouse_gene_gtf[self.human_gene_gtf['gene_name'] == gene_id]
+            else:
+                raise ValueError('Unknown species', species)
             if sub_gene_df.shape[0] > 1:
                 print(f'Warning, the {gene_id} have {sub_gene_df.shape[0]} matches in gene table.'
                       f' Return the 1st one.')

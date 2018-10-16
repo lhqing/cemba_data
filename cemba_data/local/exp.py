@@ -157,12 +157,13 @@ def category_color_transfer(categories, cmap=None, shuffle=False):
     return [colors[index_dict[i]] for i in categories]
 
 
-def plot_cat_scatter(ax, coord_df, colors, coord_name, title,
+def plot_cat_scatter(ax, coord_df, colors, coord_name, title, alpha=0.8,
                      xlim=None, ylim=None, text_size='small', linewidth=1,
-                     auto_border_quantile=0.99, auto_expand=0.1, cmap=None):
-    ax.scatter(x=coord_df.iloc[:, 0], y=coord_df.iloc[:, 1], c=category_color_transfer(colors, cmap=cmap))
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
+                     auto_border_quantile=0.99, auto_expand=0.1, cmap=None, s=10):
+    ax.scatter(x=coord_df.iloc[:, 0], y=coord_df.iloc[:, 1],
+               c=category_color_transfer(colors, cmap=cmap), s=s, alpha=alpha)
+    ax.set_xticks([])
+    ax.set_yticks([])
     ax.set_xlabel(coord_name + ' 1')
     ax.set_ylabel(coord_name + ' 2')
     ax.set_title(title)
