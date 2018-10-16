@@ -86,9 +86,6 @@ def pipeline(fastq_dataframe, out_dir):
     #
 
 
-print(int('1e5'))
-
-
 
 
 
