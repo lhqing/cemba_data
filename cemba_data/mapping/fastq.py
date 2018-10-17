@@ -1,3 +1,9 @@
+"""
+Input: fastq dataframe
+Processes: demultiplex fastq; trim fastq on quality, uniform cut and filter by length; merge lane.
+Output: fastq_final_result dataframe
+"""
+
 import pathlib
 import pandas as pd
 import subprocess

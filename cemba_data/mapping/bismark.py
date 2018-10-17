@@ -1,3 +1,9 @@
+"""
+Input: fastq_final_result dataframe
+Processes: bismark mapping R1 and R2.
+Output: bismark_result dataframe
+"""
+
 import pathlib
 import pandas as pd
 import subprocess

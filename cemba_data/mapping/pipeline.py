@@ -3,15 +3,23 @@ import glob
 import pathlib
 import configparser
 import os
+from .fastq import _demultiplex, _fastq_qc
+from .bismark import _bismark
+from .allc import _call_methylated_sites
+from .bam import _bam_qc
 
 
-def _get_configuration():
+def _get_configuration(config_path=None):
     ref_path_config = configparser.ConfigParser()
-    ref_path_config.read(os.path.dirname(__file__) + '/mapping_config.ini')
+    if config_path is None:
+        print('config path not provided, use default config')
+        ref_path_config.read(os.path.dirname(__file__) + '/mapping_config.ini')
+    else:
+        ref_path_config.read(config_path)
     return ref_path_config
 
 
-def _get_fastq_dataframe(file_path, name_pattern):
+def get_fastq_dataframe(file_path, name_pattern):
     """
     Generate fastq_dataframe for pipeline input.
     :param file_path: Accept 1. path pattern, 2. path list, 3. path of one file contain all the paths.
@@ -66,26 +74,41 @@ def validate_fastq_dataframe(fastq_dataframe):
     return fastq_dataframe
 
 
-def pipeline(fastq_dataframe, out_dir):
+def pipeline(fastq_dataframe, out_dir, config_path=None):
+    # get config
+    config = _get_configuration(config_path)
+
     # validate fastq dataframe
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
 
     # setup out_dir
     out_dir = pathlib.Path(out_dir).absolute()
-    table_dir = out_dir / 'table'
-    fastq_dir = out_dir / 'fastq'
-    bam_dir = out_dir / 'bam'
-    allc_dir = out_dir / 'allc'
+    stat_dir = out_dir / 'stats'
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
-        table_dir.mkdir()
-        fastq_dir.mkdir()
-        bam_dir.mkdir()
-        allc_dir.mkdir()
+        stat_dir.mkdir()
 
-    #
+    # fastq demultiplex
+    demultiplex_df = _demultiplex(fastq_dataframe, out_dir, config)
+    demultiplex_df.to_csv(stat_dir/'demultiplex_result.tsv.gz',
+                          sep='\t', compression='gzip', index=None)
 
+    # fastq qc
+    fastq_final_df = _fastq_qc(demultiplex_df, out_dir, config)
+    fastq_final_df.to_csv(stat_dir/'fastq_trim_result.tsv.gz',
+                          sep='\t', compression='gzip', index=None)
 
+    # bismark
+    bismark_df = _bismark(fastq_final_df, out_dir, config)
+    bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
+                      sep='\t', compression='gzip', index=None)
 
+    # bam
+    bam_df = _bam_qc(bismark_df, out_dir, config)
+    bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
+                  sep='\t', compression='gzip', index=None)
 
-
+    # allc
+    allc_df = _call_methylated_sites(bam_df, out_dir, config)
+    allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
+                   sep='\t', compression='gzip', index=None)

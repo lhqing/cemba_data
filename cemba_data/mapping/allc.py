@@ -206,23 +206,28 @@ Author: Yupeng He
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-"""
 
-# TODO: change this to use config and other standards
+
+Input: bam_result dataframe
+Processes: call allc.
+Output: allc dataframe
+"""
 
 import subprocess
 import shlex
 import pathlib
 import gzip
 import pandas as pd
+import multiprocessing
+import collections
 
 
-def read_faidx(faidx_path):
+def _read_faidx(faidx_path):
     return pd.read_table(faidx_path, index_col=0, header=None,
                          names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
 
 
-def get_chromosome_sequence(fasta_path, fai_df, query_chrom):
+def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
     if query_chrom not in fai_df.index:
         return None
     else:
@@ -238,24 +243,20 @@ def get_chromosome_sequence(fasta_path, fai_df, query_chrom):
         return seq
 
 
-def call_methylated_sites(inputf, reference_fasta,
-                          num_upstr_bases=0,
-                          num_downstr_bases=2,
-                          buffer_line_number=500000,
-                          min_mapq=10,
-                          path_to_samtools="",
-                          min_base_quality=1):
+def _call_methylated_sites_worker(bam_path, reference_fasta,
+                                  num_upstr_bases, num_downstr_bases,
+                                  buffer_line_number, min_mapq, min_base_quality):
     # Check fasta index
     if not pathlib.Path(reference_fasta + ".fai").exists():
         raise FileNotFoundError("Reference fasta not indexed. Use samtools faidx to index it and run again.")
-    fai_df = read_faidx(pathlib.Path(reference_fasta + ".fai"))
+    fai_df = _read_faidx(pathlib.Path(reference_fasta + ".fai"))
 
-    if not pathlib.Path(inputf + ".bai").exists():
+    if not pathlib.Path(bam_path + ".bai").exists():
         print("Input not indexed. Indexing...")
-        subprocess.check_call(shlex.split(path_to_samtools + "samtools index " + inputf))
+        subprocess.check_call(shlex.split("samtools index " + bam_path))
 
     # mpileup
-    mpileup_cmd = f"samtools mpileup -Q {min_base_quality} -q {min_mapq} -B -f {reference_fasta} {inputf}"
+    mpileup_cmd = f"samtools mpileup -Q {min_base_quality} -q {min_mapq} -B -f {reference_fasta} {bam_path}"
     pipes = subprocess.Popen(shlex.split(mpileup_cmd),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
@@ -263,7 +264,7 @@ def call_methylated_sites(inputf, reference_fasta,
     result_handle = pipes.stdout
 
     # Output handel
-    input_path = pathlib.Path(inputf)
+    input_path = pathlib.Path(bam_path)
     file_dir = input_path.parent
     allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
     output_path = str(file_dir / allc_name)
@@ -279,6 +280,8 @@ def call_methylated_sites(inputf, reference_fasta,
     seq = None
     chr_out_pos_list = []
     cur_out_pos = 0
+    cov_dict = collections.defaultdict(int)  # context: cov_total
+    mc_dict = collections.defaultdict(int)  # context: mc_total
     for line in result_handle:
         fields = line.split("\t")
         # if chrom changed, read whole chrom seq from fasta
@@ -286,7 +289,7 @@ def call_methylated_sites(inputf, reference_fasta,
             cur_chrom = fields[0]
             chr_out_pos_list.append((cur_chrom, str(cur_out_pos)))
             # get seq for cur_chrom
-            seq = get_chromosome_sequence(reference_fasta, fai_df, cur_chrom)
+            seq = _get_chromosome_sequence(reference_fasta, fai_df, cur_chrom)
             if seq is not None:
                 seq = seq.upper()
 
@@ -343,6 +346,8 @@ def call_methylated_sites(inputf, reference_fasta,
                 line_counts += 1
                 data = "\t".join([cur_chrom, str(pos + 1), "+", context,
                                   str(unconverted_c), str(cov), "1"]) + "\n"
+                cov_dict[context] += cov
+                mc_dict[context] += unconverted_c
                 out += data
                 cur_out_pos += len(data)
 
@@ -363,6 +368,8 @@ def call_methylated_sites(inputf, reference_fasta,
                 line_counts += 1
                 data = "\t".join([cur_chrom, str(pos + 1), "-", context,
                                   str(unconverted_c), str(cov), "1"]) + "\n"
+                cov_dict[context] += cov
+                mc_dict[context] += unconverted_c
                 out += data
                 cur_out_pos += len(data)
 
@@ -373,8 +380,6 @@ def call_methylated_sites(inputf, reference_fasta,
 
     if line_counts > 0:
         output_filehandler.write(out)
-        line_counts = 0
-        out = ""
     result_handle.close()
     output_filehandler.close()
 
@@ -382,4 +387,38 @@ def call_methylated_sites(inputf, reference_fasta,
         for (chrom, out_pos) in chr_out_pos_list:
             idx_f.write(f'{chrom}\t{out_pos}\n')
 
-    return 0
+    count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
+    count_df['mc_rate'] = count_df['mc'] / count_df['cov']
+    return count_df
+
+
+def _call_methylated_sites(bam_result_df, out_dir, config):
+    reference_fasta = config['callMethylation']['reference_fasta']
+    num_upstr_bases = config['callMethylation']['num_upstr_bases']
+    num_downstr_bases = config['callMethylation']['num_downstr_bases']
+    buffer_line_number = config['callMethylation']['buffer_line_number']
+    min_mapq = config['callMethylation']['min_mapq']
+    min_base_quality = config['callMethylation']['min_base_quality']
+    cores = config['callMethylation']['cores']
+
+    pool = multiprocessing.Pool(cores)
+    results = {}
+    for (uid, index_name), _ in bam_result_df.groupby(['uid', 'index']):
+        final_bam_path = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
+        result = pool.apply_async(_call_methylated_sites_worker,
+                                  (final_bam_path, reference_fasta,
+                                   num_upstr_bases, num_downstr_bases,
+                                   buffer_line_number, min_mapq, min_base_quality))
+        results[(uid, index_name)] = result
+    pool.join()
+    pool.close()
+
+    total_results = []
+    for (uid, index_name), result in results.items():
+        count_df = result.get()
+        count_df['uid'] = uid
+        count_df['index_name'] = index_name
+        total_results.append(count_df)
+    allc_count_df = pd.concat(total_results)
+    return allc_count_df
+
