@@ -4,6 +4,8 @@ import pathlib
 import configparser
 import os
 import logging
+import argparse
+import json
 from datetime import datetime
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
@@ -25,13 +27,14 @@ def _get_configuration(config_path=None):
     return ref_path_config
 
 
-def get_fastq_dataframe(file_path, name_pattern):
+def get_fastq_dataframe(file_path, name_pattern, out_dir=None):
     """
     Generate fastq_dataframe for pipeline input.
     :param file_path: Accept 1. path pattern, 2. path list, 3. path of one file contain all the paths.
     :param name_pattern: Name pattern of file paths, format example: "part1_part2_part3_..._partn",
     should at least contain uid, lane and read_type in the parts. file name are matched to the name patten,
     both should have same length after split by "_".
+    :parm out_dir: dir path for fastq dataframe
     :return: fastq_dataframe, required cols: uid, lane, read-type, fastq-path,
     and other optional cols contain metadata.
     """
@@ -65,18 +68,20 @@ def get_fastq_dataframe(file_path, name_pattern):
     if '*' in fastq_df.columns:
         del fastq_df['*']
     fastq_df['fastq-path'] = valid_list
+
+    if out_dir is not None:
+        fastq_df.to_csv(pathlib.Path(out_dir) / 'fastq_dataframe.tsv.gz',
+                        index=None, sep='\t', compression='gzip')
+
     return fastq_df
 
 
-def validate_fastq_dataframe(fastq_dataframe):
+def _validate_fastq_dataframe(fastq_dataframe):
     if isinstance(fastq_dataframe, str):
         fastq_dataframe = pd.read_table(fastq_dataframe, index_col=None)
     for required in ['uid', 'lane', 'read-type', 'fastq-path']:
         if required not in fastq_dataframe.columns:
             raise ValueError(required, 'not in fastq dataframe columns')
-
-    # TODO add other validations
-
     return fastq_dataframe
 
 
@@ -85,16 +90,14 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     config = _get_configuration(config_path)
 
     # validate fastq dataframe
-    fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
+    fastq_dataframe = _validate_fastq_dataframe(fastq_dataframe)
 
     # setup out_dir
-    out_dir = pathlib.Path(out_dir).absolute()
-    stat_dir = out_dir / 'stats'
+    out_dir = pathlib.Path(out_dir)
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
-        stat_dir.mkdir()
-    fastq_dataframe.to_csv(stat_dir/'fastq_list.tsv.gz',
-                           sep='\t', compression='gzip', index=None)
+    stat_dir = out_dir / 'stats'
+    stat_dir.mkdir()
 
     # setup logger
     logger = logging.getLogger()
@@ -145,3 +148,80 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
     return 0
+
+
+def batch_pipeline(out_dir,
+                   fastq_path=None,
+                   name_pattern=None,
+                   fastq_dataframe_path=None,
+                   config_path=None):
+    out_dir = pathlib.Path(out_dir).absolute()
+    if not out_dir.exists():
+        out_dir.mkdir(parents=True)
+    if config_path is None:
+        config_path = os.path.dirname(__file__) + '/mapping_config.ini'
+    with open(out_dir / 'mapping_config.ini', 'w') as wf, open(config_path, 'r') as f:
+        for line in f:
+            wf.write(line)
+    config_path = out_dir / 'mapping_config.ini'
+
+    if fastq_path is None and fastq_dataframe_path is None:
+        raise ValueError('Both fastq_path and fastq_dataframe_path are None.')
+    elif fastq_dataframe_path is not None:
+        fastq_dataframe = _validate_fastq_dataframe(fastq_dataframe_path)
+    elif fastq_path is not None and name_pattern is None:
+        raise ValueError('fastq_path is provided, but name_pattern is None.')
+    else:
+        fastq_dataframe = get_fastq_dataframe(fastq_path, name_pattern, out_dir=out_dir)
+
+    cmd_list = []
+    for uid, sub_df in fastq_dataframe.groupby('uid'):
+        uid_out_dir = out_dir / uid
+        uid_out_dir.mkdir()
+        uid_fastq_dataframe_path = uid_out_dir/'fastq_list.tsv.gz'
+        sub_df.to_csv(uid_fastq_dataframe_path,
+                      sep='\t', compression='gzip', index=None)
+        uid_cmd = f'yap mapping --fastq_dataframe {uid_fastq_dataframe_path} ' \
+                  f'--out_dir {uid_out_dir} --config_path {config_path}'
+        command_dict = {
+            'command': uid_cmd,
+            '-pe smp': 20,  # cpu for each command
+            # TODO set cup number more cleaver
+        }
+        cmd_list.append(command_dict)
+
+    with open(out_dir / 'command.json', 'w') as f:
+        json.dump(cmd_list, f)
+
+
+def pipeline_register_subparser(subparser):
+    parser = subparser.add_parser('mapping',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
+    parser.set_defaults(func=pipeline)
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--fastq_dataframe",
+        type=str,
+        required=True,
+        help="Path of fastq dataframe, can be generate with yap fastq_dataframe"
+    )
+
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="Pipeline output directory, if not exist, will create recursively."
+    )
+
+    parser_req.add_argument(
+        "--config_path",
+        type=str,
+        required=True,
+        default=None,
+        help="Pipeline configuration (.ini) file path"
+    )
+    return
+

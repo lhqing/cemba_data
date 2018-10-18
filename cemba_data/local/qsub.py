@@ -190,7 +190,7 @@ class Qsubmitter:
         return
 
     def get_reports(self):
-        cur_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        cur_time = datetime.datetime.now().strftime("[%Y-%m-%d]%H:%M:%S")
         with open(self.project_dir + f'/submit_summary.{cur_time}.txt', 'w') as summary:
             summary.write(f'Total Command: {len(self.commands)}\n')
             summary.write(f'Submission Failed Command: {len(self.submission_fail_commands)}\n')

@@ -104,8 +104,8 @@ def demultiplex(fastq_dataframe, out_dir, config):
 
 
 def fastq_qc(demultiplex_result, out_dir, config):
-    pigz_cores = int(config['fastqTrim']['r1_adapter'])
-    cutadapt_cores = int(config['fastqTrim']['r1_adapter'])
+    pigz_cores = int(config['fastqTrim']['pigz_cores'])
+    cutadapt_cores = int(config['fastqTrim']['cutadapt_cores'])
 
     r1_adapter = config['fastqTrim']['r1_adapter']
     r2_adapter = config['fastqTrim']['r1_adapter']

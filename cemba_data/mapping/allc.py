@@ -420,4 +420,3 @@ def call_methylated_sites(bam_result_df, out_dir, config):
         total_results.append(count_df)
     allc_count_df = pd.concat(total_results)
     return allc_count_df
-

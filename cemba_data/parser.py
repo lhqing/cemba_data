@@ -10,6 +10,7 @@ from cemba_data.tools.allc import allc_to_bigwig_register_subparser
 from cemba_data.tools.allc import merge_allc_register_subparser
 from cemba_data.local.prepare_dataset import prepare_dataset_register_subparser
 from cemba_data.local.qsub import qsub_register_subparser
+from cemba_data.mapping.pipeline import pipeline_register_subparser
 
 
 def cur_time():
