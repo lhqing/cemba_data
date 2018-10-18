@@ -50,9 +50,7 @@ def _make_command_dataframe(fastq_dataframe, out_dir, config):
 
 def _read_cutadapt_result(result):
     p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
-    p_name = re.compile(r'First read: Adapter AD\d+')
     series = []
-    adapter_names = []
     for line in result.stdout.split('\n'):
         if line.startswith('Total read pairs processed'):
             locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
@@ -66,19 +64,15 @@ def _read_cutadapt_result(result):
                 result_dict[k] = v
             result_series = pd.Series(result_dict)
             series.append(result_series)
-        m = p_name.search(line)
-        if m is not None:
-            adapter_names.append(m.group().split(' ')[-1])
+
     total_df = pd.DataFrame(series)
     total_df['Trimmed'] = total_df['Trimmed'].apply(lambda i: i.split(' ')[0]).astype(int)
-    total_df['Adepter'] = adapter_names
-    total_df.set_index('Adepter', inplace=True)
     total_df['TotalPair'] = total_pairs
     total_df['Ratio'] = total_df['Trimmed'] / total_pairs
     return total_df
 
 
-def _demultiplex(fastq_dataframe, out_dir, config):
+def demultiplex(fastq_dataframe, out_dir, config):
     multiplex_index_dict = config['multiplexIndex']
     multiplex_index_map = {v: k for k, v in multiplex_index_dict.items()}
     cmd_df = _make_command_dataframe(fastq_dataframe, out_dir, config)
@@ -86,8 +80,8 @@ def _demultiplex(fastq_dataframe, out_dir, config):
     cutadapt_run = functools.partial(subprocess.run,
                                      stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE,
-                                     encoding='utf8')
-
+                                     encoding='utf8',
+                                     check=True)
     total_results = []
     for uid, single_uid_df in cmd_df.groupby('uid'):
         pool = multiprocessing.Pool(cmd_df.shape[0])
@@ -106,14 +100,12 @@ def _demultiplex(fastq_dataframe, out_dir, config):
             total_results.append(result_df)
     total_result_df = pd.concat(total_results, ignore_index=True)
 
-    # clean small fastq
-    # TODO
     return total_result_df
 
 
-def _fastq_qc(demultiplex_result, out_dir, config):
-    pigz_cores = 4
-    cutadapt_cores = 4
+def fastq_qc(demultiplex_result, out_dir, config):
+    pigz_cores = int(config['fastqTrim']['r1_adapter'])
+    cutadapt_cores = int(config['fastqTrim']['r1_adapter'])
 
     r1_adapter = config['fastqTrim']['r1_adapter']
     r2_adapter = config['fastqTrim']['r1_adapter']
@@ -128,6 +120,8 @@ def _fastq_qc(demultiplex_result, out_dir, config):
     for (uid, index_name), sub_df in demultiplex_result.groupby(['uid', 'index_name']):
         sample_demultiplex_total = sub_df['Trimmed'].sum()
         if sample_demultiplex_total < total_reads_threshold:
+            print(uid, index_name,
+                  'skipped due to too less reads:', sample_demultiplex_total)
             continue
         # process R1
         r1_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R1.fq.gz'
@@ -137,7 +131,9 @@ def _fastq_qc(demultiplex_result, out_dir, config):
                  f'-q {quality_threshold} -u {left_cut} ' \
                  f'-u -{right_cut} -m {length_threshold} ' \
                  f'-a {r1_adapter} -o {r1_out} -'
-        r1_result = subprocess.run(r1_cmd, stdout=subprocess.PIPE, encoding='utf8', shell=True)
+        r1_result = subprocess.run(r1_cmd, stdout=subprocess.PIPE,
+                                   encoding='utf8', shell=True, check=True)
+
         # get R1 result stat
         lines = []
         for line in r1_result.stdout.split('\n'):
@@ -158,7 +154,8 @@ def _fastq_qc(demultiplex_result, out_dir, config):
                  f'-q {quality_threshold} -u {left_cut} ' \
                  f'-u -{right_cut} -m {length_threshold} ' \
                  f'-a {r2_adapter} -o {r2_out} -'
-        r2_result = subprocess.run(r2_cmd, stdout=subprocess.PIPE, encoding='utf8', shell=True)
+        r2_result = subprocess.run(r2_cmd, stdout=subprocess.PIPE,
+                                   encoding='utf8', shell=True, check=True)
         # get R2 result stat
         lines = []
         for line in r2_result.stdout.split('\n'):
@@ -172,6 +169,9 @@ def _fastq_qc(demultiplex_result, out_dir, config):
         results.append(s)
 
     fastq_final_result = pd.DataFrame(results)
+    if len(results) == 0:
+        # all sample skipped
+        return fastq_final_result
     fastq_final_result['out_reads_rate'] = \
         fastq_final_result['out_reads'].astype(int) / fastq_final_result['in_reads'].astype(int)
     fastq_final_result['out_bp_rate'] = \
@@ -182,5 +182,9 @@ def _fastq_qc(demultiplex_result, out_dir, config):
         r_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R*.fq.gz'
         r_rm_cmd = f'rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
+    # remove unknown reads
+    r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq.gz'
+    r_rm_cmd = f'rm -f {r_path_pattern}'
+    subprocess.run(r_rm_cmd, shell=True)
 
     return fastq_final_result

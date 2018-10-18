@@ -252,7 +252,6 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     fai_df = _read_faidx(pathlib.Path(reference_fasta + ".fai"))
 
     if not pathlib.Path(bam_path + ".bai").exists():
-        print("Input not indexed. Indexing...")
         subprocess.check_call(shlex.split("samtools index " + bam_path))
 
     # mpileup
@@ -392,26 +391,26 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     return count_df
 
 
-def _call_methylated_sites(bam_result_df, out_dir, config):
+def call_methylated_sites(bam_result_df, out_dir, config):
     reference_fasta = config['callMethylation']['reference_fasta']
-    num_upstr_bases = config['callMethylation']['num_upstr_bases']
-    num_downstr_bases = config['callMethylation']['num_downstr_bases']
-    buffer_line_number = config['callMethylation']['buffer_line_number']
-    min_mapq = config['callMethylation']['min_mapq']
-    min_base_quality = config['callMethylation']['min_base_quality']
-    cores = config['callMethylation']['cores']
+    num_upstr_bases = int(config['callMethylation']['num_upstr_bases'])
+    num_downstr_bases = int(config['callMethylation']['num_downstr_bases'])
+    buffer_line_number = int(config['callMethylation']['buffer_line_number'])
+    min_mapq = int(config['callMethylation']['min_mapq'])
+    min_base_quality = int(config['callMethylation']['min_base_quality'])
+    cores = int(config['callMethylation']['cores'])
 
     pool = multiprocessing.Pool(cores)
     results = {}
-    for (uid, index_name), _ in bam_result_df.groupby(['uid', 'index']):
+    for (uid, index_name), _ in bam_result_df.groupby(['uid', 'index_name']):
         final_bam_path = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
         result = pool.apply_async(_call_methylated_sites_worker,
-                                  (final_bam_path, reference_fasta,
+                                  (str(final_bam_path), reference_fasta,
                                    num_upstr_bases, num_downstr_bases,
                                    buffer_line_number, min_mapq, min_base_quality))
         results[(uid, index_name)] = result
-    pool.join()
     pool.close()
+    pool.join()
 
     total_results = []
     for (uid, index_name), result in results.items():

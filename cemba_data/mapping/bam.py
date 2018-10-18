@@ -9,6 +9,7 @@ import pandas as pd
 import subprocess
 import multiprocessing
 import shlex
+import glob
 
 
 def _process_bam(cmd_list):
@@ -19,8 +20,8 @@ def _process_bam(cmd_list):
             for cmd in cmd_list]
 
 
-def _bam_qc(bismark_result, out_dir, config):
-    cores = config['bamFilter']['cores']
+def bam_qc(bismark_result, out_dir, config):
+    cores = int(config['bamFilter']['cores'])
     mapq_threshold = config['bamFilter']['mapq_threshold']
 
     # process bam
@@ -29,7 +30,8 @@ def _bam_qc(bismark_result, out_dir, config):
     for i, line in bismark_result.iterrows():
         uid, index_name, read_type = line[['uid', 'index_name', 'read_type']]
         # file path
-        bismark_bam = str(list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}_{read_type}*bismark*bam'))[0].absolute())
+        bismark_bam = str(
+            list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}_{read_type}*_bismark_bt2.bam'))[0].absolute())
         sort_bam = bismark_bam[:-3] + 'sort.bam'
         dedup_bam = bismark_bam[:-3] + 'dedup.bam'
         dedup_matrix = bismark_bam[:-3] + 'dedup.matrix.txt'
@@ -70,22 +72,19 @@ def _bam_qc(bismark_result, out_dir, config):
         s['read_type'] = read_type
         s['out_reads'] = remain_reads
         qc_result.append(s)
-
-        # clean up
-        # only keep filtered bam and bismark report
-        remove_file_list = [str(p) for p in pathlib.Path(out_dir).glob(f'{uid}_{index_name}_{read_type}*bismark*')
-                            if ('filter' not in str(p)) or ('report' not in str(p))]
-        # delete bams
-        subprocess.run(['rm'] + remove_file_list)
     bam_result_df = pd.DataFrame(qc_result)
 
     for (uid, index_name), sub_df in bam_result_df.groupby(['uid', 'index_name']):
         # merge R1 R2 bam
         merge_bam = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
-        merge_cmd = f'samtools merge {merge_bam} {uid}_{index_name}_R*.filter.bam'
+        bam_list = ' '.join(glob.glob(f'{out_dir}/{uid}_{index_name}_R*filter.bam'))
+        merge_cmd = f'samtools merge -f {merge_bam} {bam_list}'
         subprocess.run(shlex.split(merge_cmd),
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8')
-        rm_cmd = f'rm {uid}_{index_name}_R*.filter.bam'
-        subprocess.run(shlex.split(rm_cmd),
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8')
+        # clean up
+        # only keep filtered bam and bismark report
+        remove_file_list = [str(p) for p in pathlib.Path(out_dir).glob(f'{uid}_{index_name}_R*.*bismark*')]
+        remove_file_str = ' '.join(remove_file_list)
+        rm_cmd = f'rm -f {remove_file_str}'
+        subprocess.run(shlex.split(rm_cmd), encoding='utf8')
     return bam_result_df

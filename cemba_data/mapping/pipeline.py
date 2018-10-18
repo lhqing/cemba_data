@@ -3,10 +3,16 @@ import glob
 import pathlib
 import configparser
 import os
-from .fastq import _demultiplex, _fastq_qc
-from .bismark import _bismark
-from .allc import _call_methylated_sites
-from .bam import _bam_qc
+import logging
+from datetime import datetime
+from .fastq import demultiplex, fastq_qc
+from .bismark import bismark
+from .allc import call_methylated_sites
+from .bam import bam_qc
+
+
+def _cur_time_string(format='[%Y-%m-%d]%H:%M:%S'):
+    return datetime.now().strftime(format)
 
 
 def _get_configuration(config_path=None):
@@ -30,7 +36,7 @@ def get_fastq_dataframe(file_path, name_pattern):
     and other optional cols contain metadata.
     """
     if isinstance(file_path, str) and ('*' in file_path):
-        file_path = [str(p.absolute()) for p in glob.glob(file_path)]
+        file_path = [str(pathlib.Path(p).absolute()) for p in glob.glob(file_path)]
     elif isinstance(file_path, list):
         pass
     else:
@@ -87,28 +93,55 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
         stat_dir.mkdir()
+    fastq_dataframe.to_csv(stat_dir/'fastq_list.tsv.gz',
+                           sep='\t', compression='gzip', index=None)
+
+    # setup logger
+    logger = logging.getLogger()
+    log_path = stat_dir / "mapping.log"
+    fh = logging.FileHandler(log_path)
+    fh.setLevel(logging.INFO)
+    fmt = "%(message)s"
+    date_fmt = "[%Y-%m-%d]%H:%M:%S"
+    formatter = logging.Formatter(fmt, date_fmt)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
     # fastq demultiplex
-    demultiplex_df = _demultiplex(fastq_dataframe, out_dir, config)
+    logger.info('Demultiplex fastq file.')
+    demultiplex_df = demultiplex(fastq_dataframe, out_dir, config)
     demultiplex_df.to_csv(stat_dir/'demultiplex_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
+    logger.info('Trim fastq file and merge lanes.')
     # fastq qc
-    fastq_final_df = _fastq_qc(demultiplex_df, out_dir, config)
-    fastq_final_df.to_csv(stat_dir/'fastq_trim_result.tsv.gz',
+    fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
+    if fastq_final_df.shape[0] == 0:
+        print('no sample remained after fastq qc step')
+        return
+    else:
+        fastq_final_df.to_csv(stat_dir/'fastq_trim_result.tsv.gz',
+                              sep='\t', compression='gzip', index=None)
+
+    logger.info('Use bismark and bowtie2 to do mapping.')
+    # bismark
+    bismark_df = bismark(fastq_final_df, out_dir, config)
+    if bismark_df.shape[0] == 0:
+        print('no sample remained after bismark step')
+        return
+    else:
+        bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
-    # bismark
-    bismark_df = _bismark(fastq_final_df, out_dir, config)
-    bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
-                      sep='\t', compression='gzip', index=None)
-
+    logger.info('Deduplicate and filter bam files.')
     # bam
-    bam_df = _bam_qc(bismark_df, out_dir, config)
+    bam_df = bam_qc(bismark_df, out_dir, config)
     bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
                   sep='\t', compression='gzip', index=None)
 
+    logger.info('Calculate mC sites.')
     # allc
-    allc_df = _call_methylated_sites(bam_df, out_dir, config)
+    allc_df = call_methylated_sites(bam_df, out_dir, config)
     allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
+    return 0

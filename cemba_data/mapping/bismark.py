@@ -38,7 +38,7 @@ def _parse_bismark_report(report_path_list):
 
     total_list = []
     for report in report_path_list:
-        uid, seq_name, read_type = report.name.split('.')[0].split('_')
+        uid, index_name, read_type = report.name.split('.')[0].split('_')
         with report.open() as rep:
             report_dict = {}
             for line in rep:
@@ -51,18 +51,18 @@ def _parse_bismark_report(report_path_list):
                 except KeyError:
                     pass
         report_dict['uid'] = uid
-        report_dict['seq_name'] = seq_name
+        report_dict['index_name'] = index_name
         report_dict['read_type'] = read_type
         total_list.append(pd.Series(report_dict))
     total_result = pd.DataFrame(total_list)
     return total_result
 
 
-def _bismark(fastq_final_result, out_dir, config):
+def bismark(fastq_final_result, out_dir, config):
     bismark_reference = config['bismark']['bismark_reference']
-    cores = config['bismark']['cores']
-    read_min = config['bismark']['read_min']
-    read_max = config['bismark']['read_max']
+    cores = int(config['bismark']['cores'])
+    read_min = int(config['bismark']['read_min'])
+    read_max = int(config['bismark']['read_max'])
 
     bismark_run = functools.partial(subprocess.run,
                                     stdout=subprocess.PIPE,
@@ -87,20 +87,24 @@ def _bismark(fastq_final_result, out_dir, config):
             continue
         ran_samples.append((uid, index_name))
         r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq.gz'
-        r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} --pbat'
+        r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} --pbat -o {out_dir} --temp_dir {out_dir}'
         # each bismark job actually use 250%
         result = pool.apply_async(bismark_run, (shlex.split(r1_cmd),))
         r1_results.append(result)
 
         r2_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R2.trimed.fq.gz'
-        r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq}'
+        r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq} -o {out_dir} --temp_dir {out_dir}'
         result = pool.apply_async(bismark_run, (shlex.split(r2_cmd),))
         r2_results.append(result)
     pool.close()
     pool.join()
 
-    report_path_list = []
-    for (uid, index_name) in ran_samples:
-        report_path_list += list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}*bismark_bt2*report.txt'))
-    bismark_result_df = _parse_bismark_report(report_path_list)
-    return bismark_result_df
+    if len(ran_samples) != 0:
+        report_path_list = []
+        for (uid, index_name) in ran_samples:
+            report_path_list += list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}*bismark_bt2*report.txt'))
+        bismark_result_df = _parse_bismark_report(report_path_list)
+        return bismark_result_df
+    else:
+        return pd.DataFrame()
+

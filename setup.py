@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-cemba_data_version = '0.1.1'
+cemba_data_version = '0.1.2'
 
 setup(
     name='cemba_data',
