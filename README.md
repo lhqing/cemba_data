@@ -1,6 +1,5 @@
-NOTE: Currently, this pipeline is still under development, I can't promise the API won't change. I will remove this note once I feel confident about the general structure.
-
-# CEMBA Data Processing (0.1.1)
+# CEMBA Data Processing (0.1.2)
+- **Data mapping**
 - **Data integration using HDF5**
 - **Data preprocessing, computation and visualization**
 - **Regulatory region analysis**

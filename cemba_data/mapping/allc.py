@@ -418,5 +418,5 @@ def call_methylated_sites(bam_result_df, out_dir, config):
         count_df['uid'] = uid
         count_df['index_name'] = index_name
         total_results.append(count_df)
-    allc_count_df = pd.concat(total_results)
+    allc_count_df = pd.concat(total_results).reset_index(drop=False)
     return allc_count_df
