@@ -80,10 +80,10 @@ def bismark(fastq_final_result, out_dir, config):
     pool = multiprocessing.Pool(cores)
     for (uid, index_name), total_reads in sorted_sample:
         if total_reads < read_min:
-            print("Drop cell due to too less reads:", uid, index_name)
+            print("Drop cell due to too less reads:", uid, index_name, total_reads)
             continue
         if total_reads > read_max:
-            print("Drop cell due to too many reads:", uid, index_name)
+            print("Drop cell due to too many reads:", uid, index_name, total_reads)
             continue
         ran_samples.append((uid, index_name))
         r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq.gz'

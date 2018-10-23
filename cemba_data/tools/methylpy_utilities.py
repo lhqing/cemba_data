@@ -890,7 +890,12 @@ def index_allc_file(allc_file, reindex=False):
         else:
             return 0
     g = open(index_file, 'w')
-    f = open_allc_file(allc_file)
+    if 'gz' in allc_file:
+        subprocess.run(f'pigz -p 8 {allc_file}')
+        f = open(allc_file[:-3])
+    else:
+        f = open(allc_file)
+
     cur_chrom = ""
     # check header
     line = f.readline()
@@ -908,7 +913,8 @@ def index_allc_file(allc_file, reindex=False):
     # find chrom pointer
     while True:
         line = f.readline()
-        if not line: break
+        if not line:
+            break
         fields = line.split("\t")
         if fields[0] != cur_chrom:
             g.write(fields[0] + "\t" + str(cur_pointer) + "\n")
@@ -917,6 +923,8 @@ def index_allc_file(allc_file, reindex=False):
     g.write("#eof\n")
     f.close()
     g.close()
+    if 'gz' in allc_file:
+        subprocess.run(f'pigz -p 8 {allc_file[:-3]}')
     return 0
 
 
@@ -1346,7 +1354,7 @@ def open_allc_file(allc_file):
         f = gzip.open(allc_file, 'rt')
     else:
         f = open(allc_file, 'r')
-    return (f)
+    return f
 
 
 def print_checkpoint(message):

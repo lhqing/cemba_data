@@ -385,6 +385,7 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     with open(output_path + '.idx', 'w') as idx_f:
         for (chrom, out_pos) in chr_out_pos_list:
             idx_f.write(f'{chrom}\t{out_pos}\n')
+        idx_f.write('#eof\n')  # methylpy idx end
 
     count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
     count_df['mc_rate'] = count_df['mc'] / count_df['cov']
