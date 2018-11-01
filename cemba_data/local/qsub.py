@@ -34,12 +34,13 @@ def check_qstat(id_set=None):
     qstat_result_string = run(['qstat', '-u', qsub_config['USER']['USER_NAME']],
                               stdout=PIPE, encoding='utf8').stdout
     if 'job-ID' not in qstat_result_string:
+        print('qstat nothing')
         return []  # qstat print nothing, all job finished
     else:
         qstat_result_lines = qstat_result_string.split('\n')
         total_id = []
         for line in qstat_result_lines:
-            line_id = line.split(' ')[0]
+            line_id = line.strip().split(' ')[0]
             if id_set is not None:
                 if line_id in id_set:
                     total_id.append(line_id)

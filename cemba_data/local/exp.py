@@ -5,9 +5,9 @@ from ..data.hdf5 import Study
 from .zoo import *
 
 
-def get_feature_dispersion(ann, min_mean=0.2, max_mean=1.25, min_disp=0.3):
+def get_feature_dispersion(ann, min_mean=0.2, max_mean=1.25, min_disp=0.3, n_bins=50):
     filter_result = sc.pp.filter_genes_dispersion(ann.X, min_mean=min_mean,
-                                                  max_mean=max_mean, min_disp=min_disp)
+                                                  max_mean=max_mean, min_disp=min_disp, n_bins=n_bins)
     fig, axes = plt.subplots(nrows=1, ncols=2)
     fig.set_size_inches(10, 3)
     axes[0].set_title('Feature Raw Dispersions')

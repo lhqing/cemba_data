@@ -11,7 +11,7 @@ from .methylpy_utilities import merge_allc_files
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                         out_path_prefix, max_cov_cutoff=None,
-                        compression=False, gzip_level=2, remove_chrm=True):
+                        compression=False, gzip_level=2, remove_chrm=True, add_chr=True):
     """
     Split ALLC into bed format, chrom column contain "chr".
     :param allc_path: Single ALLC file path
@@ -27,8 +27,9 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
         remove_chrm = ['chrM']
     else:
         remove_chrm = None
-    chrom_set = set(parse_chrom_size(genome_size_path, remove_chr_list=remove_chrm).keys())
-
+    chrom_set = set(parse_chrom_size(genome_size_path,
+                                     remove_chr_list=remove_chrm,
+                                     add_chr=add_chr).keys())
     # prepare context
     if isinstance(context_pattern, str):
         context_pattern = context_pattern.split(',')
@@ -38,7 +39,6 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     path_dict = {(c, chrom): out_path_prefix + f'.{c}.{chrom}.bed'
                  for c in context_pattern
                  for chrom in chrom_set}
-
     # open all paths
     if compression:
         open_func = partial(gzip.open, mode='at', compresslevel=gzip_level)
@@ -53,15 +53,15 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
 
     # split ALLC
     first = True
-    add_chr = None
     cur_chrom = None
     handle_dict = None
+    _add_chr = False
     with allc_open_func(allc_path) as allc:
         for line in allc:
             if first:
                 chrom = line.split('\t')[0]
-                add_chr = 'chr' != line[:3]
-                if add_chr:
+                _add_chr = add_chr & ('chr' != line[:3])
+                if _add_chr:
                     chrom = 'chr' + chrom
                 if chrom not in chrom_set:
                     continue
@@ -74,7 +74,7 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                 if int(ll[5]) > max_cov_cutoff:
                     continue
             # add "chr" to chrom
-            if add_chr:
+            if _add_chr:
                 chrom = 'chr' + ll[0]
             else:
                 chrom = ll[0]
@@ -105,7 +105,7 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
 def map_to_region(allc_path, out_path_prefix,
                   region_bed_path, region_name, genome_size_path,
                   context_pattern, max_cov_cutoff,
-                  remove_tmp=True, tmp_compression=False):
+                  remove_tmp, tmp_compression, add_chr):
     """
     Map one allc file into many region set bed file using bedtools map.
     Count mC and coverage in each region for each context pattern.
@@ -118,21 +118,24 @@ def map_to_region(allc_path, out_path_prefix,
     :param max_cov_cutoff:
     :param remove_tmp:
     :param tmp_compression:
+    :param add_chr:
     :return:
     """
     # parse ref chrom with ordered chromosome
-    ref_chrom_dict = parse_chrom_size(genome_size_path)
+    ref_chrom_dict = parse_chrom_size(genome_size_path, add_chr=add_chr)
 
     # prepare ALLC bed dict, split ALLC into different contexts
     # bed format [chrom, start, end, mc, cov]
     print('Splitting ALLC')
     # split chromosome and avoid sorting
+
     allc_bed_path_dict = _split_to_chrom_bed(allc_path=allc_path,
                                              context_pattern=context_pattern,
                                              out_path_prefix=out_path_prefix + '.tmp',
                                              genome_size_path=genome_size_path,
                                              max_cov_cutoff=max_cov_cutoff,
-                                             compression=tmp_compression)
+                                             compression=tmp_compression,
+                                             add_chr=add_chr)
     # concat bed with ordered chromosome
     tmp_dict = {}
     for c in context_pattern:
@@ -282,6 +285,14 @@ def map_to_region_register_subparser(subparser):
         required=False,
         default=False,
         help="Compress tmp file (slower but space efficient) or not"
+    )
+
+    parser_opt.add_argument(
+        "--add_chr",
+        type=bool,
+        required=False,
+        default=False,
+        help="add 'chr' before chromosome or not"
     )
     return
 

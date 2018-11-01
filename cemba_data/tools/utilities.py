@@ -33,7 +33,7 @@ def parse_chrom_size(path, add_chr=True, remove_chr_list=None):
         for line in f:
             chrom, length = line.strip('\n').split('\t')
             if add_chr:
-                if 'chr' != chrom[:3]:
+                if ('chr' != chrom[:3]) and add_chr:
                     chrom = 'chr' + chrom
             if chrom in remove_chr_list:
                 continue

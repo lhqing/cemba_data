@@ -283,6 +283,7 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     mc_dict = collections.defaultdict(int)  # context: mc_total
     for line in result_handle:
         fields = line.split("\t")
+        fields[2] = fields[2].upper()
         # if chrom changed, read whole chrom seq from fasta
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]

@@ -27,7 +27,7 @@ def cur_time():
 
 
 def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None,
-                        region_bed_path=None, region_name=None,
+                        region_bed_path=None, region_name=None, add_chr=True,
                         context_pattern=None, max_cov_cutoff=None,
                         remove_tmp=True, tmp_compression=False,
                         total_cpu=50, submission_gap=5,
@@ -75,7 +75,8 @@ def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None
                   f'--region_bed_path {region_bed_path} ' \
                   f'--region_name {region_name} ' \
                   f'--genome_size_path {genome_size_path} ' \
-                  f'--context_pattern {context_pattern} '
+                  f'--context_pattern {context_pattern} ' \
+                  f'--add_chr {add_chr} '
         # f'--remove_tmp {remove_tmp} ' \
         # f'--tmp_compression {tmp_compression} '
         if max_cov_cutoff is not None:
@@ -216,7 +217,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                     region_bed_path=None, region_name=None,
                     context_pattern=None, max_cov_cutoff=None,
                     total_cpu=50, submission_gap=5, qstat_gap=100,
-                    remove_cell_files=True, test=False):
+                    remove_cell_files=True, test=False, add_chr=True):
     generation_note = {'assembly_time': cur_time()}
 
     # prepare refs, change None in to default from config
@@ -279,7 +280,7 @@ def prepare_dataset(cell_meta_path, dataset_name, out_dir, genome, cell_id_col='
                                     context_pattern=context_pattern, max_cov_cutoff=max_cov_cutoff,
                                     remove_tmp=True, tmp_compression=False,
                                     total_cpu=total_cpu, submission_gap=submission_gap,
-                                    qstat_gap=qstat_gap, submit=True)
+                                    qstat_gap=qstat_gap, submit=True, add_chr=add_chr)
     # check submitter status before next step
     print(f'{len(submitter.commands)} jobs finished.')
     sys.stdout.flush()
