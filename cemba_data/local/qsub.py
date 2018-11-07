@@ -1,6 +1,5 @@
 from subprocess import run, PIPE
 import os
-import pathlib
 import json
 import datetime
 import re
@@ -216,10 +215,10 @@ class Command:
         return
 
 
-def qsub(command_file_path, total_cpu=60, submission_gap=2, qstat_gap=30):
+def qsub(command_file_path, working_dir, project_name, total_cpu=60, submission_gap=2, qstat_gap=30):
     submitter = Qsubmitter(command_file_path=command_file_path,
-                           working_dir=None,
-                           project_name=None,
+                           working_dir=working_dir,
+                           project_name=project_name,
                            total_cpu=total_cpu,
                            submission_gap=submission_gap,
                            qstat_gap=qstat_gap)
@@ -235,6 +234,13 @@ def qsub_register_subparser(subparser):
 
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--working_dir",
+        type=str,
+        required=True,
+        help="Working directory of the work project"
+    )
 
     parser_req.add_argument(
         "--project_name",
