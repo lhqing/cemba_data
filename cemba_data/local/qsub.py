@@ -1,7 +1,7 @@
 from subprocess import run, PIPE
 import os
+import pathlib
 import json
-import configparser
 import datetime
 import re
 import sys
@@ -9,14 +9,15 @@ import time
 import argparse
 
 
-def default_command_dict(name, error_path, output_path, qsub_config):
+def default_command_dict(name, error_path, output_path, working_dir,
+                         cpu=1, h_rt='99:99:99', s_rt='99:99:99'):
     command_dict = {'command': None,
                     '-N': name,
                     '-V': '',
-                    '-pe smp': qsub_config['QSUB_DEFAULT']['CPU'],
-                    '-l h_rt': qsub_config['QSUB_DEFAULT']['H_RT'],
-                    '-l s_rt': qsub_config['QSUB_DEFAULT']['S_RT'],
-                    '-wd': qsub_config['QSUB_DEFAULT']['WD'],
+                    '-pe smp': cpu,
+                    '-l h_rt': h_rt,
+                    '-l s_rt': s_rt,
+                    '-wd': working_dir,
                     '-e': error_path,
                     '-o': output_path}
     return command_dict
@@ -42,22 +43,19 @@ def get_running_job_id_qstat(user_name, id_set):
 
 
 class Qsubmitter:
-    def __init__(self, command_file_path, project_name,
+    def __init__(self, command_file_path, working_dir, project_name,
                  total_cpu=60, submission_gap=2, qstat_gap=30):
-        # prepare config
-        self.qsub_config = configparser.ConfigParser()
-        self.qsub_config.read(os.path.dirname(__file__) + '/config_qsub.ini')
-
-        # prepare job_dir
-        job_dir = self.qsub_config['QSUB_DEFAULT']['JOB_DIR']
-        working_job_dir = job_dir + '/' + project_name
+        # prepare working_dir
+        self.working_dir = working_dir
+        self.project_name = project_name
+        self.project_dir = self.working_dir + '/' + self.project_name + '_qsub'
         try:
-            os.mkdir(working_job_dir)
+            os.mkdir(self.project_dir)
         except OSError:
             print('Note: The job has been submitted before.')
-            print(f'If want to resubmit everything, delete or rename this directory: {working_job_dir}')
+            print(f'If want to resubmit everything, delete or rename this directory: {self.project_dir}')
             sys.stdout.flush()
-        run(['cp', command_file_path, working_job_dir])
+        run(['cp', command_file_path, self.project_dir])
 
         # submission parameters
         self.total_cpu = total_cpu
@@ -69,8 +67,6 @@ class Qsubmitter:
 
         # prepare project dir
         self.command_file_path = command_file_path
-        self.project_name = project_name
-        self.project_dir = self.qsub_config['QSUB_DEFAULT']['JOB_DIR'] + '/' + project_name
         if not os.path.exists(self.project_dir):
             os.mkdir(self.project_dir)
 
@@ -96,8 +92,8 @@ class Qsubmitter:
             for n, command_dict in enumerate(command_dict_list):
                 obj_list.append(Command(command_dict=command_dict,
                                         unique_id=f'{self.project_name}_{n}',
-                                        project_dir=self.project_dir,
-                                        qsub_config=self.qsub_config))
+                                        working_dir=self.working_dir,
+                                        project_dir=self.project_dir))
         return obj_list
 
     def submit(self):
@@ -164,10 +160,9 @@ class Qsubmitter:
 
 
 class Command:
-    def __init__(self, command_dict, unique_id, project_dir, qsub_config):
+    def __init__(self, command_dict, unique_id, working_dir, project_dir):
         self.project_dir = project_dir
         self.unique_id = unique_id
-        self.qsub_config = qsub_config
 
         # command status
         self.submitted = False
@@ -183,7 +178,7 @@ class Command:
         self.command_dict = default_command_dict(name=self.unique_id,
                                                  error_path=self.error_path,
                                                  output_path=self.output_path,
-                                                 qsub_config=self.qsub_config)
+                                                 working_dir=working_dir)
         self.command_dict.update(**command_dict)
         for k, v in self.command_dict.items():
             if v is None:
@@ -201,6 +196,7 @@ class Command:
     def make_script_file(self):
         with open(self.script_path, 'w') as sh:
             sh.write("#!/bin/bash\n")
+            # TODO: include all parameters and set same format
             for k, v in self.qsub_parameter.items():
                 if k[:2] == '-l':
                     sh.write(f'#$ {k}={v}\n')
@@ -220,9 +216,10 @@ class Command:
         return
 
 
-def qsub(project_name, command_file_path, total_cpu=60, submission_gap=2, qstat_gap=30):
+def qsub(command_file_path, total_cpu=60, submission_gap=2, qstat_gap=30):
     submitter = Qsubmitter(command_file_path=command_file_path,
-                           project_name=project_name,
+                           working_dir=None,
+                           project_name=None,
                            total_cpu=total_cpu,
                            submission_gap=submission_gap,
                            qstat_gap=qstat_gap)
