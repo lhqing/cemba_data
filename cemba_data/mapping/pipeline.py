@@ -73,9 +73,6 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     stat_dir = out_dir / 'stats'
     stat_dir.mkdir()
 
-    # setup logger
-    # TODO add log module, replace all print
-
     # fastq demultiplex
     print('Demultiplex fastq file.')
     demultiplex_df = demultiplex(fastq_dataframe, out_dir, config)
