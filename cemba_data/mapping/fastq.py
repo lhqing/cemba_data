@@ -23,22 +23,23 @@ def _make_command_dataframe(fastq_dataframe, out_dir, config):
     # make adapter parms
     adapter_type = '-g' if int(adapter_pos) == 5 else '-a'
     if anchor:
+        # X stands for anchored adapter trim
         multiplex_index_dict = {k: 'X' + v for k, v in multiplex_index_dict.items()}
     adapter_parms = ' '.join([f'{adapter_type} {k}={v}' for k, v in multiplex_index_dict.items()])
 
     # make cmd_list
-    required_cols = ('uid', 'lane', 'read-type', 'fastq-path')
+    required_cols = ('uid', 'lane', 'read_type', 'fastq_path')
     for col in required_cols:
         if col not in fastq_dataframe.columns:
             raise ValueError(col, 'not in fastq dataframe')
     # standardize read_type
-    fastq_dataframe['read-type'] = fastq_dataframe['read-type'].apply(lambda i: 'R2' if '2' in str(i) else 'R1')
+    fastq_dataframe['read_type'] = fastq_dataframe['read_type'].apply(lambda i: 'R2' if '2' in str(i) else 'R1')
 
     records = []
     for (uid, lane), sub_df in fastq_dataframe.groupby(['uid', 'lane']):
-        tmp_sub_df = sub_df.set_index('read-type')
-        r1_in = tmp_sub_df.loc['R1', 'fastq-path']
-        r2_in = tmp_sub_df.loc['R2', 'fastq-path']
+        tmp_sub_df = sub_df.set_index('read_type')
+        r1_in = tmp_sub_df.loc['R1', 'fastq_path']
+        r2_in = tmp_sub_df.loc['R2', 'fastq_path']
         r1_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R1.fq.gz")
         r2_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R2.fq.gz")
         cmd = f"cutadapt {adapter_parms} -O {overlap} -o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in}"
@@ -51,8 +52,10 @@ def _make_command_dataframe(fastq_dataframe, out_dir, config):
 def _read_cutadapt_result(result):
     p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
     series = []
+    total_pairs = -1
     for line in result.stdout.split('\n'):
         if line.startswith('Total read pairs processed'):
+            # some weird transform of cutadapt outputs...
             locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
             total_pairs = locale.atoi(line.split(' ')[-1])
 
@@ -66,7 +69,7 @@ def _read_cutadapt_result(result):
             series.append(result_series)
 
     total_df = pd.DataFrame(series)
-    total_df['Trimmed'] = total_df['Trimmed'].apply(lambda i: i.split(' ')[0]).astype(int)
+    total_df['Trimmed'] = total_df['Trimmed'].apply(lambda c: c.split(' ')[0]).astype(int)
     total_df['TotalPair'] = total_pairs
     total_df['Ratio'] = total_df['Trimmed'] / total_pairs
     return total_df
@@ -99,7 +102,6 @@ def demultiplex(fastq_dataframe, out_dir, config):
             result_df['index_name'] = result_df['Sequence'].apply(lambda ind: multiplex_index_map[ind])
             total_results.append(result_df)
     total_result_df = pd.concat(total_results, ignore_index=True)
-
     return total_result_df
 
 
@@ -111,8 +113,10 @@ def fastq_qc(demultiplex_result, out_dir, config):
     r2_adapter = config['fastqTrim']['r1_adapter']
     length_threshold = config['fastqTrim']['length_threshold']
     quality_threshold = config['fastqTrim']['quality_threshold']
-    left_cut = config['fastqTrim']['left_cut']
-    right_cut = config['fastqTrim']['right_cut']
+    r1_left_cut = config['fastqTrim']['r1_left_cut']
+    r1_right_cut = config['fastqTrim']['r1_right_cut']
+    r2_left_cut = config['fastqTrim']['r2_left_cut']
+    r2_right_cut = config['fastqTrim']['r2_right_cut']
     overlap = config['fastqTrim']['overlap']
     total_reads_threshold = int(config['fastqTrim']['total_reads_threshold'])
 
@@ -128,8 +132,8 @@ def fastq_qc(demultiplex_result, out_dir, config):
         r1_out = f'{out_dir}/{uid}_{index_name}_R1.trimed.fq.gz'
         r1_cmd = f'pigz -cd -p {pigz_cores} {r1_path_pattern} | ' \
                  f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
-                 f'-q {quality_threshold} -u {left_cut} ' \
-                 f'-u -{right_cut} -m {length_threshold} ' \
+                 f'-q {quality_threshold} -u {r1_left_cut} ' \
+                 f'-u -{r1_right_cut} -m {length_threshold} ' \
                  f'-a {r1_adapter} -o {r1_out} -'
         r1_result = subprocess.run(r1_cmd, stdout=subprocess.PIPE,
                                    encoding='utf8', shell=True, check=True)
@@ -137,9 +141,9 @@ def fastq_qc(demultiplex_result, out_dir, config):
         # get R1 result stat
         lines = []
         for line in r1_result.stdout.split('\n'):
-            l = line.split('\t')
-            if len(l) > 1:
-                lines.append(l)
+            ll = line.split('\t')
+            if len(ll) > 1:
+                lines.append(ll)
         s = pd.Series({name: number for name, number in zip(*lines)})
         s['uid'] = uid
         s['index_name'] = index_name
@@ -151,17 +155,17 @@ def fastq_qc(demultiplex_result, out_dir, config):
         r2_out = f'{out_dir}/{uid}_{index_name}_R2.trimed.fq.gz'
         r2_cmd = f'pigz -cd -p {pigz_cores} {r2_path_pattern} | ' \
                  f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
-                 f'-q {quality_threshold} -u {left_cut} ' \
-                 f'-u -{right_cut} -m {length_threshold} ' \
+                 f'-q {quality_threshold} -u {r2_left_cut} ' \
+                 f'-u -{r2_right_cut} -m {length_threshold} ' \
                  f'-a {r2_adapter} -o {r2_out} -'
         r2_result = subprocess.run(r2_cmd, stdout=subprocess.PIPE,
                                    encoding='utf8', shell=True, check=True)
         # get R2 result stat
         lines = []
         for line in r2_result.stdout.split('\n'):
-            l = line.split('\t')
-            if len(l) > 1:
-                lines.append(l)
+            ll = line.split('\t')
+            if len(ll) > 1:
+                lines.append(ll)
         s = pd.Series({name: number for name, number in zip(*lines)})
         s['uid'] = uid
         s['index_name'] = index_name

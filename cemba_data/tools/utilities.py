@@ -20,7 +20,7 @@ def parse_mc_pattern(pattern):
     return context_set
 
 
-def parse_chrom_size(path, add_chr=True, remove_chr_list=None):
+def parse_chrom_size(path, remove_chr_list=None):
     """
     return chrom:length dict
     :param path: ucsc chrom.size file

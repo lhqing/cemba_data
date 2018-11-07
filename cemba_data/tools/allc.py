@@ -11,7 +11,7 @@ from .methylpy_utilities import merge_allc_files
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                         out_path_prefix, max_cov_cutoff=None,
-                        compression=False, gzip_level=2, remove_chrm=True, add_chr=True):
+                        compression=False, gzip_level=2, remove_chrm=True):
     """
     Split ALLC into bed format, chrom column contain "chr".
     :param allc_path: Single ALLC file path

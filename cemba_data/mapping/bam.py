@@ -16,7 +16,8 @@ def _process_bam(cmd_list):
     return [subprocess.run(shlex.split(cmd),
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,
-                           encoding='utf8')
+                           encoding='utf8',
+                           check=True)
             for cmd in cmd_list]
 
 

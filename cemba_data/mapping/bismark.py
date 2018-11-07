@@ -67,7 +67,8 @@ def bismark(fastq_final_result, out_dir, config):
     bismark_run = functools.partial(subprocess.run,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
-                                    encoding='utf8')
+                                    encoding='utf8',
+                                    check=True)
     # sort by total reads, map large sample first
     sample_dict = {}
     for (uid, index_name), sub_df in fastq_final_result.sort_values('out_reads').groupby(['uid', 'index_name']):
