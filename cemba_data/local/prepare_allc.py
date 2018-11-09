@@ -116,9 +116,10 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
     with open(cmd_json_path, 'w') as f:
         json.dump(cmd_list, f)
 
-    qsub_command = f'yap qsub --project_name mapping ' \
+    qsub_command = f'yap qsub --working_dir {out_dir} ' \
+                   f'--project_name mapping ' \
                    f'--command_file_path {cmd_json_path} ' \
-                   f'--total_cpu 100 --submission_gap 2 --qstat_gap 30'
+                   f'--total_cpu 160 --submission_gap 2 --qstat_gap 60'
 
     print(f"""
     The output directory is prepared. All related files have been copied to that directory.
@@ -135,7 +136,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
     Modify the qsub parameters if you need. See "yap qsub -h" for help.
     """)
 
-    return str(out_dir / 'command.json')
+    return str(cmd_json_path)
 
 
 def batch_pipeline_register_subparser(subparser):

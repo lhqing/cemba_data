@@ -26,7 +26,7 @@ def get_running_job_id_qstat(user_name, id_set):
     qstat_result_string = run(['qstat', '-u', user_name],
                               stdout=PIPE, encoding='utf8').stdout
     if 'job-ID' not in qstat_result_string:
-        print('qstat nothing')
+        # print('qstat nothing')
         return []  # qstat print nothing, all job finished
     else:
         qstat_result_lines = qstat_result_string.split('\n')

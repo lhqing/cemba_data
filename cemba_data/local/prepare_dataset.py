@@ -10,16 +10,11 @@ import argparse
 import sys
 from numpy import uint16, uint32
 from scipy.sparse import lil_matrix
-from .qsub import Qsubmitter, qsub_config
+from .qsub import Qsubmitter
 from subprocess import run
 
 ref_path_config = configparser.ConfigParser()
 ref_path_config.read(os.path.dirname(__file__) + '/config_ref_path.ini')
-
-
-def print_config():
-    print(json.dumps(ref_path_config._sections, indent=4))
-    return
 
 
 def cur_time():
@@ -29,7 +24,6 @@ def cur_time():
 def batch_map_to_region(cell_ids, allc_files, out_dir, genome, dataset_name=None,
                         region_bed_path=None, region_name=None, add_chr=True,
                         context_pattern=None, max_cov_cutoff=None,
-                        remove_tmp=True, tmp_compression=False,
                         total_cpu=50, submission_gap=5,
                         qstat_gap=100, submit=False):
     job_dir = qsub_config['QSUB_DEFAULT']['JOB_DIR']

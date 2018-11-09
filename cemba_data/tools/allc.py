@@ -2,7 +2,6 @@ from .utilities import *
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
-from pybedtools.helpers import BEDToolsError
 from subprocess import run
 import argparse
 import os
@@ -10,8 +9,7 @@ from .methylpy_utilities import merge_allc_files
 
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
-                        out_path_prefix, max_cov_cutoff=None,
-                        compression=False, gzip_level=2, remove_chrm=True):
+                        out_path_prefix, max_cov_cutoff=None):
     """
     Split ALLC into bed format, chrom column contain "chr".
     :param allc_path: Single ALLC file path
@@ -19,17 +17,9 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     :param out_path_prefix: Single output prefix
     :param max_cov_cutoff: 2 for single cell, None for bulk or merged allc
     :param genome_size_path: UCSC chrom size file path
-    :param compression: gzip compression or not
-    :param gzip_level: compression level, default 3
     :return: Path dict for out put files
     """
-    if remove_chrm:
-        remove_chrm = ['chrM']
-    else:
-        remove_chrm = None
-    chrom_set = set(parse_chrom_size(genome_size_path,
-                                     remove_chr_list=remove_chrm,
-                                     add_chr=add_chr).keys())
+    chrom_set = set(parse_chrom_size(genome_size_path).keys())
     # prepare context
     if isinstance(context_pattern, str):
         context_pattern = context_pattern.split(',')
@@ -39,12 +29,9 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     path_dict = {(c, chrom): out_path_prefix + f'.{c}.{chrom}.bed'
                  for c in context_pattern
                  for chrom in chrom_set}
+
     # open all paths
-    if compression:
-        open_func = partial(gzip.open, mode='at', compresslevel=gzip_level)
-        path_dict = {k: v + '.gz' for k, v in path_dict.items()}  # add gz to path
-    else:
-        open_func = partial(open, mode='a')
+    open_func = partial(open, mode='a')
     # open func for allc:
     if '.gz' in allc_path[-3:]:
         allc_open_func = partial(gzip.open, mode='rt')
@@ -55,14 +42,10 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     first = True
     cur_chrom = None
     handle_dict = None
-    _add_chr = False
     with allc_open_func(allc_path) as allc:
         for line in allc:
             if first:
                 chrom = line.split('\t')[0]
-                _add_chr = add_chr & ('chr' != line[:3])
-                if _add_chr:
-                    chrom = 'chr' + chrom
                 if chrom not in chrom_set:
                     continue
                 first = False
@@ -70,14 +53,10 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                 handle_dict = {c: open_func(path_dict[(c, cur_chrom)]) for c in context_pattern}
             ll = line.split('\t')
             # filter max cov (for single cell data)
-            if max_cov_cutoff is not None:
-                if int(ll[5]) > max_cov_cutoff:
+            if (max_cov_cutoff is not None) and (int(ll[5]) > max_cov_cutoff):
                     continue
-            # add "chr" to chrom
-            if _add_chr:
-                chrom = 'chr' + ll[0]
-            else:
-                chrom = ll[0]
+            # judge chrom
+            chrom = ll[0]
             if chrom not in chrom_set:
                 continue
             if chrom != cur_chrom:
@@ -85,17 +64,14 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                 for handle in handle_dict.values():
                     handle.close()
                 handle_dict = {c: open_func(path_dict[(c, cur_chrom)]) for c in context_pattern}
-
             # bed format [chrom, start, end, mc, cov]
             ll[1] = str(int(ll[1]) - 1)  # because bed is 0 based
             bed_line = '\t'.join([chrom, ll[1], ll[1], ll[4], ll[5]]) + '\n'
-
             # assign each line to its patten content,
             # will write multiple times if patten overlap
             for c, p in pattern_dict.items():
                 if ll[3] in p:
                     handle_dict[c].write(bed_line)
-
     # close handle
     for handle in handle_dict.values():
         handle.close()
@@ -104,8 +80,7 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
 
 def map_to_region(allc_path, out_path_prefix,
                   region_bed_path, region_name, genome_size_path,
-                  context_pattern, max_cov_cutoff,
-                  remove_tmp, tmp_compression, add_chr):
+                  context_pattern, max_cov_cutoff, remove_tmp):
     """
     Map one allc file into many region set bed file using bedtools map.
     Count mC and coverage in each region for each context pattern.
@@ -117,25 +92,20 @@ def map_to_region(allc_path, out_path_prefix,
     :param context_pattern:
     :param max_cov_cutoff:
     :param remove_tmp:
-    :param tmp_compression:
-    :param add_chr:
     :return:
     """
     # parse ref chrom with ordered chromosome
-    ref_chrom_dict = parse_chrom_size(genome_size_path, add_chr=add_chr)
+    ref_chrom_dict = parse_chrom_size(genome_size_path)
 
     # prepare ALLC bed dict, split ALLC into different contexts
     # bed format [chrom, start, end, mc, cov]
     print('Splitting ALLC')
     # split chromosome and avoid sorting
-
     allc_bed_path_dict = _split_to_chrom_bed(allc_path=allc_path,
                                              context_pattern=context_pattern,
                                              out_path_prefix=out_path_prefix + '.tmp',
                                              genome_size_path=genome_size_path,
-                                             max_cov_cutoff=max_cov_cutoff,
-                                             compression=tmp_compression,
-                                             add_chr=add_chr)
+                                             max_cov_cutoff=max_cov_cutoff)
     # concat bed with ordered chromosome
     tmp_dict = {}
     for c in context_pattern:
@@ -170,38 +140,15 @@ def map_to_region(allc_path, out_path_prefix,
     for context_name, allc_bed in allc_bed_dict.items():
         for region_name, region_bed in region_bed_dict.items():
             print(f'Map {context_name} ALLC Bed to {region_name} Region Bed')
-            try:
-                region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=genome_size_path) \
-                    .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
-                            compressed=True)
-            except BEDToolsError as err:
-                # for some rare cases (10 in 2700),
-                # the gzip bed raise error in bedtools map, but unzip bed works fine.
-                # https://github.com/arq5x/bedtools2/issues/363
-                # not sure why, but try unzip once
-                if tmp_compression:
-                    print('Encounter BEDToolsError')
-                    if os.path.exists(allc_bed_path_dict[context_name]):
-                        # unzip the fine if it haven't
-                        run(['gunzip', allc_bed_path_dict[context_name]])
-                    allc_bed = BedTool(allc_bed_path_dict[context_name][:-3])  # open unzip bed
-                    region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=genome_size_path) \
-                        .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
-                                compressed=True)
-                    print('Solved BEDToolsError when gunzip the file...')
-                else:
-                    # file already unzipped, some novel error...
-                    raise err
+            region_bed.map(b=allc_bed, c='4,5', o='sum,sum', g=genome_size_path) \
+                .saveas(out_path_prefix + f'.{region_name}_{context_name}.count_table.bed.gz',
+                        compressed=True)
 
     # cleanup the tmp bed files.
     if remove_tmp:
         print('Clean tmp Bed file')
         for path in allc_bed_path_dict.values():
-            if os.path.exists(path):
-                run(['rm', '-f', path])
-            else:  # bed have been unzipped
-                run(['rm', '-f', path[:-3]])
-
+            run(['rm', '-f', path])
     cleanup()  # pybedtools tmp files
     print('Finish')
     return
@@ -277,22 +224,6 @@ def map_to_region_register_subparser(subparser):
         required=False,
         default=True,
         help="Remove tmp file or not"
-    )
-
-    parser_opt.add_argument(
-        "--tmp_compression",
-        type=bool,
-        required=False,
-        default=False,
-        help="Compress tmp file (slower but space efficient) or not"
-    )
-
-    parser_opt.add_argument(
-        "--add_chr",
-        type=bool,
-        required=False,
-        default=False,
-        help="add 'chr' before chromosome or not"
     )
     return
 
