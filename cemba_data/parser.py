@@ -8,7 +8,7 @@ import cemba_data
 from cemba_data.tools.allc import map_to_region_register_subparser
 from cemba_data.tools.allc import allc_to_bigwig_register_subparser
 from cemba_data.tools.allc import merge_allc_register_subparser
-from cemba_data.local.prepare_dataset import prepare_dataset_register_subparser
+from cemba_data.local.deprecated_prepare_dataset import prepare_dataset_register_subparser
 from cemba_data.local.qsub import qsub_register_subparser
 from cemba_data.mapping.pipeline import pipeline_register_subparser, print_default_config_register_subparser
 from cemba_data.local.prepare_allc import batch_pipeline_register_subparser

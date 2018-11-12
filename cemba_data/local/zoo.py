@@ -5,8 +5,8 @@ cat is private, may not work outside my server...
 more animals are adding...
 """
 
-from .prepare_dataset import ref_path_config
-from .prepare_study import dataset_config
+from .deprecated_prepare_dataset import ref_path_config
+from .deprecated_prepare_study import dataset_config
 import pandas as pd
 import numpy as np
 import collections
