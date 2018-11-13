@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import scanpy.api as sc
-from ..data.hdf5 import Study
+from ..data.deprecated_hdf5 import Study
 from .zoo import *
 
 

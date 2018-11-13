@@ -128,7 +128,7 @@ def prepare_study(netcdf_files,
         cell_list = []
         for file_path in netcdf_files:
             ds_index = _get_ds_indexes(file_path)
-            cell_list += ds_index['cell']
+            cell_list += ds_index['cell'].tolist()
         cell_list = list(set(cell_list))
 
     if isinstance(dataarray_select, str):

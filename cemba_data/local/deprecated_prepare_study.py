@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from functools import reduce
 from operator import add
-from ..data.hdf5 import Dataset
+from ..data.deprecated_hdf5 import Dataset
 
 
 dataset_config = configparser.ConfigParser()

@@ -1,5 +1,5 @@
 from .deprecated_prepare_study import prepare_study
-from ..data.hdf5 import Study
+from ..data.deprecated_hdf5 import Study
 import scanpy.api as sc
 import os
 
