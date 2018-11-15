@@ -120,3 +120,5 @@ def assemble_dataset(out_dir, dataset_name, cpu):
     total_dataset.to_netcdf(path=f'{out_dir}/{dataset_name}.mcds')
     return
 
+# TODO add parser for map-to-region
+# TODO add parser for assemble-dataset
