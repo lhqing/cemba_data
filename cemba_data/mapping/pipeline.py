@@ -142,6 +142,11 @@ def summary_pipeline_stat(out_dir):
         .sum()[['CA', 'CC', 'CG', 'CT']]\
         .rename(columns={c: c + '_Mc' for c in ['CA', 'CC', 'CG', 'CT']})
     mc_df['CH_Mc'] = mc_df[['CA_Mc', 'CC_Mc', 'CT_Mc']].sum(axis=1)
+    # add mc rate
+    mc_df['CH_Rate'] = mc_df['CH_Mc'] / mc_df['CH_Cov']
+    mc_df['CG_Rate'] = mc_df['CG_Mc'] / mc_df['CG_Cov']
+
+    # concat total meta
     total_meta = pd.concat([demultiplex_result, fastq_trim_result, bismark_result,
                             bam_result, mc_df, cov_df],
                            sort=True, axis=1).dropna()
