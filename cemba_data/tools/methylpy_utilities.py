@@ -874,9 +874,6 @@ def index_allc_file(allc_file, reindex=False):
     index_file = get_index_file_name(allc_file)
     # do not reindex if the index file is available and is complete
     if (not reindex) and os.path.exists(index_file):
-        # do not check completeness
-        return 0
-
         # check index file completeness
         eof_count = 0
         line = False
