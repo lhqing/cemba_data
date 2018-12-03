@@ -20,6 +20,16 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     :return: Path dict for out put files
     """
     chrom_set = set(parse_chrom_size(genome_size_path).keys())
+
+    # deal with some old allc file that don't have chr in chrom name
+    ref_chrom_have_chr = False
+    for chrom in chrom_set:
+        if chrom.startswith('chr'):
+            ref_chrom_have_chr = True
+        # if any chrom in the genome_size_path have chr, treat the whole reference as ref_chrom_have_chr
+    # whether add chr or not depending on this, judged later in the first line
+    need_to_add_chr = False
+
     # prepare context
     if isinstance(context_pattern, str):
         context_pattern = context_pattern.split(',')
@@ -46,6 +56,11 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
         for line in allc:
             if first:
                 chrom = line.split('\t')[0]
+                # judge if the first line have chr or not, if not,
+                # but ref_chrom_have_chr is true, add chr for every line
+                if ref_chrom_have_chr and not chrom.startswith('chr'):
+                    need_to_add_chr = True
+                    chrom = 'chr' + chrom
                 if chrom not in chrom_set:
                     continue
                 first = False
@@ -57,6 +72,8 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
                     continue
             # judge chrom
             chrom = ll[0]
+            if need_to_add_chr:
+                chrom = 'chr' + chrom
             if chrom not in chrom_set:
                 continue
             if chrom != cur_chrom:
