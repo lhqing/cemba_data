@@ -10,7 +10,9 @@ Welcome to cemba_data's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   demo/test.rst
+   stage_1/stage_1.rst
+   stage_2/stage_2.rst
+   stage_3/stage_3.rst
 
 Indices and tables
 ==================
