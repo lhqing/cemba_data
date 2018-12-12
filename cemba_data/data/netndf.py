@@ -63,3 +63,11 @@ class MCDS:
         else:
             return da_mc_rate
 
+    def to_ann(self):
+        return
+
+    def gather_results_from_ann(self):
+        return
+
+    def plotting_df(self):
+        return

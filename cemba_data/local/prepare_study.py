@@ -1,11 +1,37 @@
+"""
+Using strategy described here:
+http://xarray.pydata.org/en/stable/io.html#combining-multiple-files
+
+Input:
+1. cell list, consistent to all datasets and filtered by some criteria.
+   if None, use all cells from the datasets.
+2. datasets
+
+Step:
+1. split the cell list into chunks
+2. for each cell list chunk, search all datasets.
+   Because the search is only performed on dataset index,
+   and the index is cached, this is actually fast.
+3. return the loaded dataset for each chunk and concat into one study.
+
+Output:
+A study, actually have the same structure as dataset.
+
+"""
+
 import xarray as xr
 import glob
 import pathlib
 import functools
+import logging
+log = logging.getLogger()
 
 
 @functools.lru_cache(maxsize=500)
 def _get_ds_indexes(ds_path):
+    """
+    Get full dataset indexes.
+    """
     with xr.open_dataset(ds_path) as ds:
         return ds.indexes
 
@@ -17,15 +43,12 @@ def _process_one_path(ds_path,
                       mc_type,
                       count_type):
     """
-    :param ds_path:
-    :param cell_list:
-    :param region_select_dict: dict of region select or None
-    :param dataarray_select: list of da names or None
-    :param mc_type:
-    :param count_type:
-    :return:
+    query one dataset with a list of cell_id.
+    if no cell in this dataset, return None,
+    else return loaded subset of the dataset
     """
-    # print('Process dataset:', ds_path)
+
+    log.debug(f'Process dataset:{ds_path}')
     ds_indexes = _get_ds_indexes(ds_path)
     selection_dict = {}
 
@@ -80,6 +103,9 @@ def _process_cell_list(netcdf_files,
                        dataarray_select,
                        mc_type,
                        count_type):
+    """
+    For a given cell list and datasets, search and combine dataset subsets for this cell list.
+    """
     datasets = []
     for file_path in netcdf_files:
         dataset = _process_one_path(file_path,
@@ -99,6 +125,31 @@ def _process_cell_list(netcdf_files,
         return None
 
 
+def _prepare_study_generator(
+        netcdf_files,
+        cell_list,
+        region_select_dict,
+        dataarray_select,
+        mc_type,
+        count_type,
+        iter_chunksize):
+    """
+    generator for iterating through all netcdf_files, only call this from prepare study
+    """
+    cell_list_chunks = (cell_list[i:i + iter_chunksize]
+                        for i in range(0, len(cell_list), iter_chunksize))
+    for cell_chunk in cell_list_chunks:
+        combined_data = _process_cell_list(netcdf_files,
+                                           cell_chunk,
+                                           region_select_dict,
+                                           dataarray_select,
+                                           mc_type,
+                                           count_type)
+        if combined_data is None:
+            continue
+        yield combined_data
+
+
 def prepare_study(netcdf_files,
                   cell_list=None,
                   region_select_dict=None,  # dict if multiple da
@@ -109,6 +160,29 @@ def prepare_study(netcdf_files,
                   compression=False,
                   compression_level=1,
                   iter_chunksize=None):
+    """
+    Prepare study based on a list of cell id and a list of netcdf_files
+
+    Parameters
+    ----------
+    netcdf_files
+
+    cell_list
+    region_select_dict
+    dataarray_select
+    mc_type
+    count_type
+    save_path
+    compression
+    compression_level
+    iter_chunksize
+
+    Returns
+    -------
+    dataset if iter_chunksize is None
+        study is still a dataset whose cells combined from different datasets by certain purpose.
+    iterator of dataset if iter_chunksize is not None
+    """
     # netcdf_files
     if isinstance(netcdf_files, str):
         netcdf_files = sorted(glob.glob(netcdf_files))
@@ -116,6 +190,7 @@ def prepare_study(netcdf_files,
         if not isinstance(netcdf_files, list):
             raise TypeError('netcdf_files should be either str or list, provided',
                             type(netcdf_files))
+
     if len(netcdf_files) == 0:
         print('No valid path provided.')
         return None
@@ -168,27 +243,3 @@ def prepare_study(netcdf_files,
             iter_chunksize=iter_chunksize
         )
 
-
-def _prepare_study_generator(
-        netcdf_files,
-        cell_list,
-        region_select_dict,
-        dataarray_select,
-        mc_type,
-        count_type,
-        iter_chunksize):
-    """
-    generator for iterating through all netcdf_files, only call this from prepare study
-    """
-    cell_list_chunks = (cell_list[i:i + iter_chunksize]
-                        for i in range(0, len(cell_list), iter_chunksize))
-    for cell_chunk in cell_list_chunks:
-        combined_data = _process_cell_list(netcdf_files,
-                                           cell_chunk,
-                                           region_select_dict,
-                                           dataarray_select,
-                                           mc_type,
-                                           count_type)
-        if combined_data is None:
-            continue
-        yield combined_data
