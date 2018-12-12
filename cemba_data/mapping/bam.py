@@ -13,6 +13,7 @@ import glob
 
 
 def _process_bam(cmd_list):
+    """wrapper of bam processing commands"""
     return [subprocess.run(shlex.split(cmd),
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,
@@ -22,6 +23,23 @@ def _process_bam(cmd_list):
 
 
 def bam_qc(bismark_result, out_dir, config):
+    """
+    Parallel function for bam sorting, deduplication, quality filtering and merging (R1, R2) step.
+
+    Parameters
+    ----------
+    bismark_result
+        dataframe from bismark mapping step
+    out_dir
+        universal pipeline out_dir
+    config
+        universal pipeline config
+    Returns
+    -------
+    bam_result_df
+        id columns are: uid, index_name, read_type.
+        (Although the R1 R2 bams are merged, the stats are separate)
+    """
     cores = int(config['bamFilter']['cores'])
     mapq_threshold = config['bamFilter']['mapq_threshold']
 

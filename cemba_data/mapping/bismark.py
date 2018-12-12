@@ -11,9 +11,18 @@ import multiprocessing
 import shlex
 import functools
 import operator
+import logging
+
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _parse_bismark_report(report_path_list):
+    """
+    Some ugly parser for bismark report... Hope Bismark won't change...
+    # TODO make this independent to bismark
+    """
     term_dict = {'Sequences analysed in total': 'total_reads',
                  'Number of alignments with a unique best hit from the different alignments': 'unique_map',
                  'Mapping efficiency': 'mapping_rate',
@@ -59,6 +68,23 @@ def _parse_bismark_report(report_path_list):
 
 
 def bismark(fastq_final_result, out_dir, config):
+    """
+    bismark mapping using Bowtie2.
+
+    Parameters
+    ----------
+    fastq_final_result
+        dataframe from fastq QC step
+    out_dir
+        universal pipeline out_dir
+    config
+        universal pipeline config
+
+    Returns
+    -------
+        Bismark report dataframe, id columns are: uid, index_name, read_type.
+    """
+
     bismark_reference = config['bismark']['bismark_reference']
     cores = int(config['bismark']['cores'])
     read_min = int(config['bismark']['read_min'])
@@ -81,10 +107,10 @@ def bismark(fastq_final_result, out_dir, config):
     pool = multiprocessing.Pool(cores)
     for (uid, index_name), total_reads in sorted_sample:
         if total_reads < read_min:
-            print("Drop cell due to too less reads:", uid, index_name, total_reads)
+            log.info("Drop cell due to too less reads:", uid, index_name, total_reads)
             continue
         if total_reads > read_max:
-            print("Drop cell due to too many reads:", uid, index_name, total_reads)
+            log.info("Drop cell due to too many reads:", uid, index_name, total_reads)
             continue
         ran_samples.append((uid, index_name))
         r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq.gz'
@@ -107,5 +133,6 @@ def bismark(fastq_final_result, out_dir, config):
         bismark_result_df = _parse_bismark_report(report_path_list)
         return bismark_result_df
     else:
+        # in rare case that all cells are dropped
         return pd.DataFrame()
 

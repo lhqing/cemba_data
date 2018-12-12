@@ -8,6 +8,7 @@ def parse_mc_pattern(pattern):
     :param pattern: length and C position should match ALLC
     :return: context set
     """
+    # TODO support full IUPAC table
     all_pos_list = []
     for base in pattern:
         if base in 'hH':

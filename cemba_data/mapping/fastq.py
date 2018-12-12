@@ -12,9 +12,17 @@ import locale
 import functools
 import multiprocessing
 import shlex
+import logging
+
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _make_command_dataframe(fastq_dataframe, out_dir, config):
+    """
+    make a command dataframe that contains all cutadapt demultiplex command
+    """
     multiplex_index_dict = config['multiplexIndex']
     overlap = int(config['demultiplex']['overlap'])
     anchor = bool(config['demultiplex']['anchor'])
@@ -50,6 +58,10 @@ def _make_command_dataframe(fastq_dataframe, out_dir, config):
 
 
 def _read_cutadapt_result(result):
+    """
+    Ugly parser of cutadapt output
+    TODO: make this nicer, add example output
+    """
     p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
     series = []
     total_pairs = -1
@@ -76,6 +88,23 @@ def _read_cutadapt_result(result):
 
 
 def demultiplex(fastq_dataframe, out_dir, config):
+    """
+    demultiplex of AD index using cutadapt. R1 R2 together, and each lane separately.
+
+    Parameters
+    ----------
+    fastq_dataframe
+        pipeline input fastq_dataframe
+    out_dir
+        pipeline universal out_dir
+    config
+        pipeline universal config
+
+    Returns
+    -------
+    demultiplex result dataframe, id columns: uid, index_name, lane.
+
+    """
     multiplex_index_dict = config['multiplexIndex']
     multiplex_index_map = {v: k for k, v in multiplex_index_dict.items()}
     cmd_df = _make_command_dataframe(fastq_dataframe, out_dir, config)
@@ -106,6 +135,23 @@ def demultiplex(fastq_dataframe, out_dir, config):
 
 
 def fastq_qc(demultiplex_result, out_dir, config):
+    """
+    reads level QC and trimming. R1 R2 separately and merge Lane together.
+
+    Parameters
+    ----------
+    demultiplex_result
+        dataframe from demultiplex step
+    out_dir
+        pipeline universal out_dir
+    config
+        pipeline universal config
+    Returns
+    -------
+    fastq_final_result
+        id columns: uid, index_name, read_type
+    """
+
     pigz_cores = int(config['fastqTrim']['pigz_cores'])
     cutadapt_cores = int(config['fastqTrim']['cutadapt_cores'])
 
@@ -124,8 +170,8 @@ def fastq_qc(demultiplex_result, out_dir, config):
     for (uid, index_name), sub_df in demultiplex_result.groupby(['uid', 'index_name']):
         sample_demultiplex_total = sub_df['Trimmed'].sum()
         if sample_demultiplex_total < total_reads_threshold:
-            print(uid, index_name,
-                  'skipped due to too less reads:', sample_demultiplex_total)
+            log.info(uid, index_name,
+                     'skipped due to too less reads:', sample_demultiplex_total)
             continue
         # process R1
         r1_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R1.fq.gz'

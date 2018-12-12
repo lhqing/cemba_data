@@ -5,21 +5,52 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import multiprocessing
+import argparse
 
 
 def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
                         context_pattern, genome_size_path, max_cov_cutoff):
+    """
+    Batch version of map-to-region, a helper function that generating command.json for a whole dataset's ALLCs.
+    The total number of region count bed files are len(region_name) * len(context_pattern)
+
+    Parameters
+    ----------
+    allc_files
+        List of ALLC files, accept wildcard
+    out_dir
+        Out_dir for all region count tables
+    region_bed_path
+        list of reference bed file paths
+    region_name
+        list of reference bed file names, corresponding to region_bed_path
+    context_pattern
+        list of mC context
+    genome_size_path
+        UCSC chrom.size like file, see instruction here: https://www.biostars.org/p/173963/
+        Also can be downloaded from UCSC for most of the common genomes
+    max_cov_cutoff
+        maximum cov cutoff
+    Returns
+    -------
+
+    """
     out_dir = pathlib.Path(out_dir).absolute()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     # prepare out_dir
     cmd_list = []
 
     if '*' in allc_files:
         allc_files = glob.glob(allc_files)
+    else:
+        with open(allc_files) as f:
+            allc_files = [line.strip() for line in f]
 
     for f in allc_files:
         if 'stats' in f.parent.name:
             continue
-        out_path_prefix = str(f).split('.')[0]
+        out_path_prefix = str(out_dir / f.stem)
         region_paths = ' '.join(region_bed_path)
         region_names = ' '.join(region_name)
         _context_pattern = ' '.join(context_pattern)
@@ -120,5 +151,100 @@ def assemble_dataset(out_dir, dataset_name, cpu):
     total_dataset.to_netcdf(path=f'{out_dir}/{dataset_name}.mcds')
     return
 
-# TODO add parser for map-to-region
-# TODO add parser for assemble-dataset
+
+def batch_map_to_region_register_subparser(subparser):
+    parser = subparser.add_parser('map-to-region-qsub',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
+    parser.set_defaults(func=batch_map_to_region)
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--allc_files",
+        type=str,
+        required=True,
+        help="A path pattern contain wildcard or a path to a file where each line is an ALLC file path"
+    )
+
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="Pipeline output directory, if not exist, will create recursively."
+    )
+
+    parser_req.add_argument(
+        "--region_bed_path",
+        type=list,
+        required=True,
+        default=None,
+        help="Space separated path list for reference region bed files"
+    )
+
+    parser_req.add_argument(
+        "--region_name",
+        type=list,
+        required=True,
+        default=None,
+        help="Space separated name list for reference region bed files, corresponding to region_bed_path"
+    )
+
+    parser_req.add_argument(
+        "--context_pattern",
+        type=list,
+        required=True,
+        default=None,
+        help="Space separated mC context pattern list"
+    )
+
+    parser_req.add_argument(
+        "--genome_size_path",
+        type=list,
+        required=True,
+        default=None,
+        help="File path for the chrom.sizes file of reference genome fasta"
+    )
+
+    parser_req.add_argument(
+        "--max_cov_cutoff",
+        type=list,
+        required=True,
+        default=None,
+        help="Maximum base cov, for normal single cell data, recommended value is 2."
+    )
+
+    return
+
+
+def assemble_dataset_register_subparser(subparser):
+    parser = subparser.add_parser('map-to-region-qsub',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
+    parser.set_defaults(func=batch_map_to_region)
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    # out_dir, dataset_name, cpu
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="out_dir path that contains all region count bed files, same as map-to-region step"
+    )
+
+    parser_req.add_argument(
+        "--dataset_name",
+        type=str,
+        required=True,
+        help="Name of the dataset"
+    )
+
+    parser_opt.add_argument(
+        "--cpu",
+        type=int,
+        required=False,
+        default=10,
+        help="Number of cores to use."
+    )

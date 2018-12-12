@@ -4,21 +4,24 @@ import configparser
 import os
 import collections
 import argparse
-from datetime import datetime
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
 from .allc import call_methylated_sites
 from .bam import bam_qc
+import logging
 
-
-def _cur_time_string(formats='[%Y-%m-%d]%H:%M:%S'):
-    return datetime.now().strftime(formats)
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _get_configuration(config_path=None):
+    """
+    Read .ini config file from given path
+    """
     ref_path_config = configparser.ConfigParser()
     if config_path is None:
-        print('config path not provided, use default config')
+        log.info('config path not provided, use default config')
         ref_path_config.read(os.path.dirname(__file__) + '/mapping_config.ini')
     else:
         ref_path_config.read(config_path)
@@ -26,6 +29,9 @@ def _get_configuration(config_path=None):
 
 
 def print_default_configuration(out_path=None):
+    """
+    Print default .ini config file or save to out_path
+    """
     with open(os.path.dirname(__file__) + '/mapping_config.ini') as f:
         configs = f.readlines()
     if out_path is not None:
@@ -38,6 +44,11 @@ def print_default_configuration(out_path=None):
 
 
 def validate_fastq_dataframe(fastq_dataframe):
+    """
+    Check if fastq_dataframe is
+    1. have required columns
+    2. uid is unique
+    """
     if isinstance(fastq_dataframe, str):
         fastq_dataframe = pd.read_table(fastq_dataframe, index_col=None)
 
@@ -61,6 +72,20 @@ def validate_fastq_dataframe(fastq_dataframe):
 
 
 def summary_pipeline_stat(out_dir):
+    """
+    Combine all statistics and do some additional computation.
+
+    Parameters
+    ----------
+    out_dir
+        Pipeline universal directory
+
+    Returns
+    -------
+    total_meta
+        dataframe contain every parts of metadata.
+        Each row is a cell, some metadata are reduced in some way, such as lanes.
+    """
     out_dir = pathlib.Path(out_dir)
 
     # merge all stats dataframe
@@ -170,6 +195,22 @@ def summary_pipeline_stat(out_dir):
 
 
 def pipeline(fastq_dataframe, out_dir, config_path=None):
+    """
+    Run full pipeline: demultiplex, fastq QC, bismark mapping, bam QC, ALLC calling
+
+    Parameters
+    ----------
+    fastq_dataframe
+        Input dataframe for all fastq file path and metadata.
+        Must include columns: uid, read_type, index_name, lane
+    out_dir
+        pipeline universal out_dir
+    config_path
+        pipeline universal config
+    Returns
+    -------
+    0 if succeed
+    """
     # get config
     config = _get_configuration(config_path)
 
@@ -184,44 +225,44 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     stat_dir.mkdir()
 
     # fastq demultiplex
-    print('Demultiplex fastq file.')
+    log.info('Demultiplex fastq file.')
     demultiplex_df = demultiplex(fastq_dataframe, out_dir, config)
     demultiplex_df.to_csv(stat_dir / 'demultiplex_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
-    print('Trim fastq file and merge lanes.')
+    log.info('Trim fastq file and merge lanes.')
     # fastq qc
     fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
     if fastq_final_df.shape[0] == 0:
-        print('no sample remained after fastq qc step')
+        log.warning('no sample remained after fastq qc step')
         return
     else:
         fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
                               sep='\t', compression='gzip', index=None)
 
-    print('Use bismark and bowtie2 to do mapping.')
+    log.info('Use bismark and bowtie2 to do mapping.')
     # bismark
     bismark_df = bismark(fastq_final_df, out_dir, config)
     if bismark_df.shape[0] == 0:
-        print('no sample remained after bismark step')
+        log.warning('no sample remained after bismark step')
         return
     else:
         bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
-    print('Deduplicate and filter bam files.')
+    log.info('Deduplicate and filter bam files.')
     # bam
     bam_df = bam_qc(bismark_df, out_dir, config)
     bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
                   sep='\t', compression='gzip', index=None)
 
-    print('Calculate mC sites.')
+    log.info('Calculate mC sites.')
     # allc
     allc_df = call_methylated_sites(bam_df, out_dir, config)
     allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
 
-    print('Mapping finished.')
+    log.info('Mapping finished.')
     return 0
 
 

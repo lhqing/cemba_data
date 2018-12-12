@@ -5,6 +5,10 @@ import glob
 import pandas as pd
 import argparse
 from ..mapping.pipeline import validate_fastq_dataframe
+import logging
+
+# logger
+log = logging.getLogger()
 
 
 def get_fastq_dataframe(file_path, name_pattern,
@@ -12,15 +16,28 @@ def get_fastq_dataframe(file_path, name_pattern,
                         out_dir=None):
     """
     Generate fastq_dataframe for pipeline input.
-    :param file_path: Accept 1. path pattern, 2. path list, 3. path of one file contain all the paths.
-    :param name_pattern: Name pattern of file paths, format example: "Field1_Field2_Field3_..._Fieldn".
-    Both file name (after remove suffix part after frist '.') and name pattern are split by '_' and match together.
-    If the length after split is not the same, error will be raised.
-    :param uid_field: field(s) in name pattern that can combine to uid for multiplexed fileset. will be linked by '-'
-    :param lane_field: field in name pattern that stand for lane
-    :param read_type_field: field in name pattern that stand for read type (R1, R2)
-    :param out_dir: output dir path for fastq dataframe
-    :return: fastq_dataframe
+
+    Parameters
+    ----------
+    file_path
+        Accept 1. path pattern, 2. path list, 3. path of one file contain all the paths.
+    name_pattern
+        Name pattern of file paths, format example: "Field1_Field2_Field3_..._Fieldn".
+        Both file name (after remove suffix part after frist '.') and
+        name pattern are split by '_' and match together.
+        If the length after split is not the same, error will be raised.
+    uid_field
+        field(s) in name pattern that can combine to uid for multiplexed fileset. will be linked by '-'
+    lane_field
+        field in name pattern that stand for lane
+    read_type_field
+        field in name pattern that stand for read type (R1, R2)
+    out_dir
+        output dir path for fastq dataframe
+
+    Returns
+    -------
+        fastq_dataframe for pipeline input.
     """
     if isinstance(file_path, str) and ('*' in file_path):
         file_path = [str(pathlib.Path(p).absolute()) for p in glob.glob(file_path)]
@@ -52,10 +69,10 @@ def get_fastq_dataframe(file_path, name_pattern,
         fastq_data.append(name_series)
 
     fastq_df = pd.DataFrame(fastq_data)
-    print(len(broken_names), 'broken names.')
-    print(fastq_df.shape[0], 'valid fastq names.')
+    log.info(len(broken_names), 'broken names.')
+    log.info(fastq_df.shape[0], 'valid fastq names.')
     if fastq_df.shape[0] == 0:
-        print('No fastq name remained, check if the name pattern is correct.')
+        log.info('No fastq name remained, check if the name pattern is correct.')
         return None
 
     fastq_df['uid'] = fastq_df[uid_fields].apply(lambda i: '-'.join(i.tolist()), axis=1)
@@ -80,6 +97,22 @@ def get_fastq_dataframe(file_path, name_pattern,
 
 
 def batch_pipeline(fastq_dataframe, out_dir, config_path):
+    """
+    Parallel version of mapping pipeline.
+    Only generate a command.json file, not actually running the mapping.
+    Use yap qsub to submit the mapping jobs.
+
+    Parameters
+    ----------
+    fastq_dataframe
+        Input dataframe for all fastq file path and metadata.
+        Must include columns: uid, read_type, index_name, lane
+    out_dir
+        pipeline universal out_dir
+    config_path
+        pipeline universal config
+    """
+
     # prepare out_dir
     out_dir = pathlib.Path(out_dir).absolute()
     out_dir.mkdir(parents=True)
@@ -121,7 +154,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
                    f'--command_file_path {cmd_json_path} ' \
                    f'--total_cpu 160 --submission_gap 2 --qstat_gap 60'
 
-    print(f"""
+    log.info(f"""
     The output directory is prepared. All related files have been copied to that directory.
     ---------------------------------------------------------------------------------------
     - Output directory: {out_dir}

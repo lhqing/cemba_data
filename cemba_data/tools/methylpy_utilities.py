@@ -889,7 +889,7 @@ def index_allc_file(allc_file, reindex=False):
             return 0
     g = open(index_file, 'w')
     if 'gz' in allc_file:
-        subprocess.run(f'pigz -d -p 8 {allc_file}')
+        subprocess.run(f'pigz -d -p 8 {allc_file}', shell=True)
         f = open(allc_file[:-3])
     else:
         f = open(allc_file)
@@ -922,7 +922,7 @@ def index_allc_file(allc_file, reindex=False):
     f.close()
     g.close()
     if 'gz' in allc_file:
-        subprocess.run(f'pigz -p 8 {allc_file[:-3]}')
+        subprocess.run(f'pigz -p 8 {allc_file[:-3]}', shell=True)
     return 0
 
 

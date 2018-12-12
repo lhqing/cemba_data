@@ -177,7 +177,9 @@ def _prepare_study_generator(
         mc_type,
         count_type,
         iter_chunksize):
-    """Only call this from prepare study"""
+    """
+    generator for iterating through all netcdf_files, only call this from prepare study
+    """
     cell_list_chunks = (cell_list[i:i + iter_chunksize]
                         for i in range(0, len(cell_list), iter_chunksize))
     for cell_chunk in cell_list_chunks:

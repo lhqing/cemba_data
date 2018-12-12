@@ -223,11 +223,18 @@ import collections
 
 
 def _read_faidx(faidx_path):
+    """
+    Read fadix of reference fasta file
+    samtools fadix ref.fa
+    """
     return pd.read_table(faidx_path, index_col=0, header=None,
                          names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
 
 
 def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
+    """
+    read a whole chromosome sequence into memory
+    """
     if query_chrom not in fai_df.index:
         return None
     else:
@@ -246,6 +253,31 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
 def _call_methylated_sites_worker(bam_path, reference_fasta,
                                   num_upstr_bases, num_downstr_bases,
                                   buffer_line_number, min_mapq, min_base_quality):
+    """
+    Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
+    and pipe to this function to generate mC and cov count. Only for single cell, not base level statistics.
+
+    Parameters
+    ----------
+    bam_path
+        path of input bam file
+    reference_fasta
+        path of reference fasta, no assumption, should be the same as mapping
+    num_upstr_bases
+        number of base before mC
+    num_downstr_bases
+        number of base after mC
+    buffer_line_number
+        number of buffer line
+    min_mapq
+        minimum MAPQ for a read being considered, samtools mpileup parameter
+    min_base_quality
+        minimum base quality for a base being considered, samtools mpileup parameter
+    Returns
+    -------
+    count_df
+        A dataframe contain all mC context summary counts.
+    """
     # Check fasta index
     if not pathlib.Path(reference_fasta + ".fai").exists():
         raise FileNotFoundError("Reference fasta not indexed. Use samtools faidx to index it and run again.")
@@ -255,7 +287,8 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
         subprocess.check_call(shlex.split("samtools index " + bam_path))
 
     # mpileup
-    mpileup_cmd = f"samtools mpileup -Q {min_base_quality} -q {min_mapq} -B -f {reference_fasta} {bam_path}"
+    mpileup_cmd = f"samtools mpileup -Q {min_base_quality} " \
+                  f"-q {min_mapq} -B -f {reference_fasta} {bam_path}"
     pipes = subprocess.Popen(shlex.split(mpileup_cmd),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
@@ -267,20 +300,26 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     file_dir = input_path.parent
     allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
     output_path = str(file_dir / allc_name)
-    output_filehandler = gzip.open(output_path, 'wt')
+    output_file_handler = gzip.open(output_path, 'wt')
 
-    # process mpileup result
-    complement = {"A": "T", "C": "G", "G": "C", "T": "A", "N": "N"}
+    # initialize variables
+    complement = {"A": "T",
+                  "T": "A",
+                  "C": "G",
+                  "G": "C",
+                  "N": "N"}
     mc_sites = {'C', 'G'}
     context_len = num_upstr_bases + 1 + num_downstr_bases
     cur_chrom = ""
     line_counts = 0
     out = ""
-    seq = None
+    seq = None  # whole cur_chrom seq
     chr_out_pos_list = []
     cur_out_pos = 0
     cov_dict = collections.defaultdict(int)  # context: cov_total
     mc_dict = collections.defaultdict(int)  # context: mc_total
+
+    # process mpileup result
     for line in result_handle:
         fields = line.split("\t")
         fields[2] = fields[2].upper()
@@ -374,14 +413,14 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
                 cur_out_pos += len(data)
 
         if line_counts > buffer_line_number:
-            output_filehandler.write(out)
+            output_file_handler.write(out)
             line_counts = 0
             out = ""
 
     if line_counts > 0:
-        output_filehandler.write(out)
+        output_file_handler.write(out)
     result_handle.close()
-    output_filehandler.close()
+    output_file_handler.close()
 
     with open(output_path + '.idx', 'w') as idx_f:
         for (chrom, out_pos) in chr_out_pos_list:
@@ -394,6 +433,22 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
 
 
 def call_methylated_sites(bam_result_df, out_dir, config):
+    """
+    Parallel function for ALLC calling.
+
+    Parameters
+    ----------
+    bam_result_df
+        dataframe from bam qc step
+    out_dir
+        universal pipeline out_dir
+    config
+        universal pipeline config
+    Returns
+    -------
+    allc_count_df
+        id columns are: uid, index_name
+    """
     reference_fasta = config['callMethylation']['reference_fasta']
     num_upstr_bases = int(config['callMethylation']['num_upstr_bases'])
     num_downstr_bases = int(config['callMethylation']['num_downstr_bases'])
