@@ -5,7 +5,7 @@
 - **Regulatory region analysis**
 
 ## Giant workflow
-[TODO]
+[!Giant workflow](/doc/image/pipeline.svg)
 
 ## Documentation
 [TODO] [Here](https://cemba-data.readthedocs.io/en/latest)
