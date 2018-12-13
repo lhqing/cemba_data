@@ -6,7 +6,33 @@ import numpy as np
 def plot_on_plate(data, value_col, groupby, ncols=4,
                   plate_base=384, figsize=(5, 3.5),
                   vmin=0, vmax=1, heatmap_kws=None, aggregation_func=None):
-    """magic"""
+    """
+    Plot metadata into 384 or 96 plate view (heatmap)
+
+    Parameters
+    ----------
+    data
+        dataframe contain all kinds of metadata
+    value_col
+        value to be plotted on plate view
+    groupby
+        groupby column, typically groupby plate id column(s) to plot each plate separately
+    ncols
+        number of column for axes, nrows will be calculated accordingly
+    plate_base
+        {384, 96} size of the plate view
+    figsize
+        matplotlib.Figure figsize
+    vmin
+        cmap vmin
+    vmax
+        cmap vmax
+    heatmap_kws
+        kws pass to sns.heatmap
+    aggregation_func
+        apply to reduce rows after groupby if the row is not unique
+    """
+
     heatmap_data_list = []
     heatmap_names = []
     for plate, sub_df in data.groupby(groupby):
@@ -51,30 +77,31 @@ def simple_violin(data, x, y, rotate_x=True):
     return fig, ax
 
 
-def cutoff_vs_cell_remain(data, value_col, cutoff_num=1000,
-                          xlim=None, distribution_ylim=None,
-                          bins=100, kde=False):
-    if xlim is None:
-        xlim = (data[value_col].min(), data[value_col].max())
-
+def cutoff_vs_cell_remain(data, cutoff_num=1000,
+                          xlim_quantile=(0.001, 0.999), distribution_ylim=None,
+                          bins=100, kde=False, count_percent=True):
+    xlim = tuple(np.quantile(data, xlim_quantile))
     x = np.linspace(xlim[0], xlim[1], cutoff_num)
-    count_list = [(data[value_col] > i).sum() for i in x]
+    count_list = np.array([(data > i).sum() for i in x])
+    original_total_data = data.size
+    if count_percent:
+        count_list = count_list / original_total_data
+    data = data[(data < xlim[1]) & (data > xlim[0])]
 
     fig, ax1 = plt.subplots()
-    ax1 = sns.distplot(data[value_col], bins=50, kde=kde,
+    ax1.grid()
+    ax1 = sns.distplot(data, bins=bins, kde=kde,
                        ax=ax1)
-    if distribution_ylim is None:
-        distribution_ylim = (0, (data.shape[0] / bins) * 4)
-    ax1.set_ylim(*distribution_ylim)
-    ax1.set_ylabel('Cell Number in Bin')
+    ax1.set_xlim(xlim)
+    ax1.set_xlabel('Data Point Count')
+    if distribution_ylim is not None:
+        ax1.set_ylim(*distribution_ylim)
 
     ax2 = ax1.twinx()
     sns.scatterplot(x=x, y=count_list, linewidth=0, legend=None,
                     s=5, hue=x, palette='viridis', ax=ax2)
-    ax2.set_xlabel('Final Reads Cutoff')
-    ax2.set_ylabel('Cell Pass Cutoff')
-    ax2.set_title(f'Cell {value_col} Cutoff & Pass')
-    return fig
+    ax2.set_ylabel('% of Data Pass Filter')
+    return fig, (ax1, ax2)
 
 
 def success_vs_fail(data, filter_col, filter_cutoff, x, y):
