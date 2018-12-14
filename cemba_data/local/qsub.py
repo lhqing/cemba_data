@@ -1,3 +1,10 @@
+"""
+SGE qsub system auto-submitter
+
+TODO: add qacct check and better report run time and success/failure
+TODO: Standardize parameter support
+"""
+
 from subprocess import run, PIPE
 import os
 import json

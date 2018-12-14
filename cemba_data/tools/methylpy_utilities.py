@@ -936,7 +936,7 @@ def read_allc_index(allc_file):
             fields = line.rstrip().split("\t")
             chrom_pointer[fields[0]] = int(fields[1])
     f.close()
-    return (chrom_pointer)
+    return chrom_pointer
 
 
 def remove_allc_index(allc_file):
@@ -1108,7 +1108,8 @@ def split_mpileup_file(num_chunks, inputf, output_prefix):
             chunk_num += 1
             # This code looks a bit weird, but it's to handle a nasty edge case.
             # There's a problem if there is a C in one of the last two positions of a chunk
-            # This information is needed at the end of the current file (to figure out the context of previous cytosines)
+            # This information is needed at the end of the current file
+            # (to figure out the context of previous cytosines)
             # and the beginning of the next (to create new positions in the allc file). Consequently I write
             # the last two positions of a file again to the beginning of the next file.
             g = open(output_prefix + str(chunk_num), 'w')
@@ -1374,6 +1375,3 @@ def print_warning(error_message=""):
     sys.stderr.write("Warning:\n" + error_message)
     # sys.exit(1)
 
-
-if __name__ == '__main__':
-    pass

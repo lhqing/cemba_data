@@ -4,7 +4,7 @@ import json
 import glob
 import pandas as pd
 import argparse
-from ..mapping.pipeline import validate_fastq_dataframe
+from cemba_data.mapping.pipeline import validate_fastq_dataframe
 import logging
 
 # logger

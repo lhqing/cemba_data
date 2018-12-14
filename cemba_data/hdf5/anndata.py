@@ -169,7 +169,3 @@ def highly_variable_genes(
                    ('means', 'float32'),
                    ('dispersions', 'float32'),
                    ('dispersions_norm', 'float32')])
-
-
-import scanpy.api as sc
-sc.pl.highly_variable_genes()

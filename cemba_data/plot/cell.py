@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 import scanpy.api as sc
-from ..data.deprecated_hdf5 import Study
-from .zoo import *
+from cemba_data.local.zoo import *
 
 
 def get_feature_dispersion(ann, min_mean=0.2, max_mean=1.25, min_disp=0.3, n_bins=50):
@@ -25,16 +24,6 @@ def get_feature_dispersion(ann, min_mean=0.2, max_mean=1.25, min_disp=0.3, n_bin
     fig.tight_layout()
     print(f'{filter_result.gene_subset.sum()} features been selected.')
     return filter_result
-
-
-def ann_to_study(ann):
-    col_dict = ann.var.to_dict('series')
-    col_dict['col_names'] = ann.var.index
-    row_dict = ann.obs.to_dict('series')
-    row_dict['row_names'] = ann.obs.index
-    uns_dict = ann.uns
-    study = Study(ann.X, col_dict=col_dict, row_dict=row_dict, uns_dict=uns_dict, study_name=None)
-    return study
 
 
 def plot_feature_set(ann):
@@ -121,26 +110,6 @@ def plot_genes(gene_list, ann, s=1, vmin=0.01, vmax=0.99, species='mouse'):
     fig.set_size_inches(3 * len(marker_list), 6)
     fig.tight_layout()
     return fig, axes
-
-
-def anno_gene_ann(gene_ann, compute_ann, cell_meta):
-    for k, v in compute_ann.uns.items():
-        gene_ann.uns[k] = v
-
-    gene_ann = gene_ann[compute_ann.obs_names, :]
-    for var_name, var_data in compute_ann.var.iteritems():
-        gene_ann.var[var_name] = var_data
-
-    for obs_name, obs_data in compute_ann.obs.iteritems():
-        gene_ann.obs[obs_name] = obs_data
-
-    for k in compute_ann.obsm.keys():
-        gene_ann.obsm[k] = compute_ann.obsm[k]
-
-    for col, data in cell_meta.iteritems():
-        if col in ['region', 'replicate', 'Total reads', 'Mapped reads', 'mCG/CG', 'mCH/CH', '% Genome covered']:
-            gene_ann.obs[col] = data
-    return gene_ann
 
 
 def category_color_transfer(categories, cmap=None, shuffle=False):
