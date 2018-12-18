@@ -170,36 +170,3 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
     """)
 
     return str(cmd_json_path)
-
-
-def batch_pipeline_register_subparser(subparser):
-    parser = subparser.add_parser('mapping-qsub',
-                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
-    parser.set_defaults(func=batch_pipeline)
-
-    parser_req = parser.add_argument_group("Required inputs")
-
-    parser_req.add_argument(
-        "--fastq_dataframe",
-        type=str,
-        required=True,
-        help="Path of fastq dataframe, can be generate with yap fastq_dataframe"
-    )
-
-    parser_req.add_argument(
-        "--out_dir",
-        type=str,
-        required=True,
-        help="Pipeline output directory, if not exist, will create recursively."
-    )
-
-    parser_req.add_argument(
-        "--config_path",
-        type=str,
-        required=True,
-        default=None,
-        help="Pipeline configuration (.ini) file path. "
-             "You can use 'yap default-mapping-config' to print out default config can modify it."
-    )
-    return

@@ -15,7 +15,7 @@ setup(
                       'matplotlib', 'seaborn', 'allensdk', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
                       'six', 'xarray', 'magic'],
     entry_points={
-        'console_scripts': ['yap=cemba_data.parser:get_common_parser'],
+        'console_scripts': ['yap=cemba_data.__main__:main'],
     }
 )
 
