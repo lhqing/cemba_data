@@ -170,8 +170,8 @@ def fastq_qc(demultiplex_result, out_dir, config):
     for (uid, index_name), sub_df in demultiplex_result.groupby(['uid', 'index_name']):
         sample_demultiplex_total = sub_df['Trimmed'].sum()
         if sample_demultiplex_total < total_reads_threshold:
-            log.info(uid, index_name,
-                     'skipped due to too less reads:', sample_demultiplex_total)
+            log.info(f'In  uid {uid}: index {index_name} skipped '
+                     f'due to too less reads: {sample_demultiplex_total}')
             continue
         # process R1
         r1_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R1.fq.gz'
