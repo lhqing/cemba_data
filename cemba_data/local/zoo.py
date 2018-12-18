@@ -5,8 +5,6 @@ cat is private, may not work outside my server...
 more animals are adding...
 """
 
-from .deprecated_prepare_dataset import ref_path_config
-from .deprecated_prepare_study import dataset_config
 import pandas as pd
 import numpy as np
 import collections
@@ -29,6 +27,7 @@ def _get_cell_metadata_df(cell_meta_path, region_list, dataset_col, allc_path_co
     return cell_total_df
 
 
+"""
 class _Cat:
     def __init__(self):
         self.dataset_config = dataset_config
@@ -70,6 +69,7 @@ class _Cat:
                 print(f'Warning, the {gene_id} have {sub_gene_df.shape[0]} matches in gene table.'
                       f' Return the 1st one.')
             return sub_gene_df.index[0]
+"""
 
 
 class _Dog:
@@ -123,6 +123,4 @@ class _Dog:
         """
         return
 
-    
-dog = _Dog()
-cat = _Cat()
+
