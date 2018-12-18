@@ -25,12 +25,11 @@ def parse_mc_pattern(pattern):
     :param pattern: length and C position should match ALLC
     :return: context set
     """
-    # TODO support full IUPAC table
+    # IUPAC DNA abbr. table
+
     all_pos_list = []
+    pattern = pattern.upper()
     for base in pattern:
-        if base in 'hH':
-            all_pos_list.append('ATC')
-        elif base in '*-_Nn':
         try:
             all_pos_list.append(IUPAC_TABLE[base])
         except KeyError:
