@@ -1,5 +1,22 @@
 import itertools
 import collections
+IUPAC_TABLE = {
+        'A': 'A',
+        'T': 'T',
+        'C': 'C',
+        'G': 'G',
+        'R': 'AG',
+        'Y': 'CT',
+        'S': 'GC',
+        'W': 'AT',
+        'K': 'GT',
+        'M': 'AC',
+        'B': 'CGT',
+        'D': 'AGT',
+        'H': 'ATC',
+        'V': 'ACG',
+        'N': 'ATCG'
+    }
 
 
 def parse_mc_pattern(pattern):
@@ -14,9 +31,10 @@ def parse_mc_pattern(pattern):
         if base in 'hH':
             all_pos_list.append('ATC')
         elif base in '*-_Nn':
-            all_pos_list.append('ATCG')
-        else:
-            all_pos_list.append(base.upper())
+        try:
+            all_pos_list.append(IUPAC_TABLE[base])
+        except KeyError:
+            raise KeyError(f'Base {base} is not in IUPAC table.')
     context_set = set([''.join(i) for i in itertools.product(*all_pos_list)])
     return context_set
 
