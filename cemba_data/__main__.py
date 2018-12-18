@@ -478,6 +478,8 @@ def main():
     # execute command
     args_vars = vars(args)
     cur_command = args_vars.pop('command')
+    if len(args_vars) == 1:
+        parser.parse_args([cur_command, "-h"])
     # Do real import here:
     if cur_command == 'qsub':
         from .local.qsub import qsub as func
