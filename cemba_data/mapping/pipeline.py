@@ -3,7 +3,6 @@ import pathlib
 import configparser
 import os
 import collections
-import argparse
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
 from .allc import call_methylated_sites
@@ -168,8 +167,8 @@ def summary_pipeline_stat(out_dir):
         .rename(columns={c: c + '_Mc' for c in ['CA', 'CC', 'CG', 'CT']})
     mc_df['CH_Mc'] = mc_df[['CA_Mc', 'CC_Mc', 'CT_Mc']].sum(axis=1)
     # add mc rate
-    mc_df['CH_Rate'] = mc_df['CH_Mc'] / mc_df['CH_Cov']
-    mc_df['CG_Rate'] = mc_df['CG_Mc'] / mc_df['CG_Cov']
+    mc_df['CH_Rate'] = mc_df['CH_Mc'] / cov_df['CH_Cov']
+    mc_df['CG_Rate'] = mc_df['CG_Mc'] / cov_df['CG_Cov']
 
     # concat total meta
     total_meta = pd.concat([demultiplex_result, fastq_trim_result, bismark_result,

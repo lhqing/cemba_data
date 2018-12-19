@@ -89,7 +89,6 @@ def cutoff_vs_cell_remain(data, cutoff_num=1000,
     data = data[(data < xlim[1]) & (data > xlim[0])]
 
     fig, ax1 = plt.subplots()
-    ax1.grid()
     ax1 = sns.distplot(data, bins=bins, kde=kde,
                        ax=ax1)
     ax1.set_xlim(xlim)
@@ -101,14 +100,14 @@ def cutoff_vs_cell_remain(data, cutoff_num=1000,
     sns.scatterplot(x=x, y=count_list, linewidth=0, legend=None,
                     s=5, hue=x, palette='viridis', ax=ax2)
     ax2.set_ylabel('% of Data Pass Filter')
+    ax2.grid()
     return fig, (ax1, ax2)
 
 
-def success_vs_fail(data, filter_col, filter_cutoff, x, y):
+def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
     use_data = data.copy()
     use_data['filter'] = (data[filter_col] > filter_cutoff).apply(lambda i: 'Success' if i else 'Fail')
-    fig, ax = plt.subplots()
     sns.violinplot(x=x, y=y, data=use_data, hue='filter',
                    ax=ax)
     ax.tick_params(axis='x', rotation=90)
-    return fig, ax
+    return ax
