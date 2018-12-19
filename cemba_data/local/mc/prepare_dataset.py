@@ -5,7 +5,6 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import multiprocessing
-import argparse
 
 
 def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,

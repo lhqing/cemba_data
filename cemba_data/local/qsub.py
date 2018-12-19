@@ -12,7 +12,6 @@ import datetime
 import re
 import sys
 import time
-import argparse
 
 
 def default_command_dict(name, error_path, output_path, working_dir,
@@ -231,4 +230,3 @@ def qsub(command_file_path, working_dir, project_name, total_cpu=60, submission_
                            qstat_gap=qstat_gap)
     print(f'{len(submitter.commands)} jobs finished.')
     return
-

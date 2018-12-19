@@ -3,7 +3,6 @@ import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
 from subprocess import run
-import argparse
 import os
 from .methylpy_utilities import merge_allc_files
 

@@ -3,7 +3,6 @@ import os
 import json
 import glob
 import pandas as pd
-import argparse
 from cemba_data.mapping.pipeline import validate_fastq_dataframe
 import logging
 
@@ -142,7 +141,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
         command_dict = {
             'command': uid_cmd,
             '-pe smp': 20,  # cpu for each command
-            # TODO set cup number more clever
+            # TODO set cpu number more clever
         }
         cmd_list.append(command_dict)
     cmd_json_path = out_dir / 'command.json'
