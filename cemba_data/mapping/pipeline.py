@@ -92,11 +92,12 @@ def summary_pipeline_stat(out_dir):
     for f in out_dir.glob('**/stats/*tsv.gz'):
         df = pd.read_table(f)
         stat_dict[f.name.split('.')[0]].append(df)
+    # result df is a dict contain 5 concat dfs for raw metadata
     result_dfs = {}
     for k, v in stat_dict.items():
         result_dfs[k] = pd.concat(v, ignore_index=True, sort=True)
 
-    # demultiplex stat
+    # demultiplex stat, from cutadapt demultiplex step
     demultiplex_result = result_dfs['demultiplex_result'].groupby(['uid', 'index_name']) \
         .sum()[['TotalPair', 'Trimmed']]
     demultiplex_result.rename(columns={'TotalPair': 'MultiplexReadsTotal',
@@ -122,10 +123,10 @@ def summary_pipeline_stat(out_dir):
         'IndexReadsTotal']
 
     # bismark stat
-    bismark_r1 = result_dfs['bismark_result'][result_dfs['bismark_result']['read_type'].apply(lambda i: '1' in i)]\
+    bismark_r1 = result_dfs['bismark_result'][result_dfs['bismark_result']['read_type'].apply(lambda i: '1' in i)] \
         .set_index(['uid', 'index_name'])[['CTOB', 'CTOT', 'mapping_rate', 'total_c',
                                            'total_reads', 'unique_map', 'unmap', 'ununique_map']]
-    bismark_r1.rename(columns={'mapping_rate': 'R1MappedRatio',
+    bismark_r1.rename(columns={'mapping_rate': 'R1MappedRatio',  # this mapping rate is unique mapping rate
                                'total_c': 'R1TotalC',
                                'total_reads': 'R1TrimmedReads',
                                'unique_map': 'R1UniqueMappedReads',
@@ -143,32 +144,44 @@ def summary_pipeline_stat(out_dir):
                                'ununique_map': 'R2UnuniqueMappedReads'},
                       inplace=True)
     bismark_result = pd.concat([bismark_r1, bismark_r2], sort=True, axis=1)
+    bismark_result['TotalUniqueMappedReads'] = \
+        bismark_result['R1UniqueMappedReads'] + bismark_result['R2UniqueMappedReads']
+    bismark_result['TotalMappedRatio'] = bismark_result['TotalUniqueMappedReads'] / bismark_result[
+        'R1TrimmedReads', 'R2TrimmedReads'].sum(axis=1)
 
-    bam_result = result_dfs['bam_process_result'].groupby(['uid', 'index_name'])\
-        .sum()[['UNPAIRED_READ_DUPLICATES', 'out_reads']]\
+    bam_result = result_dfs['bam_process_result'].groupby(['uid', 'index_name']) \
+        .sum()[['UNPAIRED_READ_DUPLICATES', 'out_reads']] \
         .rename(columns={'UNPAIRED_READ_DUPLICATES': 'DupReads',
                          'out_reads': 'DeduppedReads'})
     bam_result['DeduppedRatio'] = bam_result['DeduppedReads'] / bam_result.sum(axis=1)
 
     # ALLC stat
-    cov_df = result_dfs['allc_total_result']\
-        .set_index(['uid', 'index_name', 'index'])['cov']\
-        .unstack('index')\
+    cov_df = result_dfs['allc_total_result'] \
+        .set_index(['uid', 'index_name', 'index'])['cov'] \
+        .unstack('index') \
         .fillna(0).astype(int)
+    ccc_cov = cov_df['CCC']
     cov_df = cov_df.groupby(lambda i: i[:2], axis=1) \
         .sum()[['CA', 'CC', 'CG', 'CT']] \
         .rename(columns={c: c + '_Cov' for c in ['CA', 'CC', 'CG', 'CT']})
     cov_df['CH_Cov'] = cov_df[['CA_Cov', 'CC_Cov', 'CT_Cov']].sum(axis=1)
-    mc_df = result_dfs['allc_total_result']\
-        .set_index(['uid', 'index_name', 'index'])['mc']\
+    mc_df = result_dfs['allc_total_result'] \
+        .set_index(['uid', 'index_name', 'index'])['mc'] \
         .unstack('index').fillna(0).astype(int)
-    mc_df = mc_df.groupby(lambda i: i[:2], axis=1)\
-        .sum()[['CA', 'CC', 'CG', 'CT']]\
+    ccc_mc = mc_df['CCC']
+    mc_df = mc_df.groupby(lambda i: i[:2], axis=1) \
+        .sum()[['CA', 'CC', 'CG', 'CT']] \
         .rename(columns={c: c + '_Mc' for c in ['CA', 'CC', 'CG', 'CT']})
     mc_df['CH_Mc'] = mc_df[['CA_Mc', 'CC_Mc', 'CT_Mc']].sum(axis=1)
     # add mc rate
     mc_df['CH_Rate'] = mc_df['CH_Mc'] / cov_df['CH_Cov']
     mc_df['CG_Rate'] = mc_df['CG_Mc'] / cov_df['CG_Cov']
+    # add CCC rate and use it to add adj mc rate
+    mc_df['CCC_Mc'] = ccc_mc
+    mc_df['CCC_Cov'] = ccc_cov
+    mc_df['CCC_Rate'] = ccc_mc / ccc_cov
+    mc_df['CH_RateAdj'] = (mc_df['CH_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
+    mc_df['CG_RateAdj'] = (mc_df['CG_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
 
     # concat total meta
     total_meta = pd.concat([demultiplex_result, fastq_trim_result, bismark_result,
@@ -238,7 +251,6 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     else:
         fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
                               sep='\t', compression='gzip', index=None)
-
     log.info('Use bismark and bowtie2 to do mapping.')
     # bismark
     bismark_df = bismark(fastq_final_df, out_dir, config)
@@ -248,19 +260,15 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     else:
         bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
-
     log.info('Deduplicate and filter bam files.')
     # bam
     bam_df = bam_qc(bismark_df, out_dir, config)
     bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
                   sep='\t', compression='gzip', index=None)
-
     log.info('Calculate mC sites.')
     # allc
     allc_df = call_methylated_sites(bam_df, out_dir, config)
     allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
-
     log.info('Mapping finished.')
     return 0
-
