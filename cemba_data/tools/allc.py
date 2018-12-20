@@ -100,16 +100,25 @@ def map_to_region(allc_path, out_path_prefix,
     """
     Map one allc file into many region set bed file using bedtools map.
     Count mC and coverage in each region for each context pattern.
-    :param allc_path:
-    :param out_path_prefix:
-    :param region_bed_path:
-    :param region_name:
-    :param genome_size_path:
-    :param context_pattern:
-    :param max_cov_cutoff:
-    :param remove_tmp:
-    :return:
+
+    Parameters
+    ----------
+    allc_path
+    out_path_prefix
+    region_bed_path
+    region_name
+    genome_size_path
+        UCSC chrom.sizes file, will determine which chrom to keep in the output.
+        Use main chrom if want to remove those random contigs
+    context_pattern
+    max_cov_cutoff
+    remove_tmp
+
+    Returns
+    -------
+
     """
+
     # parse ref chrom with ordered chromosome
     ref_chrom_dict = parse_chrom_size(genome_size_path)
 

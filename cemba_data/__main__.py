@@ -197,31 +197,34 @@ def batch_map_to_region_register_subparser(subparser):
 
     parser_req.add_argument(
         "--region_bed_path",
-        type=list,
+        type=str,
         required=True,
         default=None,
+        nargs='+',
         help="Space separated path list for reference region bed files"
     )
 
     parser_req.add_argument(
         "--region_name",
-        type=list,
+        type=str,
         required=True,
         default=None,
+        nargs='+',
         help="Space separated name list for reference region bed files, corresponding to region_bed_path"
     )
 
     parser_req.add_argument(
         "--context_pattern",
-        type=list,
+        type=str,
         required=True,
         default=None,
+        nargs='+',
         help="Space separated mC context pattern list"
     )
 
     parser_req.add_argument(
         "--genome_size_path",
-        type=list,
+        type=str,
         required=True,
         default=None,
         help="File path for the chrom.sizes file of reference genome fasta"
@@ -229,7 +232,7 @@ def batch_map_to_region_register_subparser(subparser):
 
     parser_req.add_argument(
         "--max_cov_cutoff",
-        type=list,
+        type=int,
         required=True,
         default=None,
         help="Maximum base cov, for normal single cell data, recommended value is 2."
