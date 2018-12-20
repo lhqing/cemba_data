@@ -47,6 +47,7 @@ def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
             allc_files = [line.strip() for line in f]
 
     for f in allc_files:
+        f = pathlib.Path(f)
         if 'stats' in f.parent.name:
             continue
         out_path_prefix = str(out_dir / f.stem)
