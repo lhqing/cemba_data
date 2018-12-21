@@ -3,6 +3,9 @@ import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
 from subprocess import run
+from collections import defaultdict
+import pandas as pd
+import numpy as np
 import os
 from .methylpy_utilities import merge_allc_files
 
@@ -68,7 +71,7 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
             ll = line.split('\t')
             # filter max cov (for single cell data)
             if (max_cov_cutoff is not None) and (int(ll[5]) > max_cov_cutoff):
-                    continue
+                continue
             # judge chrom
             chrom = ll[0]
             if need_to_add_chr:
@@ -278,3 +281,92 @@ def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern
                 out_allc.write('\t'.join(cur_line) + '\n')
     print('Extract CG finished:', out_path)
     return
+
+
+def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, save_profile=False):
+    """
+    Generate approximate profile for allc file. 1e8 rows finish in about 5 min.
+
+    Parameters
+    ----------
+    allc_path
+        path of the allc file
+    drop_n
+        whether drop context contain N
+    n_rows
+        number of rows to use, 1e8 is sufficient to get an approximate profile
+    save_profile
+        whether save the profile, if True, save as {allc_path}.profile
+    Returns
+    -------
+
+    """
+    if 'gz' in allc_path:
+        opener = partial(gzip.open, mode='rt')
+    else:
+        opener = partial(open, mode='r')
+
+    # initialize count dict
+    mc_sum_dict = defaultdict(int)
+    cov_sum_dict = defaultdict(int)
+    cov_sum2_dict = defaultdict(int)  # sum of square, for calculating variance
+    rate_sum_dict = defaultdict(float)
+    rate_sum2_dict = defaultdict(float)  # sum of square, for calculating variance
+    context_count_dict = defaultdict(int)
+    with opener(allc_path) as f:
+        n = 0
+        for line in f:
+            chrom, pos, strand, context, mc, cov, p = line.split('\t')
+            if drop_n and 'N' in context:
+                continue
+            # mc and cov
+            mc_sum_dict[context] += int(mc)
+            cov_sum_dict[context] += int(cov)
+            cov_sum2_dict[context] += int(cov) ** 2
+            # raw base rate
+            rate = int(mc) / int(cov)
+            rate_sum_dict[context] += rate
+            rate_sum2_dict[context] += rate ** 2
+            # count context finally
+            context_count_dict[context] += 1
+            n += 1
+            if (n_rows is not None) and (n >= n_rows):
+                break
+    # overall count
+    profile_df = pd.DataFrame({'partial_mc': mc_sum_dict,
+                               'partial_cov': cov_sum_dict})
+    profile_df['base_count'] = pd.Series(context_count_dict)
+    profile_df['overall_mc_rate'] = profile_df['partial_mc'] / profile_df['partial_cov']
+
+    # cov base mean and base std.
+    # assume that base cov follows normal distribution
+    cov_sum_series = pd.Series(cov_sum_dict)
+    cov_sum2_series = pd.Series(cov_sum2_dict)
+    profile_df['base_cov_mean'] = cov_sum_series / profile_df['base_count']
+    profile_df['base_cov_std'] = np.sqrt(
+        (cov_sum2_series / profile_df['base_count']) - profile_df['base_cov_mean'] ** 2)
+
+    # assume that base rate follow beta distribution
+    # so that observed rate actually follow joint distribution of beta (rate) and normal (cov) distribution
+    # here we use the observed base_rate_mean and base_rate_var to calculate
+    # approximate alpha and beta value for the base rate beta distribution
+    rate_sum_series = pd.Series(rate_sum_dict)
+    rate_sum2_series = pd.Series(rate_sum2_dict)
+    profile_df['base_rate_mean'] = rate_sum_series / profile_df['base_count']
+    profile_df['base_rate_var'] = (rate_sum2_series / profile_df['base_count']) - profile_df['base_rate_mean'] ** 2
+
+    # based on beta distribution mean, var
+    # a / (a + b) = base_rate_mean
+    # a * b / ((a + b) ^ 2 * (a + b + 1)) = base_rate_var
+    # we have:
+    a = (1 - profile_df['base_rate_mean']) * (profile_df['base_rate_mean'] ** 2) / profile_df['base_rate_var'] - \
+        profile_df['base_rate_mean']
+    b = a * (1 / profile_df['base_rate_mean'] - 1)
+    profile_df['base_beta_a'] = a
+    profile_df['base_beta_b'] = b
+
+    if save_profile:
+        profile_df.to_csv(allc_path+'.profile', sep='\t')
+        return None
+    else:
+        return profile_df
