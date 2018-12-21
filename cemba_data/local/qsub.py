@@ -52,6 +52,8 @@ class Qsubmitter:
                  total_cpu=60, submission_gap=2, qstat_gap=30):
         # prepare working_dir
         self.working_dir = working_dir
+        if project_name[0].isdigit():
+            raise ValueError('Project name can not start with number, qsub will fail.')
         self.project_name = project_name
         self.project_dir = self.working_dir + '/' + self.project_name + '_qsub'
         try:
