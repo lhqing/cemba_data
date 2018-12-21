@@ -48,8 +48,6 @@ def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
 
     for f in allc_files:
         f = pathlib.Path(f)
-        if 'stats' in f.parent.name:
-            continue
         out_path_prefix = str(out_dir / f.stem)
         region_paths = ' '.join(region_bed_path)
         region_names = ' '.join(region_name)
@@ -73,7 +71,7 @@ def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name map-to-region ' \
                    f'--command_file_path {cmd_json_path} ' \
-                   f'--total_cpu 160 --submission_gap 2 --qstat_gap 30'
+                   f'--total_cpu 100 --submission_gap 1 --qstat_gap 30'
 
     print(f"""
     The command file for map-to-region is prepared
