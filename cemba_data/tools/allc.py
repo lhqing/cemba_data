@@ -283,7 +283,7 @@ def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern
     return
 
 
-def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, out_path=None):
+def get_allc_profile(allc_path, drop_n=True, n_rows=100000000, out_path=None):
     """
     Generate approximate profile for allc file. 1e8 rows finish in about 5 min.
 
@@ -295,8 +295,8 @@ def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, out_path=None):
         whether drop context contain N
     n_rows
         number of rows to use, 1e8 is sufficient to get an approximate profile
-    save_profile
-        whether save the profile, if True, save as {allc_path}.profile
+    out_path
+        if not None, save profile to out_path
     Returns
     -------
 
