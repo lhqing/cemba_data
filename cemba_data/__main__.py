@@ -494,7 +494,7 @@ def main():
         from .local.mc.prepare_dataset import batch_map_to_region as func
     elif cur_command == 'map-to-region':
         from .tools.allc import map_to_region as func
-    elif cur_command == 'assemble_dataset':
+    elif cur_command == 'assemble-dataset':
         from .local.mc.prepare_dataset import assemble_dataset as func
     elif cur_command == 'allc-to-bigwig':
         from .tools.allc import allc_to_bigwig as func
