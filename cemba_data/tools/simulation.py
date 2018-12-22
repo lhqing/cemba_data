@@ -23,13 +23,18 @@ import numpy as np
 
 
 def simulate_allc(genome_cov_path,
-                  target_allc_path, allc_profile_path, out_path):
+                  target_allc_path, out_path, allc_profile_path=None):
     reader = subprocess.Popen(shlex.split(f'tabix -R {genome_cov_path} {target_allc_path}'),
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
                               encoding='utf8')
     genome_cov_bed = pd.read_table(genome_cov_path, header=None,
                                    names=['chrom', 'start', 'end', 'cov'])
+    if allc_profile_path is None:
+        allc_profile_path = str(target_allc_path) + '.profile'
+        if not pathlib.Path(allc_profile_path).exists():
+            raise FileNotFoundError(f'target ALLC file {allc_profile_path} do not have profile. '
+                                    f'use yap allc-profile to generate')
     allc_profile = pd.read_table(allc_profile_path, index_col=0)
     context_a = allc_profile['base_beta_a'].to_dict()
     context_ab = allc_profile[['base_beta_a', 'base_beta_b']].sum(axis=1).to_dict()
@@ -71,9 +76,9 @@ def simulate_allc(genome_cov_path,
     return
 
 
-def simulate_read_genome_cov(read_number_mean, read_number_sd,
-                             read_length_mean, read_length_sd,
-                             out_prefix, chrom_size_path, genome_cov=2, remove_chr=False):
+def simulate_long_reads_coverage(read_number_mean, read_number_sd,
+                                 read_length_mean, read_length_sd,
+                                 out_path, chrom_size_path, genome_cov=2, remove_chr=False):
     chrom_sizes = pd.read_table(chrom_size_path, header=None, index_col=0, squeeze=True, names=['chrom_size'])
     read_number = int(np.random.normal(read_number_mean, read_number_sd, 1))
     # the portion of reads to keep in each genome copy
@@ -109,7 +114,7 @@ def simulate_read_genome_cov(read_number_mean, read_number_sd,
         .genome_coverage(bg=True, g=chrom_size_path) \
         .sort() \
         .to_dataframe()
-    genome_cov_path = pathlib.Path(out_prefix+'.cov.bedgraph')
+    genome_cov_path = pathlib.Path(out_path)
     if remove_chr:
         genome_cov_bed.iloc[:, 0] = genome_cov_bed.iloc[:, 0].str[3:]
     genome_cov_bed.to_csv(genome_cov_path, sep='\t', index=None, header=None)
