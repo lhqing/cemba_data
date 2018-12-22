@@ -283,7 +283,7 @@ def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern
     return
 
 
-def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, save_profile=False):
+def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, out_path=None):
     """
     Generate approximate profile for allc file. 1e8 rows finish in about 5 min.
 
@@ -365,8 +365,8 @@ def get_allc_profile(allc_path, drop_n=True, n_rows=1e8, save_profile=False):
     profile_df['base_beta_a'] = a
     profile_df['base_beta_b'] = b
 
-    if save_profile:
-        profile_df.to_csv(allc_path+'.profile', sep='\t')
+    if out_path is not None:
+        profile_df.to_csv(out_path, sep='\t')
         return None
     else:
         return profile_df

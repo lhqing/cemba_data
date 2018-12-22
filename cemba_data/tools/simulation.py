@@ -22,21 +22,29 @@ import pandas as pd
 import numpy as np
 
 
-def simulate_allc(cell_region_path, genome_cov_path, target_allc_path, out_path):
-    reader = subprocess.Popen(shlex.split(f'tabix -R {cell_region_path} {target_allc_path}'),
+def simulate_allc(genome_cov_path,
+                  target_allc_path, allc_profile_path, out_path):
+    reader = subprocess.Popen(shlex.split(f'tabix -R {genome_cov_path} {target_allc_path}'),
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
                               encoding='utf8')
     genome_cov_bed = pd.read_table(genome_cov_path, header=None,
                                    names=['chrom', 'start', 'end', 'cov'])
+    allc_profile = pd.read_table(allc_profile_path, index_col=0)
+    context_a = allc_profile['base_beta_a'].to_dict()
+    context_ab = allc_profile[['base_beta_a', 'base_beta_b']].sum(axis=1).to_dict()
+
     cur_chrom = None
     cur_row = None
     cur_row_num = None
     chrom_read_cov = pd.DataFrame()
-    out_file = pathlib.Path(out_path)
+    out_file = pathlib.Path(out_path).absolute()
     f = out_file.open('w')
     for line in reader.stdout:
         chrom, pos, strand, context, mc, cov, p = line.split('\t')
+        if 'N' in context:
+            # N is very rare, just pass it
+            continue
         if chrom != cur_chrom:
             cur_chrom = chrom
             print(cur_chrom)
@@ -54,10 +62,9 @@ def simulate_allc(cell_region_path, genome_cov_path, target_allc_path, out_path)
         # the mc and cov is adjusted by assuming that mC% follow a prior distribution Beta(1, 1)
         # see https://www.nature.com/articles/nmeth.3035
         # this prevent the problem that most mC are 0, peak
-        adj_mc = int(mc) + 1
-        adj_cov = int(cov) + 2
+        adj_mc = float(mc) + context_a[context]  # mc + a
+        adj_cov = float(cov) + context_ab[context]  # cov + a + b
         read_mc = np.random.binomial(1, adj_mc / adj_cov, read_cov).sum()
-
         pseudo_line = [chrom, str(pos), strand, context, str(read_mc), str(read_cov), p]
         f.write('\t'.join(pseudo_line))
     f.close()
@@ -102,11 +109,9 @@ def simulate_read_genome_cov(read_number_mean, read_number_sd,
         .genome_coverage(bg=True, g=chrom_size_path) \
         .sort() \
         .to_dataframe()
-    cell_region_path = pathlib.Path(out_prefix+'.region.bed')
-    genome_cov_path = pathlib.Path(out_prefix+'.cov.bed')
+    genome_cov_path = pathlib.Path(out_prefix+'.cov.bedgraph')
     if remove_chr:
         genome_cov_bed.iloc[:, 0] = genome_cov_bed.iloc[:, 0].str[3:]
-    genome_cov_bed.iloc[:, :-1].to_csv(cell_region_path, sep='\t', index=None, header=None)
     genome_cov_bed.to_csv(genome_cov_path, sep='\t', index=None, header=None)
     return
 
