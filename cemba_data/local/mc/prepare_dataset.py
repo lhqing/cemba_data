@@ -100,6 +100,7 @@ def _read_count_table(file_path, region_name, cell_id):
 
 
 def assemble_dataset(out_dir, dataset_name, cpu):
+    out_dir = pathlib.Path(out_dir).absolute()
     records = []
     for f in out_dir.glob('**/*.count_table.bed.gz'):
         id_part, type_part, _, _, _ = f.name.split('.')
