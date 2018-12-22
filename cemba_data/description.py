@@ -1,8 +1,5 @@
 description = """
-yap (yet another pipeline)
-Toolkit for single cell sequencing analysis
-
-Author: Hanqing Liu, hanliu@salk.edu
+yap (yet another pipeline) is a toolkit for single cell sequencing analysis
 """
 
 epilog = """
