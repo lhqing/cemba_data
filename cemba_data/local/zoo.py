@@ -78,9 +78,6 @@ class _Dog:
 
     @staticmethod
     def sample_this(obj, n=None, frac=None, axis=None, replace=None, weights=None, seed=1994):
-        """
-        TODO versatile sample function for any array or matrix like data
-        """
         if frac is None and n is None:
             raise ValueError(f"frac and n can't be both None")
 
@@ -102,7 +99,6 @@ class _Dog:
                     n = int(obj.size * frac)
                 sample = np.random.choice(obj, size=n, replace=replace, p=weights)
             else:
-                # TODO nD array
                 print("Out of ability...")
                 return
         else:
@@ -116,11 +112,5 @@ class _Dog:
         print(f'Random sample size {len(sample)} for object type {type(obj)}, return type {type(sample)}')
         return sample
 
-    @staticmethod
-    def chunk_this(obj, bins=None, n=None, axis=None):
-        """
-        TODO versatile chunk function for any array or matrix like data
-        """
-        return
 
 

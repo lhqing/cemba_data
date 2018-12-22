@@ -22,11 +22,8 @@ IUPAC_TABLE = {
 def parse_mc_pattern(pattern):
     """
     parse mC context pattern
-    :param pattern: length and C position should match ALLC
-    :return: context set
     """
     # IUPAC DNA abbr. table
-
     all_pos_list = []
     pattern = pattern.upper()
     for base in pattern:
@@ -41,9 +38,6 @@ def parse_mc_pattern(pattern):
 def parse_chrom_size(path, remove_chr_list=None):
     """
     return chrom:length dict
-    :param path: ucsc chrom.size file
-    :param remove_chr_list: remove chromosomes from the return dict
-    :return: chrom:length dict
     """
     if remove_chr_list is None:
         remove_chr_list = []

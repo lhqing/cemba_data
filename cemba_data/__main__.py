@@ -1,3 +1,9 @@
+"""
+When adding new function:
+1. add a func_register_subparser function to register the subparser
+2. add a condition in main func about this new func name, import the real func as func in main
+"""
+
 import argparse
 import sys
 import inspect
@@ -146,7 +152,8 @@ def print_default_config_register_subparser(subparser):
 def batch_pipeline_register_subparser(subparser):
     parser = subparser.add_parser('mapping-qsub',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
+                                  help="Batch mapping pipeline from multiplexed FASTQ file to ALLC file. "
+                                       "Return a command.json file for yap qsub to submit on qsub.")
 
     parser_req = parser.add_argument_group("Required inputs")
 
@@ -178,7 +185,8 @@ def batch_pipeline_register_subparser(subparser):
 def batch_map_to_region_register_subparser(subparser):
     parser = subparser.add_parser('map-to-region-qsub',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
+                                  help="Batch map-to-region for a whole list of allc_files. "
+                                       "Generate a command.json file for yap qsub.")
     parser_req = parser.add_argument_group("Required inputs")
 
     parser_req.add_argument(
@@ -244,8 +252,7 @@ def batch_map_to_region_register_subparser(subparser):
 def assemble_dataset_register_subparser(subparser):
     parser = subparser.add_parser('assemble-dataset',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
-
+                                  help="Assemble dataset after got all region count bed files for a whole dataset.")
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
 

@@ -13,6 +13,8 @@ local/
     unstable code that only used for local analysis, may be changed or removed in any time.
 __main__.py
     enter point of yap
+
+# TODO add api for useful functions, like scanpy
 """
 
 __version__ = '0.1.2'

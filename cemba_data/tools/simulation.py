@@ -28,6 +28,19 @@ log = logging.getLogger()
 
 def simulate_allc(genome_cov_path,
                   target_allc_path, out_path, allc_profile_path=None):
+    """
+
+    Parameters
+    ----------
+    genome_cov_path
+    target_allc_path
+    out_path
+    allc_profile_path
+
+    Returns
+    -------
+
+    """
     reader = subprocess.Popen(shlex.split(f'tabix -R {genome_cov_path} {target_allc_path}'),
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,
@@ -47,6 +60,7 @@ def simulate_allc(genome_cov_path,
     cur_row = None
     cur_row_num = None
     chrom_read_cov = pd.DataFrame()
+    out_path = out_path.rstrip('.gz')
     out_file = pathlib.Path(out_path).absolute()
     f = out_file.open('w')
     for line in reader.stdout:
@@ -85,6 +99,23 @@ def simulate_allc(genome_cov_path,
 def simulate_long_reads_coverage(read_number_mean, read_number_sd,
                                  read_length_mean, read_length_sd,
                                  out_path, chrom_size_path, genome_cov=2, remove_chr=False):
+    """
+
+    Parameters
+    ----------
+    read_number_mean
+    read_number_sd
+    read_length_mean
+    read_length_sd
+    out_path
+    chrom_size_path
+    genome_cov
+    remove_chr
+
+    Returns
+    -------
+
+    """
     chrom_sizes = pd.read_table(chrom_size_path, header=None, index_col=0, squeeze=True, names=['chrom_size'])
     read_number = int(np.random.normal(read_number_mean, read_number_sd, 1))
     # the portion of reads to keep in each genome copy

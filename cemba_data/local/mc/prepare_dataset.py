@@ -100,6 +100,19 @@ def _read_count_table(file_path, region_name, cell_id):
 
 
 def assemble_dataset(out_dir, dataset_name, cpu):
+    """
+    TODO Re-write assemble dataset, use less memory
+
+    Parameters
+    ----------
+    out_dir
+    dataset_name
+    cpu
+
+    Returns
+    -------
+
+    """
     out_dir = pathlib.Path(out_dir).absolute()
     records = []
     for f in out_dir.glob('**/*.count_table.bed.gz'):
@@ -149,4 +162,3 @@ def assemble_dataset(out_dir, dataset_name, cpu):
     total_dataset = xr.Dataset(region_da_dict)
     total_dataset.to_netcdf(path=f'{out_dir}/{dataset_name}.mcds')
     return
-

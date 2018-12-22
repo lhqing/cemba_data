@@ -84,7 +84,6 @@ def large_categorical_scatter(x, y, color, data=None, sample=3000, size=5,
         _scatter = data_table.to.scatter(x, y)
         g = _scatter.overlay(color).opts(opts_dict)
     else:
-        # TODO
         g = None
     return g
 
@@ -108,7 +107,6 @@ def large_continuous_scatter(x, y, color, data=None, sample=3000, size=5,
         if add_hist:
             g = g.hist()
     else:
-        # TODO
         g = None
     return g
 
