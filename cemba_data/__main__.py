@@ -491,7 +491,7 @@ def simulate_read_genome_cov_register_subparser(subparser):
         "--chrom_size_path",
         type=str,
         required=True,
-        help="SD for read length (normal) distribution"
+        help="Path to the chromosome size file. UCSC chrom.sizes format."
     )
 
     parser_opt.add_argument(
@@ -507,7 +507,7 @@ def simulate_read_genome_cov_register_subparser(subparser):
         type=bool,
         required=False,
         default=False,
-        help="SD for read length (normal) distribution"
+        help="whether remove 'chr' character from the chrom column."
     )
 
 

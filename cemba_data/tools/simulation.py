@@ -20,6 +20,10 @@ import pathlib
 import pybedtools
 import pandas as pd
 import numpy as np
+import logging
+
+# logger
+log = logging.getLogger()
 
 
 def simulate_allc(genome_cov_path,
@@ -52,7 +56,7 @@ def simulate_allc(genome_cov_path,
             continue
         if chrom != cur_chrom:
             cur_chrom = chrom
-            print(cur_chrom)
+            log.info(f'Simulating chromosome: {cur_chrom}')
             chrom_read_cov = genome_cov_bed[genome_cov_bed['chrom'] == cur_chrom]
             cur_row_num = 0
             cur_row = chrom_read_cov.iloc[cur_row_num, :]
@@ -73,6 +77,8 @@ def simulate_allc(genome_cov_path,
         pseudo_line = [chrom, str(pos), strand, context, str(read_mc), str(read_cov), p]
         f.write('\t'.join(pseudo_line))
     f.close()
+
+    subprocess.run(['bgzip', str(out_file)])
     return
 
 
