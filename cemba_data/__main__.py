@@ -9,9 +9,20 @@ import sys
 import inspect
 import cemba_data
 import logging
-from .description import description, epilog
 
 log = logging.getLogger()
+
+DESCRIPTION = """
+yap (yet another pipeline) is a toolkit for single cell sequencing analysis
+"""
+# TODO add DESCRIPTION for structured functional groups
+# mapping
+# allc
+# dataset etc
+
+EPILOG = """
+Author: Hanqing Liu, hanliu@salk.edu
+"""
 
 
 class NiceFormatter(logging.Formatter):
@@ -82,6 +93,7 @@ def qsub_register_subparser(subparser):
         "--total_cpu",
         type=int,
         required=False,
+        default=30,
         help="Total CPU in qsub list"
     )
 
@@ -89,6 +101,7 @@ def qsub_register_subparser(subparser):
         "--submission_gap",
         type=int,
         required=False,
+        default=2,
         help="Submission Gap in qsub list"
     )
 
@@ -96,6 +109,7 @@ def qsub_register_subparser(subparser):
         "--qstat_gap",
         type=int,
         required=False,
+        default=30,
         help="Qstat check gap in qsub list"
     )
     return
@@ -182,10 +196,10 @@ def batch_pipeline_register_subparser(subparser):
     return
 
 
-def batch_map_to_region_register_subparser(subparser):
-    parser = subparser.add_parser('map-to-region-qsub',
+def generate_dataset_register_subparser(subparser):
+    parser = subparser.add_parser('generate-dataset',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Batch map-to-region for a whole list of allc_files. "
+                                  help="Batch map-to-region for a whole list of allc_files and then generate a MCDS. "
                                        "Generate a command.json file for yap qsub.")
     parser_req = parser.add_argument_group("Required inputs")
 
@@ -246,6 +260,14 @@ def batch_map_to_region_register_subparser(subparser):
         help="Maximum base cov, for normal single cell data, recommended value is 2."
     )
 
+    parser_req.add_argument(
+        "--dataset_name",
+        type=str,
+        required=True,
+        default=None,
+        help="Name of the dataset output"
+    )
+
     return
 
 
@@ -265,6 +287,24 @@ def assemble_dataset_register_subparser(subparser):
     )
 
     parser_req.add_argument(
+        "--region_bed_path",
+        type=str,
+        required=True,
+        default=None,
+        nargs='+',
+        help="Space separated path list for reference region bed files"
+    )
+
+    parser_req.add_argument(
+        "--region_name",
+        type=str,
+        required=True,
+        default=None,
+        nargs='+',
+        help="Space separated name list for reference region bed files, corresponding to region_bed_path"
+    )
+
+    parser_req.add_argument(
         "--dataset_name",
         type=str,
         required=True,
@@ -272,11 +312,11 @@ def assemble_dataset_register_subparser(subparser):
     )
 
     parser_opt.add_argument(
-        "--cpu",
+        "--thread",
         type=int,
         required=False,
-        default=10,
-        help="Number of cores to use."
+        default=5,
+        help="Number of threads to use, 5 is recommend."
     )
 
 
@@ -316,26 +356,10 @@ def merge_allc_register_subparser(subparser):
 
     parser_opt.add_argument(
         "--index",
-        type=bool,
-        required=False,
-        default=False,
-        help="methylpy default index, not doing it by default."
-    )
-
-    parser_opt.add_argument(
-        "--get_mcg",
-        type=bool,
-        required=False,
-        default=True,
-        help="Generate a CG only, strand merged ALLC file for CG DMR calling."
-    )
-
-    parser_opt.add_argument(
-        "--cg_pattern",
         type=str,
         required=False,
-        default='CGN',
-        help="mCG context pattern for --get_mcg."
+        default='tabix',
+        help="methylpy default index, not doing it by default."
     )
 
 
@@ -604,9 +628,49 @@ def allc_profile_register_subparser(subparser):
     )
 
 
+def extract_context_allc_register_subparser(subparser):
+    parser = subparser.add_parser('allc-extract',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Extract sub-ALLC for certain mc context, such as mCG")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_path",
+        type=str,
+        required=True,
+        help="Path of the ALLC file."
+    )
+
+    parser_req.add_argument(
+        "--out_path",
+        type=str,
+        required=True,
+        help="Path of the output ALLC file."
+    )
+
+    parser_opt.add_argument(
+        "--merge_strand",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to merge the continuous +/- strand mC and cov, only valid for mCG"
+    )
+
+    parser_opt.add_argument(
+        "--mc_context",
+        type=str,
+        required=False,
+        default=['CGN'],
+        nargs='+',
+        help="space separated mC contexts to extract"
+    )
+
+
 def main():
-    parser = argparse.ArgumentParser(description=description,
-                                     epilog=epilog)
+    parser = argparse.ArgumentParser(description=DESCRIPTION,
+                                     epilog=EPILOG)
     subparsers = parser.add_subparsers(
         title="functions",
         dest="command",
@@ -651,8 +715,8 @@ def main():
         from .mapping.pipeline import print_default_configuration as func
     elif cur_command == 'mapping-qsub':
         from .local.mc.prepare_allc import batch_pipeline as func
-    elif cur_command == 'map-to-region-qsub':
-        from .local.mc.prepare_dataset import batch_map_to_region as func
+    elif cur_command == 'generate-dataset':
+        from .local.mc.prepare_dataset import generate_dataset as func
     elif cur_command == 'map-to-region':
         from .tools.allc import map_to_region as func
     elif cur_command == 'assemble-dataset':
@@ -667,7 +731,10 @@ def main():
         from .tools.simulation import simulate_long_reads_coverage as func
     elif cur_command == 'simulate-allc':
         from .tools.simulation import simulate_allc as func
+    elif cur_command == 'allc-extract':
+        from .tools.allc import extract_context_allc as func
     else:
+        log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
         return
 
