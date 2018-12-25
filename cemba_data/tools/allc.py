@@ -182,21 +182,19 @@ def map_to_region(allc_path, out_path_prefix,
     return
 
 
-def merge_allc(allc_paths, out_path, cpu=1, index=False,
-               get_mcg=True, cg_pattern='CGN'):
+def merge_allc(allc_paths, out_path, cpu=1, index='tabix'):
     """
     Just a wrapper of methylpy merge allc
     :param allc_paths:
     :param out_path:
     :param cpu:
     :param index:
-    :param get_mcg:
-    :param cg_pattern:
     :return:
     """
     if len(allc_paths) == 1:
         with open(allc_paths[0]) as f:
             allc_paths = [i.strip('\n') for i in f.readlines()]
+    out_path = out_path.rstrip('.gz')
     if not os.path.exists(out_path + '.gz'):
         merge_allc_files(allc_paths,
                          out_path,
@@ -209,14 +207,13 @@ def merge_allc(allc_paths, out_path, cpu=1, index=False,
         # use bgzip and tabix
         run(['bgzip', out_path])
 
-        if index:
+        if index == 'tabix':
             run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_path + '.gz'])
-    if get_mcg:
-        extract_mcg(allc_path=out_path + '.gz', out_path=out_path[:-6] + f'{cg_pattern}.tsv.gz', cg_pattern=cg_pattern)
     return
 
 
 def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
+    # TODO add allc to bigwig COV version, not calculate mC but only compute cov
     from .methylpy_utilities import convert_allc_to_bigwig
     convert_allc_to_bigwig(allc_path,
                            out_path,
@@ -229,23 +226,23 @@ def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
                            min_bin_cov=0,
                            max_site_cov=None,
                            min_site_cov=0,
-                           add_chr_prefix=True
-                           )
+                           add_chr_prefix=True)
     return
 
 
-def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern='CGN'):
-    if '.gz' in allc_path[-3:]:
+def extract_context_allc(allc_path, out_path, merge_strand=True, mc_context='CGN'):
+    if 'CG' not in mc_context:
+        merge_strand = False
+
+    if allc_path.endswith('gz'):
         opener = partial(gzip.open, mode='rt')
     else:
         opener = partial(open, mode='r')
     writer = partial(gzip.open, mode='wt')
 
-    context_set = parse_mc_pattern(cg_pattern)
+    context_set = parse_mc_pattern(mc_context)
     with opener(allc_path) as allc, \
             writer(out_path) as out_allc:
-        if header:
-            allc.readline()
         if merge_strand:
             prev_line = None
             cur_chrom = None
@@ -279,7 +276,7 @@ def extract_mcg(allc_path, out_path, merge_strand=True, header=False, cg_pattern
                 if cur_line[3] not in context_set:
                     continue
                 out_allc.write('\t'.join(cur_line) + '\n')
-    print('Extract CG finished:', out_path)
+    print(f'Extract {mc_context} finished:', out_path)
     return
 
 
