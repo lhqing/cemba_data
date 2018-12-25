@@ -4,11 +4,11 @@ import glob
 import xarray as xr
 import pandas as pd
 import numpy as np
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
-                        context_pattern, genome_size_path, max_cov_cutoff):
+def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
+                     context_pattern, genome_size_path, max_cov_cutoff, dataset_name):
     """
     Batch version of map-to-region, a helper function that generating command.json for a whole dataset's ALLCs.
     The total number of region count bed files are len(region_name) * len(context_pattern)
@@ -46,11 +46,11 @@ def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
         with open(allc_files) as f:
             allc_files = [line.strip() for line in f]
 
+    region_paths = ' '.join(region_bed_path)
+    region_names = ' '.join(region_name)
     for f in allc_files:
         f = pathlib.Path(f)
         out_path_prefix = str(out_dir / f.stem)
-        region_paths = ' '.join(region_bed_path)
-        region_names = ' '.join(region_name)
         _context_pattern = ' '.join(context_pattern)
         cmd = f'yap map-to-region --allc_path {f} ' \
               f'--out_path_prefix {out_path_prefix} ' \
@@ -65,100 +65,124 @@ def batch_map_to_region(allc_files, out_dir, region_bed_path, region_name,
         }
         cmd_list.append(command_dict)
 
-    cmd_json_path = out_dir / 'map-to-region_command.json'
+    cmd_json_path = out_dir / 'map-to-region.command.json'
     with open(cmd_json_path, 'w') as f:
         json.dump(cmd_list, f)
-    qsub_command = f'yap qsub --working_dir {out_dir} ' \
-                   f'--project_name map-to-region ' \
-                   f'--command_file_path {cmd_json_path} ' \
-                   f'--total_cpu 100 --submission_gap 1 --qstat_gap 30'
+
+    assemble_command = f'yap assemble-dataset --out_dir {out_dir}' \
+                       f'--region_bed_path {region_paths}' \
+                       f'--region_name {region_names}' \
+                       f'--dataset_name {dataset_name}' \
+                       f'--thread 5'
+    assemble_json_path = out_dir / 'assemble.command.json'
+    with open(assemble_json_path, 'w') as f:
+        json.dump([{
+            'command': assemble_command,
+            '-pe smp': 10
+        }], f)
+
+    # make a master of master qsub command.json
+    qsub_wd = out_dir / 'qsub'
+    qsub_wd.mkdir()
+    records = []
+    for command_path in [cmd_json_path, assemble_json_path]:
+        project_name = command_path.name.split('.')[0]
+        cmd = f'yap qsub --working_dir {qsub_wd} --project_name {project_name} ' \
+              f'--command_file_path {command_path} --total_cpu 60 ' \
+              f'--submission_gap 1 --qstat_gap 30'
+        cmd_dict = {
+            'command': cmd,
+            '-pe smp': 2
+        }
+        records.append(cmd_dict)
+    command_path = out_dir / 'master.command.json'
+    with command_path.open('w') as f:
+        json.dump(records, f)
+
+    # submit master of master
+    qsub_command = f'yap qsub --working_dir {qsub_wd} ' \
+                   f'--project_name master ' \
+                   f'--command_file_path {command_path} ' \
+                   f'--total_cpu 1 --submission_gap 1 --qstat_gap 30'
 
     print(f"""
-    The command file for map-to-region is prepared
-    ---------------------------------------------------------------------------------------
-    - Output directory: {out_dir}
-    - Yap mapping command list: {cmd_json_path}
+            The command file for generate-dataset is prepared
+            ---------------------------------------------------------------------------------------
+            - Output directory: {out_dir}
+            - Yap command list: {command_path}
 
-    To run the command list using qsub, use "yap qsub" like this:
+            To run the command list using qsub, use "yap qsub" like this:
 
-    {qsub_command}
+            {qsub_command}
 
-    Modify the qsub parameters if you need. See "yap qsub -h" for help.
-    """)
+            Modify the qsub parameters if you need. See "yap qsub -h" for help.
+            """)
 
     return str(cmd_json_path)
 
 
-def _read_count_table(file_path, region_name, cell_id):
-    region_df = pd.read_table(file_path, na_values='.', index_col=region_name,
-                              names=['chrom', 'start', 'end', region_name, 'mc', 'cov']).fillna(0)
-    region_mc = region_df['mc'].astype(np.uint16)
-    region_mc.rename(cell_id, inplace=True)
-    region_cov = region_df['cov'].astype(np.uint16)
-    region_cov.rename(cell_id, inplace=True)
-    return region_mc, region_cov
+def read_count_table(path):
+    count_table = pd.read_table(path, index_col=3, header=None, na_values='.',
+                                names=['chrom', 'start', 'end', 'id', 'mc', 'cov']).fillna(0)
+    return count_table['mc'].astype(np.uint16).values, count_table['cov'].astype(np.uint16).values
 
 
-def assemble_dataset(out_dir, dataset_name, cpu):
-    """
-    TODO Re-write assemble dataset, use less memory
-
-    Parameters
-    ----------
-    out_dir
-    dataset_name
-    cpu
-
-    Returns
-    -------
-
-    """
+def assemble_dataset(out_dir, region_bed_path, region_name, dataset_name,
+                     thread=5):
     out_dir = pathlib.Path(out_dir).absolute()
+    bed_paths = list(out_dir.glob('*count_table.bed.gz'))
+    region_meta_dfs = {region_name: pd.read_table(region_bed, header=None, index_col=3,
+                                                  names=['chrom', 'start', 'end', region_name])
+                       for region_name, region_bed in zip(region_name, region_bed_path)}
+
+    # Note: this part subject to the name pattern in generate_dataset
     records = []
-    for f in out_dir.glob('**/*.count_table.bed.gz'):
-        id_part, type_part, _, _, _ = f.name.split('.')
-        _, uid, index_name = id_part.split('_')
-        region_name, mc_type = type_part.split('_')
-        records.append({'uid': uid,
-                        'index_name': index_name,
-                        'region_name': region_name,
-                        'mc_type': mc_type,
-                        'file_path': f})
-    count_path_df = pd.DataFrame(records)
+    for path in bed_paths:
+        id_part, _, type_part, *_ = (path.name.split('.'))
+        cell = id_part.lstrip('allc_')
+        region_type, mc_type = type_part.split('_')
+        records.append([cell, region_type, mc_type, str(path)])
+    count_table_df = pd.DataFrame(records,
+                                  columns=['cell', 'region_type', 'mc_type', 'path']) \
+        .set_index('cell')
 
-    region_da_dict = {}
-    for region_name, region_df in count_path_df.groupby('region_name'):
-        mc_das = []
-        for mc_type, mc_type_df in region_df.groupby('mc_type'):
-            pool = multiprocessing.Pool(cpu)
-            # read bed files
-            results = []
-            for _, row in mc_type_df.iterrows():
-                cell_id = f"{row['uid']}-{row['index_name']}"
-                result = pool.apply_async(_read_count_table,
-                                          kwds=dict(file_path=row['file_path'],
-                                                    region_name=row['region_name'],
-                                                    cell_id=cell_id))
-                results.append(result)
-            pool.close()
-            pool.join()
+    cell_index = count_table_df.index.unique()
+    cell_count = cell_index.size
+    mc_index = pd.Index(count_table_df.mc_type.unique())
+    mc_type_count = mc_index.size
 
-            # make region data array
-            region_das = []
-            for result in results:
-                region_mc, region_cov = result.get()
-                region_mc_da = region_mc.to_xarray().expand_dims(['count_type', 'cell'])
-                region_mc_da.coords['count_type'] = ['mc']
-                region_mc_da.coords['cell'] = [region_cov.name]
-                region_cov_da = region_cov.to_xarray().expand_dims(['count_type', 'cell'])
-                region_cov_da.coords['count_type'] = ['cov']
-                region_cov_da.coords['cell'] = [region_cov.name]
-                region_das.append(xr.concat([region_mc_da, region_cov_da],
-                                            dim='count_type'))
-            region_total_da = xr.concat(region_das, dim='cell').expand_dims(['mc_type'])
-            region_total_da.coords['mc_type'] = [mc_type]
-            mc_das.append(region_total_da)
-        region_da_dict[region_name + '_da'] = xr.concat(mc_das, dim='mc_type')
-    total_dataset = xr.Dataset(region_da_dict)
-    total_dataset.to_netcdf(path=f'{out_dir}/{dataset_name}.mcds')
+    da_dict = {}
+    for region_type, _sub_df in count_table_df.groupby('region_type'):
+        # initialize an empty ndarray with shape [cell, region, mc_type, count_type]
+        region_meta = region_meta_dfs[region_type]
+        region_count = region_meta.shape[0]
+        region_data = np.zeros(shape=(cell_count, region_count, mc_type_count, 2),
+                               dtype=np.uint16)
+
+        for mc_i, mc_type in enumerate(mc_index):
+            # make sure mc_type in order
+            sub_df = _sub_df[_sub_df['mc_type'] == mc_type]
+            # make sure cell in order
+            sub_df = sub_df.reindex(cell_index)
+
+            # multi-thread loading
+            with ThreadPoolExecutor(max_workers=thread) as executor:
+                future_data = {}
+                for cell_i, path in enumerate(sub_df.path):
+                    future_data[executor.submit(read_count_table, path)] = cell_i
+                for future in as_completed(future_data):
+                    cell_i = future_data[future]
+                    mc, cov = future.result()
+                    region_data[cell_i, :, mc_i, 0] = mc
+                    region_data[cell_i, :, mc_i, 1] = cov
+        region_dataarray = xr.DataArray(region_data,
+                                        coords=[cell_index,
+                                                region_meta.index,
+                                                mc_index,
+                                                pd.Index(['mc', 'cov'])],
+                                        dims=['cell', region_type, 'mc_type', 'count_type'])
+        da_dict[region_type + '_da'] = region_dataarray
+    total_ds = xr.Dataset(da_dict)
+    ds_out_path = out_dir / f'{dataset_name}.mcds'
+    total_ds.to_netcdf(path=str(ds_out_path))
     return
