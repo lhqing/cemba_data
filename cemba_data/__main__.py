@@ -86,7 +86,8 @@ def qsub_register_subparser(subparser):
         "--command_file_path",
         type=str,
         required=True,
-        help="Path of the command dict file"
+        nargs='+',
+        help="One or space-separated paths of the command.json file."
     )
 
     parser_opt.add_argument(
@@ -94,23 +95,8 @@ def qsub_register_subparser(subparser):
         type=int,
         required=False,
         default=30,
-        help="Total CPU in qsub list"
-    )
-
-    parser_opt.add_argument(
-        "--submission_gap",
-        type=int,
-        required=False,
-        default=2,
-        help="Submission Gap in qsub list"
-    )
-
-    parser_opt.add_argument(
-        "--qstat_gap",
-        type=int,
-        required=False,
-        default=30,
-        help="Qstat check gap in qsub list"
+        nargs='+',
+        help="Total CPU in qsub list, use space-separated list for multiple command.json files"
     )
     return
 

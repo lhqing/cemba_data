@@ -151,7 +151,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name mapping ' \
                    f'--command_file_path {cmd_json_path} ' \
-                   f'--total_cpu 160 --submission_gap 2 --qstat_gap 60'
+                   f'--total_cpu 160'
 
     log.info(f"""
     The output directory is prepared. All related files have been copied to that directory.

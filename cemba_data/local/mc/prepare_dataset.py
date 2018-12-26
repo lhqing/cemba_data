@@ -81,35 +81,18 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
             '-pe smp': 10
         }], f)
 
-    # make a master of master qsub command.json
-    qsub_wd = out_dir / 'qsub'
-    qsub_wd.mkdir()
-    records = []
-    for command_path in [cmd_json_path, assemble_json_path]:
-        project_name = command_path.name.split('.')[0]
-        cmd = f'yap qsub --working_dir {qsub_wd} --project_name {project_name} ' \
-              f'--command_file_path {command_path} --total_cpu 60 ' \
-              f'--submission_gap 1 --qstat_gap 30'
-        cmd_dict = {
-            'command': cmd,
-            '-pe smp': 2
-        }
-        records.append(cmd_dict)
-    command_path = out_dir / 'master.command.json'
-    with command_path.open('w') as f:
-        json.dump(records, f)
-
-    # submit master of master
-    qsub_command = f'yap qsub --working_dir {qsub_wd} ' \
-                   f'--project_name master ' \
-                   f'--command_file_path {command_path} ' \
-                   f'--total_cpu 1 --submission_gap 1 --qstat_gap 30'
+    # submit master
+    command_paths = ' '.join([cmd_json_path, assemble_json_path])
+    qsub_command = f'yap qsub --working_dir {out_dir} ' \
+                   f'--project_name generate-dataset ' \
+                   f'--command_file_path {command_paths} ' \
+                   f'--total_cpu 60 10'
 
     print(f"""
             The command file for generate-dataset is prepared
             ---------------------------------------------------------------------------------------
             - Output directory: {out_dir}
-            - Yap command list: {command_path}
+            - Yap command list: {command_paths}
 
             To run the command list using qsub, use "yap qsub" like this:
 

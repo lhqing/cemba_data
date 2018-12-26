@@ -225,30 +225,12 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
         out_dir / 'allc_extract.command.json'
     ]
 
-    qsub_wd = out_dir / 'qsub'
-    qsub_wd.mkdir()
-
-    # make a master of master qsub command.json
-    records = []
-    for command_path in command_path_list:
-        project_name = command_path.name.split('.')[0]
-        cmd = f'yap qsub --working_dir {qsub_wd} --project_name {project_name} ' \
-              f'--command_file_path {command_path} --total_cpu {cpu} ' \
-              f'--submission_gap 2 --qstat_gap 60'
-        cmd_dict = {
-            'command': cmd,
-            '-pe smp': 2
-        }
-        records.append(cmd_dict)
-    command_path = out_dir / 'master.command.json'
-    with command_path.open('w') as f:
-        json.dump(records, f)
-
     # submit master of master
-    qsub_command = f'yap qsub --working_dir {qsub_wd} ' \
+    command_path = ' '.join(command_path_list)
+    qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name master ' \
                    f'--command_file_path {command_path} ' \
-                   f'--total_cpu 1 --submission_gap 1 --qstat_gap 30'
+                   f'--total_cpu 120'
 
     print(f"""
         The command file for prepare-cluster-profile is prepared

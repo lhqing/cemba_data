@@ -224,11 +224,22 @@ class Command:
 
 
 def qsub(command_file_path, working_dir, project_name, total_cpu=60, submission_gap=2, qstat_gap=30):
-    submitter = Qsubmitter(command_file_path=command_file_path,
-                           working_dir=working_dir,
-                           project_name=project_name,
-                           total_cpu=total_cpu,
-                           submission_gap=submission_gap,
-                           qstat_gap=qstat_gap)
-    print(f'{len(submitter.commands)} jobs finished.')
+    if isinstance(command_file_path, str):
+        command_file_path = [command_file_path]
+    if isinstance(total_cpu, int):
+        total_cpu = [total_cpu] * len(command_file_path)
+
+    # for multiple command files, run one by one
+    for i, (command_file, cpu) in enumerate(zip(command_file_path, total_cpu)):
+        print(f'Execute command file: {command_file}')
+        _project_name = project_name
+        if len(command_file_path) != 1:
+            _project_name += f'_{i}'
+        submitter = Qsubmitter(command_file_path=command_file,
+                               working_dir=working_dir,
+                               project_name=_project_name,
+                               total_cpu=cpu,
+                               submission_gap=submission_gap,
+                               qstat_gap=qstat_gap)
+        print(f'{len(submitter.commands)} jobs finished.')
     return
