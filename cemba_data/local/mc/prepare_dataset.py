@@ -82,7 +82,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
         }], f)
 
     # submit master
-    command_paths = ' '.join([cmd_json_path, assemble_json_path])
+    command_paths = ' '.join([str(cmd_json_path), str(assemble_json_path)])
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name generate-dataset ' \
                    f'--command_file_path {command_paths} ' \

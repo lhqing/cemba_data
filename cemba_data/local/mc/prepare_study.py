@@ -188,15 +188,15 @@ def prepare_study(netcdf_files,
         netcdf_files = sorted(glob.glob(netcdf_files))
     else:
         if not isinstance(netcdf_files, list):
-            raise TypeError('netcdf_files should be either str or list, provided',
-                            type(netcdf_files))
+            raise TypeError(f'netcdf_files should be either str or list, '
+                            f'provided {type(netcdf_files)}')
 
     if len(netcdf_files) == 0:
         print('No valid path provided.')
         return None
     for file_path in netcdf_files:
         if not pathlib.Path(file_path).exists():
-            raise ValueError(file_path, 'do not exist.')
+            raise ValueError(f'{file_path} do not exist.')
 
     if cell_list is None:
         # no cell list, select all cells
