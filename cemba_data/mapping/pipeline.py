@@ -248,8 +248,8 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     demultiplex_df.to_csv(stat_dir / 'demultiplex_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
-    log.info('Trim fastq file and merge lanes.')
     # fastq qc
+    log.info('Trim fastq file and merge lanes.')
     fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
     if fastq_final_df.shape[0] == 0:
         log.warning('no sample remained after fastq qc step')
@@ -257,8 +257,9 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     else:
         fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
                               sep='\t', compression='gzip', index=None)
-    log.info('Use bismark and bowtie2 to do mapping.')
+
     # bismark
+    log.info('Use bismark and bowtie2 to do mapping.')
     bismark_df = bismark(fastq_final_df, out_dir, config)
     if bismark_df.shape[0] == 0:
         log.warning('no sample remained after bismark step')
@@ -266,13 +267,15 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     else:
         bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
-    log.info('Deduplicate and filter bam files.')
+
     # bam
+    log.info('Deduplicate and filter bam files.')
     bam_df = bam_qc(bismark_df, out_dir, config)
     bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
                   sep='\t', compression='gzip', index=None)
-    log.info('Calculate mC sites.')
+
     # allc
+    log.info('Calculate mC sites.')
     allc_df = call_methylated_sites(bam_df, out_dir, config)
     allc_df.to_csv(stat_dir / 'allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
