@@ -69,10 +69,10 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     with open(cmd_json_path, 'w') as f:
         json.dump(cmd_list, f)
 
-    assemble_command = f'yap assemble-dataset --out_dir {out_dir}' \
-                       f'--region_bed_path {region_paths}' \
-                       f'--region_name {region_names}' \
-                       f'--dataset_name {dataset_name}' \
+    assemble_command = f'yap assemble-dataset --out_dir {out_dir} ' \
+                       f'--region_bed_path {region_paths} ' \
+                       f'--region_name {region_names} ' \
+                       f'--dataset_name {dataset_name} ' \
                        f'--thread 5'
     assemble_json_path = out_dir / 'assemble.command.json'
     with open(assemble_json_path, 'w') as f:
