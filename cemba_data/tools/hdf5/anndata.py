@@ -33,16 +33,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import numpy as np
 import pandas as pd
 from anndata import AnnData
-from sklearn.impute import SimpleImputer
 import logging
 
 log = logging.getLogger()
-
-
-def simple_impute(adata):
-    imputer = SimpleImputer(strategy='mean')
-    adata.X = imputer.fit_transform(adata.X)
-    return adata
 
 
 def _get_mean_var(X):
@@ -63,14 +56,13 @@ def _get_mean_var(X):
     return mean, var
 
 
-def highly_variable_genes(
+def highly_variable_feature(
         adata,
         min_disp=None, max_disp=None,
         min_mean=None, max_mean=None,
-        n_top_genes=None,
+        n_top_feature=None,
         n_bins=20,
-        subset=False,
-        inplace=True):
+        no_info_cutoff=0.02):
     """
     Adapted from Scanpy, see license above
     """
@@ -78,12 +70,12 @@ def highly_variable_genes(
 
     if not isinstance(adata, AnnData):
         raise ValueError(
-            '`pp.highly_variable_genes` expects an `AnnData` argument, '
+            '`highly_variable_feature` expects an `AnnData` argument, '
             'pass `inplace=False` if you want to return a `np.recarray`.')
 
-    if n_top_genes is not None and not all([min_disp is None, max_disp is None,
-                                            min_mean is None, max_mean is None]):
-        log.info('If you pass `n_top_genes`, all cutoffs are ignored.')
+    if n_top_feature is not None and not all([min_disp is None, max_disp is None,
+                                              min_mean is None, max_mean is None]):
+        log.info('If you pass `n_top_feature`, all cutoffs are ignored.')
     if min_disp is None:
         min_disp = 0.5
     if min_mean is None:
@@ -93,18 +85,23 @@ def highly_variable_genes(
 
     # X = np.expm1(adata.X) if flavor == 'seurat' else adata.X
     # not doing any transform for X
-    X = adata.X
-
+    total_X = adata.X
+    mean, var = _get_mean_var(total_X)
+    # calculate total mean var 1st, filter out those region that have no coverage. (mean -> 1, var -> 0)
+    use_var = adata.var.index[(mean - 1) ** 2 + var > no_info_cutoff]
+    X = adata[:, use_var].X
     mean, var = _get_mean_var(X)
     # now actually compute the dispersion
-    mean[mean == 0] = 1e-12  # set entries equal to zero to small value
+    if 0 in mean:
+        mean[mean == 0] = 1e-12  # set entries equal to zero to small value
     # raw dispersion is the variance normalized by mean
     dispersion = var / mean
-    dispersion[dispersion == 0] = np.nan
+    if 0 in dispersion:
+        dispersion[dispersion == 0] = np.nan
     dispersion = np.log(dispersion)
 
     # all of the following quantities are "per-feature" here
-    df = pd.DataFrame()
+    df = pd.DataFrame(index=use_var)
     df['mean'] = mean
     df['dispersion'] = dispersion
 
@@ -132,40 +129,32 @@ def highly_variable_genes(
                              - disp_mean_bin[df['mean_bin']].values) / disp_std_bin[df['mean_bin']].values
     dispersion_norm = df['dispersion_norm'].values.astype('float32')
 
-    # Select n_top_genes
-    if n_top_genes is not None:
+    # Select n_top_feature
+    if n_top_feature is not None:
         dispersion_norm = dispersion_norm[~np.isnan(dispersion_norm)]
         dispersion_norm[::-1].sort()  # interestingly, np.argpartition is slightly slower
-        disp_cut_off = dispersion_norm[n_top_genes - 1]
+        disp_cut_off = dispersion_norm[n_top_feature - 1]
         gene_subset = np.nan_to_num(df['dispersion_norm'].values) >= disp_cut_off
-        log.info(f'the {n_top_genes} top genes correspond to a normalized dispersion cutoff of {disp_cut_off}')
+        log.info(f'the {n_top_feature} top genes correspond to a normalized dispersion cutoff of {disp_cut_off}')
     else:
         max_disp = np.inf if max_disp is None else max_disp
         dispersion_norm[np.isnan(dispersion_norm)] = 0  # similar to Seurat
         gene_subset = np.logical_and.reduce((mean > min_mean, mean < max_mean,
                                              dispersion_norm > min_disp,
                                              dispersion_norm < max_disp))
+    df['gene_subset'] = gene_subset
     log.info('    finished')
 
-    if inplace or subset:
-        adata.var['highly_variable'] = gene_subset
-        adata.var['means'] = df['mean'].values
-        adata.var['dispersions'] = df['dispersion'].values
-        adata.var['dispersions_norm'] = df['dispersion_norm'].values.astype('float32', copy=False)
-        log.info("added\n"
-                 "    \'highly_variable\', boolean vector (adata.var)\n"
-                 "    \'means\', boolean vector (adata.var)\n"
-                 "    \'dispersions\', boolean vector (adata.var)\n"
-                 "    \'dispersions_norm\', boolean vector (adata.var)")
-        if subset:
-            adata._inplace_subset_var(gene_subset)
-    else:
-        return np.rec.fromarrays(
-            (gene_subset,
-             df['mean'].values,
-             df['dispersion'].values,
-             df['dispersion_norm'].values.astype('float32', copy=False)),
-            dtype=[('highly_variable', np.bool_),
-                   ('means', 'float32'),
-                   ('dispersions', 'float32'),
-                   ('dispersions_norm', 'float32')])
+    # normalize only performed on use_var,
+    # add mean and minimum dispersion for those vars not passing no_info_cutoff
+    # these region must be filtered out anyway
+    other_var = adata[:, ~adata.var.index.isin(use_var)].X
+    other_mean, other_var = _get_mean_var(other_var)
+    other_df = pd.DataFrame({
+        'mean': other_mean,
+        'dispersion': df['dispersion'].min(),
+        'dispersion_norm': df['dispersion_norm'].min(),
+        'gene_subset': False,
+    }, index=adata.var.index[~adata.var.index.isin(use_var)])
+    df = pd.concat([df, other_df], sort=True).reindex(adata.var.index)
+    return df
