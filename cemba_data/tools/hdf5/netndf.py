@@ -14,8 +14,7 @@ def _calculate_posterior_mc_rate(mc_array, cov_array, var_dim='chrom100k',
     # a / (a + b) = cell_rate_mean
     # a * b / ((a + b) ^ 2 * (a + b + 1)) = cell_rate_var
     # calculate alpha beta value for each cell
-    cell_a = (1 - cell_rate_mean) * (cell_rate_mean ** 2) / cell_rate_var - \
-             cell_rate_mean
+    cell_a = (1 - cell_rate_mean) * (cell_rate_mean ** 2) / cell_rate_var - cell_rate_mean
     cell_b = cell_a * (1 / cell_rate_mean - 1)
 
     # cell specific posterior rate
@@ -34,6 +33,10 @@ class MCDS(xr.Dataset):
         super().__init__(data_vars=dataset.data_vars, coords=dataset.coords,
                          attrs=dataset.attrs, compat='broadcast_equals')
         return
+
+    @classmethod
+    def open_dataset(cls, file_path):
+        return cls(xr.open_dataset(file_path))
 
     def filter_cell_cov(self, dim, da, mc_type,
                         min_cov=10000, max_cov=None):
@@ -117,8 +120,10 @@ class MCDS(xr.Dataset):
                     normalize_per_cell=True,
                     clip_norm_value=10,
                     rate_da_suffix='rate'):
+        if da not in self.data_vars:
+            raise KeyError(f'{da} is not in this dataset')
         if dim not in self[da].dims:
-            raise ValueError(f'{dim} is not a dimension of {da}')
+            raise KeyError(f'{dim} is not a dimension of {da}')
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
 
@@ -135,8 +140,10 @@ class MCDS(xr.Dataset):
     def add_gene_rate(self, dim='gene', da='gene_da',
                       normalize_per_cell=True, clip_norm_value=10,
                       rate_da_suffix='rate'):
+        if da not in self.data_vars:
+            raise KeyError(f'{da} is not in this dataset')
         if dim not in self[da].dims:
-            raise ValueError(f'{dim} is not a dimension of {da}')
+            raise KeyError(f'{dim} is not a dimension of {da}')
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
 
@@ -178,7 +185,7 @@ class MCDS(xr.Dataset):
                                    columns=[f'{coord_name}_{i}' for i in range(obsm_data.shape[1])])
             obsm_df.index.name = obs_dim
             obsm_df.columns.name = coord_name
-            self[coord_name+'_coord'] = obsm_df
+            self[coord_name + '_coord'] = obsm_df
 
         for varm_key in adata.varm_keys():
             coord_name = varm_key
@@ -205,5 +212,5 @@ class MCDS(xr.Dataset):
         self[da_name] = df
         return
 
-    def plotting_df(self):
+    def get_plot_data(self, genes=None, coord='tsne'):
         return

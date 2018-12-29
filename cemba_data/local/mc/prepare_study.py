@@ -24,6 +24,7 @@ import glob
 import pathlib
 import functools
 import logging
+from ...tools.hdf5.netndf import MCDS
 log = logging.getLogger()
 
 
@@ -147,7 +148,7 @@ def _prepare_study_generator(
                                            count_type)
         if combined_data is None:
             continue
-        yield combined_data
+        yield MCDS(combined_data)
 
 
 def prepare_study(netcdf_files,
@@ -230,7 +231,7 @@ def prepare_study(netcdf_files,
             combined_data.to_netcdf(save_path, encoding=encoding_dict)
             return None
         else:
-            return combined_data
+            return MCDS(combined_data)
     else:
         # generator mode
         return _prepare_study_generator(
@@ -242,4 +243,3 @@ def prepare_study(netcdf_files,
             count_type=count_type,
             iter_chunksize=iter_chunksize
         )
-
