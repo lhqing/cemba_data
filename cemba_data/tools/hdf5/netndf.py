@@ -4,9 +4,9 @@ import xarray as xr
 from anndata import AnnData
 
 
-def _calculate_posterior_mc_rate(mc_array, cov_array, var_dim='chrom100k',
+def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
                                  normalize_per_cell=True, clip_norm_value=10):
-    raw_rate = mc_array / cov_array
+    raw_rate = mc_da / cov_da
     cell_rate_mean = raw_rate.mean(dim=var_dim)
     cell_rate_var = raw_rate.var(dim=var_dim)
 
@@ -18,11 +18,11 @@ def _calculate_posterior_mc_rate(mc_array, cov_array, var_dim='chrom100k',
     cell_b = cell_a * (1 / cell_rate_mean - 1)
 
     # cell specific posterior rate
-    post_rate = (mc_array + cell_a) / (cov_array + cell_a + cell_b)
+    post_rate = (mc_da + cell_a) / (cov_da + cell_a + cell_b)
 
     if normalize_per_cell:
         # this is normalize by post_rate per cell, just a mean center
-        post_rate = post_rate / post_rate.mean(dim='chrom100k')
+        post_rate = post_rate / post_rate.mean(dim=var_dim)
         if clip_norm_value is not None:
             post_rate.values[np.where(post_rate.values > clip_norm_value)] = clip_norm_value
     return post_rate
@@ -127,14 +127,12 @@ class MCDS(xr.Dataset):
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
 
-        rate = _calculate_posterior_mc_rate(mc_array=da_mc.values,
-                                            cov_array=da_cov.values,
+        rate = _calculate_posterior_mc_rate(mc_da=da_mc,
+                                            cov_da=da_cov,
+                                            var_dim=dim,
                                             normalize_per_cell=normalize_per_cell,
                                             clip_norm_value=clip_norm_value)
-        da_rate = xr.DataArray(data=rate,
-                               coords=da_mc.coords,
-                               dims=da_mc.dims)
-        self[da + "_" + rate_da_suffix] = da_rate
+        self[da + "_" + rate_da_suffix] = rate
         return
 
     def add_gene_rate(self, dim='gene', da='gene_da',
