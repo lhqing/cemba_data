@@ -158,7 +158,7 @@ class MCDS(xr.Dataset):
 
     def to_ann(self, da, var_dim, mc_type, obs_dim='cell'):
         index_dict = self[da].indexes
-        return AnnData(X=self[da].sel(mc_type=mc_type).values.copy(),
+        return AnnData(X=self[da].sel(mc_type=mc_type).squeeze().values.copy(),
                        obs=pd.DataFrame(index=index_dict[obs_dim]),
                        var=pd.DataFrame(index=index_dict[var_dim]))
 

@@ -33,27 +33,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from ..utilities import get_mean_var
+from scipy import stats
+from statsmodels.stats.multitest import multipletests
 import logging
 
 log = logging.getLogger()
-
-
-def _get_mean_var(X):
-    # - using sklearn.StandardScaler throws an error related to
-    #   int to long trafo for very large matrices
-    # - using X.multiply is slower
-    mean = X.mean(axis=0)
-    # scanpy deal with both sparse and full matrix, here only support full
-    # if issparse(X):
-    #     mean_sq = X.multiply(X).mean(axis=0)
-    #     mean = mean.A1
-    #     mean_sq = mean_sq.A1
-    # else:
-    #     mean_sq = np.multiply(X, X).mean(axis=0)
-    mean_sq = np.multiply(X, X).mean(axis=0)
-    # enforce R convention (unbiased estimator) for variance
-    var = (mean_sq - mean**2) * (X.shape[0]/(X.shape[0]-1))
-    return mean, var
 
 
 def highly_variable_feature(
@@ -61,7 +46,7 @@ def highly_variable_feature(
         min_disp=None, max_disp=None,
         min_mean=None, max_mean=None,
         n_top_feature=None,
-        n_bins=20,
+        n_bins=50,
         no_info_cutoff=0.02):
     """
     Adapted from Scanpy, see license above
@@ -86,11 +71,11 @@ def highly_variable_feature(
     # X = np.expm1(adata.X) if flavor == 'seurat' else adata.X
     # not doing any transform for X
     total_X = adata.X
-    mean, var = _get_mean_var(total_X)
+    mean, var = get_mean_var(total_X)
     # calculate total mean var 1st, filter out those region that have no coverage. (mean -> 1, var -> 0)
     use_var = adata.var.index[(mean - 1) ** 2 + var > no_info_cutoff]
     X = adata[:, use_var].X
-    mean, var = _get_mean_var(X)
+    mean, var = get_mean_var(X)
     # now actually compute the dispersion
     if 0 in mean:
         mean[mean == 0] = 1e-12  # set entries equal to zero to small value
@@ -149,7 +134,7 @@ def highly_variable_feature(
     # add mean and minimum dispersion for those vars not passing no_info_cutoff
     # these region must be filtered out anyway
     other_var = adata[:, ~adata.var.index.isin(use_var)].X
-    other_mean, other_var = _get_mean_var(other_var)
+    other_mean, other_var = get_mean_var(other_var)
     other_df = pd.DataFrame({
         'mean': other_mean,
         'dispersion': df['dispersion'].min(),
@@ -158,3 +143,221 @@ def highly_variable_feature(
     }, index=adata.var.index[~adata.var.index.isin(use_var)])
     df = pd.concat([df, other_df], sort=True).reindex(adata.var.index)
     return df
+
+
+def _select_groups(adata, groups_order_subset='all', key='groups'):
+    """Get subset of groups in adata.obs[key].
+    """
+    groups_order = adata.obs[key].cat.categories
+    if key + '_masks' in adata.uns:
+        groups_masks = adata.uns[key + '_masks']
+    else:
+        groups_masks = np.zeros((len(adata.obs[key].cat.categories),
+                                 adata.obs[key].values.size), dtype=bool)
+        for iname, name in enumerate(adata.obs[key].cat.categories):
+            # if the name is not found, fallback to index retrieval
+            if adata.obs[key].cat.categories[iname] in adata.obs[key].values:
+                mask = adata.obs[key].cat.categories[iname] == adata.obs[key].values
+            else:
+                mask = str(iname) == adata.obs[key].values
+            groups_masks[iname] = mask
+    if groups_order_subset != 'all':
+        groups_ids = []
+        for name in groups_order_subset:
+            groups_ids.append(
+                np.where(adata.obs[key].cat.categories.values == name)[0][0])
+        if len(groups_ids) == 0:
+            # fallback to index retrieval
+            groups_ids = np.where(
+                np.in1d(np.arange(len(adata.obs[key].cat.categories)).astype(str),
+                        np.array(groups_order_subset)))[0]
+        if len(groups_ids) == 0:
+            log.info(np.array(groups_order_subset),
+                     'invalid! specify valid groups_order (or indices) one of',
+                     adata.obs[key].cat.categories)
+            from sys import exit
+            exit(0)
+        groups_masks = groups_masks[groups_ids]
+        groups_order_subset = adata.obs[key].cat.categories[groups_ids].values
+    else:
+        groups_order_subset = groups_order.values
+    return groups_order_subset, groups_masks
+
+
+def rank_features_groups(
+        adata,
+        groupby,
+        data_type='mc',
+        use_raw=True,
+        groups='all',
+        reference='rest',
+        n_genes=100,
+        rankby_abs=False,
+        copy=False,
+        method='t-test_overestim_var',
+        corr_method='benjamini-hochberg'):
+    """Rank genes for characterizing groups.
+    Adapted from scanpy, the mainly modification is that, in scRNA, we try to find HEG,
+    but in methylation, we try to find hypo-methylation
+    """
+
+    log.info('ranking genes')
+    avail_methods = {'t-test', 't-test_overestim_var'}
+    if method not in avail_methods:
+        raise ValueError('Method must be one of {}.'.format(avail_methods))
+
+    avail_corr = {'benjamini-hochberg', 'bonferroni'}
+    if corr_method not in avail_corr:
+        raise ValueError('Correction method must be one of {}.'.format(avail_corr))
+
+    adata = adata.copy() if copy else adata
+    # sanitize anndata
+    # adata._sanitize()
+
+    # for clarity, rename variable
+    groups_order = groups
+    if isinstance(groups_order, list) and isinstance(groups_order[0], int):
+        groups_order = [str(n) for n in groups_order]
+    if reference != 'rest' and reference not in set(groups_order):
+        groups_order += [reference]
+    if (reference != 'rest'
+            and reference not in set(adata.obs[groupby].cat.categories)):
+        raise ValueError('reference = {} needs to be one of groupby = {}.'
+                         .format(reference,
+                                 adata.obs[groupby].cat.categories.tolist()))
+
+    groups_order, groups_masks = _select_groups(
+        adata, groups_order, groupby)
+
+    key_added = 'rank_feature_groups'
+    adata.uns[key_added] = {}
+    adata.uns[key_added]['params'] = {
+        'groupby': groupby,
+        'reference': reference,
+        'method': method,
+        'use_raw': use_raw,
+        'corr_method': corr_method,
+    }
+
+    # adata_comp mocks an AnnData object if use_raw is True
+    # otherwise it's just the AnnData object
+    adata_comp = adata
+    if adata.raw is not None and use_raw:
+        adata_comp = adata.raw
+    X = adata_comp.X
+
+    # for clarity, rename variable
+    n_genes_user = n_genes
+    # make sure indices are not OoB in case there are less genes than n_genes
+    if n_genes_user > X.shape[1]:
+        n_genes_user = X.shape[1]
+    # in the following, n_genes is simply another name for the total number of genes
+    n_genes = X.shape[1]
+
+    n_groups = groups_masks.shape[0]
+    ns = np.zeros(n_groups, dtype=int)
+    for imask, mask in enumerate(groups_masks):
+        ns[imask] = np.where(mask)[0].size
+    if reference != 'rest':
+        ireference = np.where(groups_order == reference)[0][0]
+    reference_indices = np.arange(adata_comp.n_vars, dtype=int)
+
+    rankings_gene_scores = []
+    rankings_gene_names = []
+    rankings_gene_logfoldchanges = []
+    rankings_gene_pvals = []
+    rankings_gene_pvals_adj = []
+
+    if method in {'t-test', 't-test_overestim_var'}:
+        # loop over all masks and compute means, variances and sample numbers
+        means = np.zeros((n_groups, n_genes))
+        vars = np.zeros((n_groups, n_genes))
+        for imask, mask in enumerate(groups_masks):
+            means[imask], vars[imask] = get_mean_var(X[mask])
+        # test each either against the union of all other groups or against a
+        # specific group
+        for igroup in range(n_groups):
+            if reference == 'rest':
+                mask_rest = ~groups_masks[igroup]
+            else:
+                if igroup == ireference:
+                    continue
+                else:
+                    mask_rest = groups_masks[ireference]
+            mean_rest, var_rest = get_mean_var(X[mask_rest])
+            ns_group = ns[igroup]  # number of observations in group
+
+            # this is the only place t-test different from t-test_overestim_var
+            if method == 't-test':
+                ns_rest = np.where(mask_rest)[0].size
+            elif method == 't-test_overestim_var':
+                ns_rest = ns[igroup]  # hack for overestimating the variance for small groups
+            else:
+                raise ValueError('Method does not exist.')
+
+            # if ns_rest became smaller (t-test_overestim_var),
+            # the denominator is larger, t is smaller
+            denominator = np.sqrt(vars[igroup] / ns_group + var_rest / ns_rest)
+            denominator[np.flatnonzero(denominator == 0)] = np.nan  # set denominator == 0 to nan
+
+            if data_type == 'mc':
+                # for methylation, we reverse the score, this doesn't impact p-value, but impact score sorting.
+                # because we are looking for hypo-methylation
+                scores = (mean_rest - means[igroup]) / denominator
+            else:
+                scores = (means[igroup] - mean_rest) / denominator
+
+            mean_rest[mean_rest == 0] = 1e-9  # set 0s to small value
+            foldchanges = (means[igroup] + 1e-9) / mean_rest
+            scores[np.isnan(scores)] = 0
+            # Get p-values
+            # https://en.wikipedia.org/wiki/Welch%27s_t-test
+            denominator_dof = (np.square(vars[igroup]) / (np.square(ns_group) * (ns_group - 1))) + (
+                (np.square(var_rest) / (np.square(ns_rest) * (ns_rest - 1))))
+            denominator_dof[np.flatnonzero(denominator_dof == 0)] = np.nan
+            dof = np.square(
+                vars[igroup] / ns_group + var_rest / ns_rest) / denominator_dof  # dof calculation for Welch t-test
+            dof[np.isnan(dof)] = 0
+            pvals = stats.t.sf(abs(scores), dof) * 2  # *2 because of two-tailed t-test
+
+            if corr_method == 'benjamini-hochberg':
+                pvals[np.isnan(pvals)] = 1  # set Nan values to 1 to properly convert using Benhjamini Hochberg
+                _, pvals_adj, _, _ = multipletests(pvals, alpha=0.05, method='fdr_bh')
+            elif corr_method == 'bonferroni':
+                pvals_adj = pvals * n_genes
+            else:
+                raise ValueError('Method does not exist.')
+
+            # this rank rule is same as scanpy, but I modified the score calculation above
+            scores_sort = np.abs(scores) if rankby_abs else scores
+
+            partition = np.argpartition(scores_sort, -n_genes_user)[-n_genes_user:]
+            partial_indices = np.argsort(scores_sort[partition])[::-1]
+            global_indices = reference_indices[partition][partial_indices]
+            rankings_gene_scores.append(scores[global_indices])
+            rankings_gene_logfoldchanges.append(np.log2(np.abs(foldchanges[global_indices])))
+            rankings_gene_names.append(adata_comp.var_names[global_indices])
+            rankings_gene_pvals.append(pvals[global_indices])
+            rankings_gene_pvals_adj.append(pvals_adj[global_indices])
+
+    groups_order_save = [str(g) for g in groups_order]
+    if (reference != 'rest' and method != 'logreg') or (method == 'logreg' and len(groups) == 2):
+        groups_order_save = [g for g in groups_order if g != reference]
+    adata.uns[key_added]['scores'] = np.rec.fromarrays(
+        [n for n in rankings_gene_scores],
+        dtype=[(rn, 'float32') for rn in groups_order_save])
+    adata.uns[key_added]['names'] = np.rec.fromarrays(
+        [n for n in rankings_gene_names],
+        dtype=[(rn, 'U50') for rn in groups_order_save])
+
+    if method in {'t-test', 't-test_overestim_var', 'wilcoxon'}:
+        adata.uns[key_added]['logfoldchanges'] = np.rec.fromarrays(
+            [n for n in rankings_gene_logfoldchanges],
+            dtype=[(rn, 'float32') for rn in groups_order_save])
+        adata.uns[key_added]['pvals'] = np.rec.fromarrays(
+            [n for n in rankings_gene_pvals],
+            dtype=[(rn, 'float64') for rn in groups_order_save])
+        adata.uns[key_added]['pvals_adj'] = np.rec.fromarrays(
+            [n for n in rankings_gene_pvals_adj],
+            dtype=[(rn, 'float64') for rn in groups_order_save])
+    return adata if copy else None
