@@ -211,6 +211,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
 
     cell_path_series = pd.read_table(cell_path_file, index_col=0, header=None, squeeze=True)
 
+    out_dir = pathlib.Path(out_dir).absolute()
     _batch_merge_allc(cluster_table, cell_path_series=cell_path_series,
                       out_dir=out_dir, min_group=min_group, cpu=min(cpu // 8, 30))
     _batch_allc_profile(out_dir=out_dir)
