@@ -46,8 +46,8 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
     for column_num, column in enumerate(cluster_table.columns):
         for cluster_name, sub_df in cluster_table.groupby(column):
             cluster_uid = f'{column}-{cluster_name}'
-            contain_groups = set([group_id for group_id, group_id_dict in cell_group_dict.items()
-                                  if group_id_dict['pattern'][column_num] == cluster_name])
+            contain_groups = tuple(set([group_id for group_id, group_id_dict in cell_group_dict.items()
+                                        if group_id_dict['pattern'][column_num] == cluster_name]))
             if len(contain_groups) == 0:
                 dropped_clusters.append((column, cluster_name))
                 # this cluster have no group, which happens to small cluster whose group dropped by min_group
@@ -203,7 +203,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     """
     TODO: clustering name system, also OS path safe characters
     """
-    cluster_table = pd.read_table(cluster_table_path, index_col=0)
+    cluster_table = pd.read_table(cluster_table_path, index_col=0, header=0)
     if cluster_table.columns.duplicated().sum() != 0:
         raise ValueError('Cluster table have duplicated columns')
     if cluster_table.columns.duplicated().sum() != 0:
