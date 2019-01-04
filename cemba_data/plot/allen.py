@@ -17,7 +17,7 @@ logging.getLogger().setLevel(logging.WARNING)
 SLICE_REF_MICRON = {1: 2695, 2: 3290, 3: 3885, 4: 4480, 5: 5075, 6: 5670,
                     7: 6265, 8: 6860, 9: 7455, 10: 8050, 11: 8645, 12: 9240,
                     13: 9835, 14: 10430, 15: 11025, 16: 11620, 17: 12215, 18: 12810}
-ALLEN_DIR = '/gale/netapp/scratch/hanliu/allen/'
+ALLEN_DIR = '/gale/netapp/scratch/hanliu/rna/'
 # ALLEN_DIR = '/Users/hq/Documents/src/learn/allen_api'
 
 ACRONYM_TO_FINEST = json.load(open(f'{ALLEN_DIR}/StructureTree/acronym_to_finest_nodes.json'))
