@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def _get_configuration(config_path=None):
+def get_configuration(config_path=None):
     """
     Read .ini config file from given path
     """
@@ -230,7 +230,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     0 if succeed
     """
     # get config
-    config = _get_configuration(config_path)
+    config = get_configuration(config_path)
 
     # get and validate fastq dataframe
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)

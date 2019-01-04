@@ -105,6 +105,11 @@ def demultiplex(fastq_dataframe, out_dir, config):
     demultiplex result dataframe, id columns: uid, index_name, lane.
 
     """
+
+    if isinstance(config, str):
+        from .pipeline import get_configuration
+        config = get_configuration(config)
+
     multiplex_index_dict = config['multiplexIndex']
     multiplex_index_map = {v: k for k, v in multiplex_index_dict.items()}
     cmd_df = _make_command_dataframe(fastq_dataframe, out_dir, config)
@@ -151,6 +156,10 @@ def fastq_qc(demultiplex_result, out_dir, config):
     fastq_final_result
         id columns: uid, index_name, read_type
     """
+
+    if isinstance(config, str):
+        from .pipeline import get_configuration
+        config = get_configuration(config)
 
     pigz_cores = int(config['fastqTrim']['pigz_cores'])
     cutadapt_cores = int(config['fastqTrim']['cutadapt_cores'])
@@ -232,9 +241,10 @@ def fastq_qc(demultiplex_result, out_dir, config):
         r_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R*.fq.gz'
         r_rm_cmd = f'rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
-    # remove unknown reads
-    r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq.gz'
-    r_rm_cmd = f'rm -f {r_path_pattern}'
-    subprocess.run(r_rm_cmd, shell=True)
+    for uid in demultiplex_result['uid'].unique():
+        # remove unknown reads
+        r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq.gz'
+        r_rm_cmd = f'rm -f {r_path_pattern}'
+        subprocess.run(r_rm_cmd, shell=True)
 
     return fastq_final_result

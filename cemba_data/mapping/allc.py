@@ -449,6 +449,13 @@ def call_methylated_sites(bam_result_df, out_dir, config):
     allc_count_df
         id columns are: uid, index_name
     """
+    # TODO make this into CLI, and parallel on single bam level
+    # read python doc 1st, implement cutadapt pipeline mode
+
+    if isinstance(config, str):
+        from .pipeline import get_configuration
+        config = get_configuration(config)
+
     reference_fasta = config['callMethylation']['reference_fasta']
     num_upstr_bases = int(config['callMethylation']['num_upstr_bases'])
     num_downstr_bases = int(config['callMethylation']['num_downstr_bases'])

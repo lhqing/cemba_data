@@ -85,6 +85,10 @@ def bismark(fastq_final_result, out_dir, config):
         Bismark report dataframe, id columns are: uid, index_name, read_type.
     """
 
+    if isinstance(config, str):
+        from .pipeline import get_configuration
+        config = get_configuration(config)
+
     bismark_reference = config['bismark']['bismark_reference']
     cores = int(config['bismark']['cores'])
     read_min = int(config['bismark']['read_min'])
@@ -125,6 +129,11 @@ def bismark(fastq_final_result, out_dir, config):
         r2_results.append(result)
     pool.close()
     pool.join()
+
+    for result in (r1_results + r2_results):
+        # get every result to make sure it finished properly with return code 0
+        # if not do this, check=True in subprocess.run will not work
+        result.get()
 
     if len(ran_samples) != 0:
         report_path_list = []

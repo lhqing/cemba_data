@@ -40,6 +40,11 @@ def bam_qc(bismark_result, out_dir, config):
         id columns are: uid, index_name, read_type.
         (Although the R1 R2 bams are merged, the stats are separate)
     """
+
+    if isinstance(config, str):
+        from .pipeline import get_configuration
+        config = get_configuration(config)
+
     cores = int(config['bamFilter']['cores'])
     mapq_threshold = config['bamFilter']['mapq_threshold']
 
@@ -64,6 +69,11 @@ def bam_qc(bismark_result, out_dir, config):
         results.append(result)
     pool.close()
     pool.join()
+
+    for result in results:
+        # get every result to make sure it finished properly with return code 0
+        # if not do this, check=True in subprocess.run will not work
+        result.get()
 
     # get qc stats
     qc_result = []
