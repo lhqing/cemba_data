@@ -215,11 +215,31 @@ import subprocess
 import multiprocessing
 import gzip
 import glob
+import resource
 from .utilities import parse_mc_pattern
 
 
+# get the system soft and hard limit of file handle
+SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
+DEFAULT_MAX_ALLC = HARD - 100
+
+
+def increase_soft_fd_limit():
+    """
+    Increase soft file descriptor limit to hard limit,
+    this is the maximum a process can do
+    Use this in merge_allc, because for single cell, a lot of file need to be opened
+
+    Some useful discussion
+    https://unix.stackexchange.com/questions/36841/why-is-number-of-open-files-limited-in-linux
+    https://docs.python.org/3.6/library/resource.html
+    https://stackoverflow.com/questions/6774724/why-python-has-limit-for-count-of-file-handles/6776345
+    """
+    resource.setrlimit(resource.RLIMIT_NOFILE, (HARD, HARD))
+
+
 def _open_allc_file(allc_file):
-    if allc_file[-3:] == ".gz":
+    if allc_file.endswith(".gz"):
         f = gzip.open(allc_file, 'rt')
     else:
         f = open(allc_file, 'r')
@@ -236,8 +256,8 @@ def convert_allc_to_bigwig(input_allc_file,
                            min_bin_cov=0,
                            max_site_cov=None,
                            min_site_cov=0,
-                           add_chr_prefix=False
-                           ):
+                           add_chr_prefix=False):
+    # TODO add option for only convert cov bigwig
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
             mc_type = [mc_type]
@@ -336,13 +356,24 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
 
 
+def exp_merge_allc_files():
+    # TODO new merge allc
+    # only use bgzip and tabix
+    # automatically take care the too many file open issue
+    # do merge iteratively if file number exceed limit
+    # parallel in chrom_bin level, not chrom level
+    return
+
+
 def merge_allc_files(allc_files,
                      output_file,
                      num_procs=1,
-                     mini_batch=100,
+                     mini_batch=DEFAULT_MAX_ALLC,
                      compress_output=True,
                      skip_snp_info=True,
                      buffer_line_number=100000, index=True):
+    if len(allc_files) > SOFT:
+        increase_soft_fd_limit()
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
@@ -353,7 +384,7 @@ def merge_allc_files(allc_files,
     # check index
     # ME: keep this for original index
     index_allc_file_batch(allc_files,
-                          num_procs=num_procs)
+                          cpu=num_procs)
     print("Start merging")
     if not (num_procs > 1):
         merge_allc_files_minibatch(allc_files,
@@ -411,7 +442,6 @@ def merge_allc_files(allc_files,
             f.close()
         if line_counts > 0:
             g.write(out)
-            out = ""
         g.close()
     except:
         print("Failed to merge using multiple processors. " +
@@ -437,7 +467,7 @@ def merge_allc_files(allc_files,
 def merge_allc_files_minibatch(allc_files,
                                output_file,
                                query_chroms=None,
-                               mini_batch=100,
+                               mini_batch=DEFAULT_MAX_ALLC,
                                compress_output=False,
                                skip_snp_info=True):
     # User input checks
@@ -519,7 +549,7 @@ def merge_allc_files_worker(allc_files,
     # merge allc files
     out = ""
     for chrom in chroms:
-        cur_pos = np.array([np.nan for index in range(len(allc_files))])
+        cur_pos = np.array([np.nan for _ in range(len(allc_files))])
         cur_fields = []
         num_remaining_allc = 0
         # init
@@ -559,7 +589,7 @@ def merge_allc_files_worker(allc_files,
         while num_remaining_allc > 0:
             mc, h = 0, 0
             if not skip_snp_info:
-                matches = [0 for index in range(context_len)]
+                matches = [0 for _ in range(context_len)]
                 mismatches = list(matches)
             c_info = None
             for index in np.where(cur_pos == np.nanmin(cur_pos))[0]:
@@ -602,89 +632,75 @@ def merge_allc_files_worker(allc_files,
     return 0
 
 
-def get_index_file_name(allc_file):
-    return allc_file + ".idx"
-
-
-def index_allc_file_batch(allc_files, num_procs=1, reindex=False):
-    if num_procs == 1:
+def index_allc_file_batch(allc_files, cpu=1):
+    if cpu == 1:
         for allc_file in allc_files:
-            index_allc_file(allc_file, reindex)
+            index_allc_file(allc_file)
     else:
-        pool = multiprocessing.Pool(min(num_procs, len(allc_files), 100))
+        pool = multiprocessing.Pool(min(cpu, len(allc_files), 100))
         for allc_file in allc_files:
-            pool.apply_async(index_allc_file, (allc_file, reindex))
+            pool.apply_async(index_allc_file, (allc_file,))
         pool.close()
         pool.join()
     return 0
 
 
-def index_allc_file(allc_file, reindex=False):
-    index_file = get_index_file_name(allc_file)
-    # do not reindex if the index file is available and is complete
-    if (not reindex) and os.path.exists(index_file):
-        # check index file completeness
-        eof_count = 0
-        line = False
-        with open(index_file, 'r') as f:
-            for line in f:
-                if line == '#eof\n':
-                    eof_count += 1
-        # need reindex
-        if eof_count > 1 or line != '#eof\n':
-            pass
-        else:
-            return 0
-    g = open(index_file, 'w')
-    if 'gz' in allc_file:
-        with open(allc_file[:-3], 'w') as f:
-            subprocess.run(f'zcat {allc_file}',
-                           shell=True,
-                           stdout=f)
-        f = open(allc_file[:-3])
+def index_allc_file(allc_file):
+    index_file = str(allc_file) + '.idx'
+    if os.path.exists(index_file):
+        # backward compatibility
+        with open(index_file) as f:
+            last_line = f.readlines()[-1]
+            if last_line == "#eof\n":
+                return
+
+    if allc_file.endswith('gz'):  # works for .gz, .bgz
+        f = subprocess.Popen(['zcat', allc_file],
+                             stdout=subprocess.PIPE,
+                             encoding='utf8').stdout
     else:
         f = open(allc_file)
 
-    cur_chrom = ""
+    index_lines = []
+    cur_chrom = "TOTALLY_NOT_A_CHROM"
+    cur_start = cur_chrom + '\t'
+    cur_pointer = 0
     # check header
-    line = f.readline()
-    try:
-        fields = line.split("\t")
-        int(fields[1])
-        int(fields[4])
-        int(fields[5])
-        # no header, continue to start from the beginning of allc file
-        f.seek(0)
-        cur_pointer = 0
-    except:
-        # find header, skip it
-        cur_pointer = f.tell()
-    # find chrom pointer
-    while True:
-        line = f.readline()
-        if not line:
-            break
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            g.write(fields[0] + "\t" + str(cur_pointer) + "\n")
+    first_line = True
+    for line in f:
+        if first_line:
+            fields = line.split("\t")
+            first_line = False
+            try:
+                int(fields[1])
+                int(fields[4])
+                int(fields[5])
+                # no header, continue to start from the beginning of allc file
+            except ValueError:
+                # find header, skip it
+                cur_pointer += len(line)
+                continue
+        if not line.startswith(cur_start):
+            fields = line.split("\t")
+            index_lines.append(fields[0] + "\t" + str(cur_pointer) + "\n")
             cur_chrom = fields[0]
-        cur_pointer = f.tell()
-    g.write("#eof\n")
+            cur_start = cur_chrom + '\t'
+        cur_pointer += len(line)
+    # backward compatibility
+    index_lines.append("#eof\n")
     f.close()
-    g.close()
-    if 'gz' in allc_file:
-        subprocess.run(f'rm -f {allc_file[:-3]}', shell=True)
-    return 0
+    with open(index_file, 'w') as idx:
+        idx.writelines(index_lines)
+    return
 
 
 def read_allc_index(allc_file):
-    index_file = get_index_file_name(allc_file)
-    index_allc_file(allc_file, reindex=False)
-    f = open(index_file, 'r')
-    chrom_pointer = {}
-    for line in f:
-        if line[0] != '#':
-            fields = line.rstrip().split("\t")
-            chrom_pointer[fields[0]] = int(fields[1])
-    f.close()
+    index_file = str(allc_file) + ".idx"
+    index_allc_file(allc_file)
+    with open(index_file, 'r') as f:
+        chrom_pointer = {}
+        for line in f:
+            if line[0] != '#':
+                fields = line.rstrip().split("\t")
+                chrom_pointer[fields[0]] = int(fields[1])
     return chrom_pointer
