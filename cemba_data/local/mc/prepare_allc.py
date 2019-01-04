@@ -140,7 +140,8 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
                   f'--out_dir {uid_out_dir} --config_path {config_path}'
         command_dict = {
             'command': uid_cmd,
-            '-pe smp': 20,  # cpu for each command
+            'pe smp': 20,  # cpu for each command
+            'l h_vmem': '100G'
             # TODO set cpu number more clever
         }
         cmd_list.append(command_dict)

@@ -97,9 +97,11 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
               f'--out_path {group_allc_out_path} --cpu {cpu} --index tabix'
+        memory_gbs = int(cpu * 4)
         cmd_dict = {
             'command': cmd,
-            '-pe smp': cpu
+            'pe smp': cpu,
+            'l h_vmem': f'{memory_gbs}G'
         }
         records.append(cmd_dict)
     group_command_path = out_dir / 'group_merge.command.json'
@@ -120,7 +122,8 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
             cmd = f'cp {group_out_paths[0]} {cluster_allc_out_path}'
             cmd_dict = {
                 'command': cmd,
-                '-pe smp': 1
+                'pe smp': 1,
+                'l h_vmem': '3G'
             }
         else:
             group_id_list_path = cluster_column_dir / f'{cluster_id}.group_list'
@@ -129,9 +132,11 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
                     f.write(str(path) + '\n')
             cmd = f'yap merge-allc --allc_paths {group_id_list_path} ' \
                   f'--out_path {cluster_allc_out_path} --cpu {cpu} --index tabix'
+            memory_gbs = int(cpu * 4)
             cmd_dict = {
                 'command': cmd,
-                '-pe smp': cpu
+                'pe smp': cpu,
+                'l h_vmem': f'{memory_gbs}G'
             }
         records.append(cmd_dict)
     cluster_command_path = out_dir / 'cluster_merge.command.json'
@@ -147,7 +152,8 @@ def _batch_allc_profile(out_dir):
         cmd = f'yap allc-profile --allc_path {allc_file}'
         cmd_dict = {
             'command': cmd,
-            '-pe smp': 1
+            'pe smp': 1,
+            'l h_vmem': '3G'
         }
         records.append(cmd_dict)
     command_path = out_dir / 'allc_profile.command.json'
@@ -166,7 +172,8 @@ def _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts):
                   f'--out_path {out_path} --chrom_size {chrom_size_path} --mc_type {mc_context}'
             cmd_dict = {
                 'command': cmd,
-                '-pe smp': 1
+                'pe smp': 1,
+                'l h_vmem': '3G'
             }
             records.append(cmd_dict)
     command_path = out_dir / 'allc_bigwig.command.json'
@@ -187,7 +194,8 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
                   f'--out_path {out_path} --merge_strand {merge_strand} --mc_context {mc_context}'
             cmd_dict = {
                 'command': cmd,
-                '-pe smp': 1
+                'pe smp': 1,
+                'l h_vmem': '3G'
             }
             records.append(cmd_dict)
     command_path = out_dir / 'allc_extract.command.json'

@@ -61,7 +61,8 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
               f'--max_cov_cutoff {max_cov_cutoff}'
         command_dict = {
             'command': cmd,
-            '-pe smp': 1,  # cpu for each command
+            'pe smp': 1,  # cpu for each command,
+            'l h_vmem': '4G',  # cpu for each command
         }
         cmd_list.append(command_dict)
 
@@ -78,7 +79,8 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     with open(assemble_json_path, 'w') as f:
         json.dump([{
             'command': assemble_command,
-            '-pe smp': 10
+            'pe smp': 5,
+            'l h_vmem': '30G'
         }], f)
 
     # submit master
