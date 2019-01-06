@@ -1,4 +1,5 @@
 import itertools
+import functools
 import collections
 import numpy as np
 
@@ -21,6 +22,7 @@ IUPAC_TABLE = {
 }
 
 
+@functools.lru_cache(maxsize=100)
 def parse_mc_pattern(pattern):
     """
     parse mC context pattern
@@ -37,6 +39,7 @@ def parse_mc_pattern(pattern):
     return context_set
 
 
+@functools.lru_cache(maxsize=10)
 def parse_chrom_size(path, remove_chr_list=None):
     """
     return chrom:length dict
@@ -51,6 +54,38 @@ def parse_chrom_size(path, remove_chr_list=None):
                 continue
             chrom_dict[chrom] = int(length)
     return chrom_dict
+
+
+def genome_region_chunks(chrom_size_file, bin_length):
+    chrom_size_dict = parse_chrom_size(chrom_size_file)
+
+    cur_chrom_pos = 0
+    records = []
+    record_lengths = []
+    for chrom, chrom_length in chrom_size_dict.items():
+        while cur_chrom_pos + bin_length <= chrom_length:
+            records.append(f'{chrom}:{cur_chrom_pos}-{cur_chrom_pos+bin_length}')
+            cur_chrom_pos += bin_length
+            record_lengths.append(bin_length)
+        else:
+            records.append(f'{chrom}:{cur_chrom_pos}-{chrom_length}')
+            cur_chrom_pos = 0
+            record_lengths.append(chrom_length - cur_chrom_pos)
+
+    # merge small records (when bin larger then chrom length)
+    final_records = []
+    temp_records = []
+    cum_length = 0
+    for record, record_length in zip(records, record_lengths):
+        temp_records.append(record)
+        cum_length += record_length
+        if cum_length >= bin_length:
+            final_records.append(' '.join(temp_records))
+            temp_records = []
+            cum_length = 0
+    if len(temp_records) != 0:
+        final_records.append(' '.join(temp_records))
+    return final_records
 
 
 def get_mean_var(X):

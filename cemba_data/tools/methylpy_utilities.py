@@ -216,8 +216,9 @@ import multiprocessing
 import gzip
 import glob
 import resource
-from .utilities import parse_mc_pattern
-
+from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from .open import open_allc
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -356,13 +357,183 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
 
 
-def exp_merge_allc_files():
-    # TODO new merge allc
+def batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_length, cpu=10):
+    # TODO check_bgzip_and_tabix before merge
+    regions = genome_region_chunks(chrom_size_file, bin_length=bin_length)
+    print(f'Split genome into {len(regions)} regions, each is {bin_length}bp')
+
+    with open_allc(out_file, 'w', threads=3) as out_handle:
+        with ProcessPoolExecutor(max_workers=cpu) as executor:
+            future_merge_result = {executor.submit(merge_allc_files,
+                                                   allc_files=allc_files,
+                                                   out_file=None,
+                                                   chrom_size_file=chrom_size_file,
+                                                   query_region=region,
+                                                   buffer_line_number=100000): region_id
+                                   for region_id, region in enumerate(regions)}
+            cur_id = 0
+            temp_dict = {}
+            # future may return in any order
+            # save future.result into temp_dict 1st
+            # write data in order by region_id
+            # so the out file is ordered
+            for future in as_completed(future_merge_result):
+                region_id = future_merge_result[future]
+                try:
+                    temp_dict[region_id] = future.result()
+                except Exception as exc:
+                    print('%r generated an exception: %s' % (region_id, exc))
+                else:
+                    try:
+                        while len(temp_dict) > 0:
+                            data = temp_dict.pop(cur_id)
+                            out_handle.write(data)
+                            print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                            cur_id += 1
+                    except KeyError:
+                        continue
+            # write last pieces of data
+            while len(temp_dict) > 0:
+                data = temp_dict.pop(cur_id)
+                out_handle.write(data)
+                print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                cur_id += 1
+        print('Merge finished.')
+    # TODO after merge, tabix output
+    return
+
+
+def check_bgzip_and_tabix(allc_files):
+    # TODO check file gzip type and tabix existence
+    return
+
+
+def fix_bgzip_and_tabix(allc_files):
+    # TODO fix file bgzip type and tabix
+    return
+
+
+def merge_allc_files_tabix(allc_files,
+                           out_file,
+                           chrom_size_file,
+                           query_region=None,
+                           buffer_line_number=100000):
+    # TODO deal with too many file open or too many process problem
+    # TODO merge iteratively if too many
     # only use bgzip and tabix
     # automatically take care the too many file open issue
     # do merge iteratively if file number exceed limit
     # parallel in chrom_bin level, not chrom level
-    return
+
+    # User input checks
+    if not isinstance(allc_files, list):
+        exit("allc_files must be a list of string(s)")
+    chrom_size_dict = parse_chrom_size(chrom_size_file)
+    all_chroms = list(chrom_size_dict.keys())
+    if query_region is not None:
+        if not isinstance(query_region, str):
+            exit("query_region must be str or None")
+        region_chroms = set([region.split(':')[0] for region in query_region.split(' ')])
+        all_chroms = [chrom for chrom in all_chroms if chrom in region_chroms]
+    processing_chrom = all_chroms.pop(0)
+
+    # scan allc file to set up a table for fast look-up of lines belong
+    # to different chromosomes
+    file_handles = [open_allc(allc_file,
+                              region=query_region)
+                    for allc_file in allc_files]
+    if out_file is not None:
+        out_handle = open_allc(out_file, 'w')
+    else:
+        out_handle = ''
+
+    # merge allc files
+    out = ""
+    cur_chrom = ['NOT_A_CHROM' for _ in range(len(allc_files))]
+    cur_pos = np.array([np.nan for _ in range(len(allc_files))])
+    cur_fields = [None for _ in range(len(allc_files))]
+    file_reading = np.array([True for _ in range(len(allc_files))])
+
+    # init
+    for index, allc_file in enumerate(allc_files):
+        line = file_handles[index].readline()
+        if line:
+            fields = line.split("\t")
+            cur_chrom[index] = fields[0]
+            cur_pos[index] = int(fields[1])
+            cur_fields[index] = fields
+        else:
+            # file handle read nothing, the file is empty
+            file_reading[index] = False
+
+    active_handle = np.array([True if chrom == processing_chrom else False
+                              for chrom in cur_chrom])
+
+    # merge
+    line_count = 0
+    while file_reading.sum() > 0:
+        mc, cov = 0, 0
+        genome_info = None
+        # select index whose cur_pos is smallest among all active handle
+        for index in np.where((cur_pos == np.nanmin(cur_pos[active_handle]))
+                              & active_handle)[0]:
+            mc += int(cur_fields[index][4])
+            cov += int(cur_fields[index][5])
+            if genome_info is None:
+                genome_info = cur_fields[index][:4]
+
+            # update
+            line = file_handles[index].readline()
+            if line:
+                fields = line.split("\t")
+                # judge if chrom changed between two lines
+            else:
+                # read to the end of a file
+                fields = ['NOT_A_CHROM', 9999999999]
+                file_reading[index] = False
+
+            this_chrom = cur_fields[index][0]
+            next_chrom = fields[0]
+            if next_chrom == this_chrom:
+                cur_pos[index] = int(fields[1])
+                cur_fields[index] = fields
+            else:
+                # read to next chrom
+                # handle became inactive
+                active_handle[index] = False
+                cur_chrom[index] = next_chrom
+                cur_pos[index] = int(fields[1])
+                cur_fields[index] = fields
+
+                # if all handle became inactive, move processing_chrom to next
+                if sum(active_handle) == 0:
+                    if len(all_chroms) == 0:
+                        break
+                    processing_chrom = all_chroms.pop(0)
+                    # and re-judge active handle
+                    active_handle = np.array([True if chrom == processing_chrom else False
+                                              for chrom in cur_chrom])
+
+        # output
+        out += '\t'.join(genome_info) + f'\t{mc}\t{cov}\t1\n'
+        line_count += 1
+        if line_count > buffer_line_number:
+            if isinstance(out_handle, str):
+                out_handle += out
+            else:
+                out_handle.write(out)
+            line_count = 0
+            out = ""
+    # the last out
+    for file_handle in file_handles:
+        file_handle.close()
+    if isinstance(out_handle, str):
+        out_handle += out
+        return out_handle
+    else:
+        out_handle.write(out)
+        out_handle.close()
+        return
 
 
 def merge_allc_files(allc_files,
@@ -512,7 +683,6 @@ def merge_allc_files_worker(allc_files,
                             output_file,
                             query_chroms=None,
                             compress_output=False,
-                            skip_snp_info=True,
                             buffer_line_number=100000):
     # User input checks
     if not isinstance(allc_files, list):
@@ -550,57 +720,26 @@ def merge_allc_files_worker(allc_files,
     out = ""
     for chrom in chroms:
         cur_pos = np.array([np.nan for _ in range(len(allc_files))])
-        cur_fields = []
+        cur_fields = [None for _ in range(len(allc_files))]
         num_remaining_allc = 0
         # init
         for index, allc_file in enumerate(allc_files):
             fhandles[index].seek(chrom_pointer[index].get(chrom, 0))
             line = fhandles[index].readline()
             fields = line.split("\t")
-            cur_fields.append(None)
             if fields[0] == chrom:
                 cur_pos[index] = int(fields[1])
                 cur_fields[index] = fields
                 num_remaining_allc += 1
 
-        # check consistency of SNP information
-        context_len = None
-        if not skip_snp_info:
-            for index, allc_file in enumerate(allc_files):
-                # skip allc with no data in this chromosome
-                if cur_fields[index] is None:
-                    continue
-                # SNP information is missing
-                if len(cur_fields[index]) < 9:
-                    print("SNP information not found in " + allc_file + "!\n"
-                          + "Skip SNP information\n")
-                    skip_snp_info = True
-                    break
-                # init contex_len
-                if context_len is None:
-                    context_len = len(cur_fields[index][7].split(","))
-                # check whether contex length are the same
-                if context_len != len(cur_fields[index][7].split(",")) or \
-                        context_len != len(cur_fields[index][8].split(",")):
-                    print("Inconsistent sequence context length: "
-                          + allc_file + "\n")
         # merge
         line_counts = 0
         while num_remaining_allc > 0:
             mc, h = 0, 0
-            if not skip_snp_info:
-                matches = [0 for _ in range(context_len)]
-                mismatches = list(matches)
             c_info = None
-            for index in np.where(cur_pos == np.nanmin(cur_pos))[0]:
+            for index, in np.where(cur_pos == np.nanmin(cur_pos)):
                 mc += int(cur_fields[index][4])
                 h += int(cur_fields[index][5])
-                if not skip_snp_info:
-                    for ind, match, mismatch in zip(range(context_len),
-                                                    cur_fields[index][7].split(","),
-                                                    cur_fields[index][8].split(",")):
-                        matches[ind] += int(match)
-                        mismatches[ind] += int(mismatch)
                 if c_info is None:
                     c_info = "\t".join(cur_fields[index][:4])
                 # update
@@ -613,11 +752,7 @@ def merge_allc_files_worker(allc_files,
                     cur_pos[index] = np.nan
                     num_remaining_allc -= 1
             # output
-            if not skip_snp_info:
-                out += c_info + "\t" + str(mc) + "\t" + str(h) + "\t1" + "\t" \
-                       + ",".join(map(str, matches)) + "\t" + ",".join(map(str, mismatches)) + "\n"
-            else:
-                out += c_info + "\t" + str(mc) + "\t" + str(h) + "\t1\n"
+            out += c_info + "\t" + str(mc) + "\t" + str(h) + "\t1\n"
             line_counts += 1
             if line_counts > buffer_line_number:
                 g.write(out)
