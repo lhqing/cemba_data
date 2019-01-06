@@ -768,11 +768,14 @@ def merge_allc_files_worker(allc_files,
 
 
 def index_allc_file_batch(allc_files, cpu=1):
+    if isinstance(allc_files, str):
+        allc_files = glob.glob(allc_files)
+
     if cpu == 1:
         for allc_file in allc_files:
             index_allc_file(allc_file)
     else:
-        pool = multiprocessing.Pool(min(cpu, len(allc_files), 100))
+        pool = multiprocessing.Pool(min(cpu, len(allc_files), 48))
         for allc_file in allc_files:
             pool.apply_async(index_allc_file, (allc_file,))
         pool.close()
