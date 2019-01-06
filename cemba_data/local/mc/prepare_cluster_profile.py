@@ -43,9 +43,14 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
     # make cluster dict, cluster is merged from 1 or more groups
     cluster_dict = {}
     existing_group_pattern = {}
+    real_cluster_name_map = {}
     for column_num, column in enumerate(cluster_table.columns):
         for cluster_name, sub_df in cluster_table.groupby(column):
             cluster_uid = f'{column}-{cluster_name}'
+
+            # [real_column_dir, real_cluster_uid, original column, original cluster_name]
+            # the 1st 2 items are used for make real path, last 2 items are used for sync original cluster table
+            real_cluster_name_map[cluster_uid] = [column, cluster_uid, column, cluster_name]
             contain_groups = tuple(set([group_id for group_id, group_id_dict in cell_group_dict.items()
                                         if group_id_dict['pattern'][column_num] == cluster_name]))
             if len(contain_groups) == 0:
@@ -55,8 +60,20 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
             if keep_unique_cluster and (contain_groups in existing_group_pattern):
                 # always keep cluster exists in later columns, delete the previous one.
                 # assume that later columns are always in higher level.
-                # this do not check the cell, but check on group level. cell_count could be diff.
+                # this do not check the cell, but check on group level.
                 del cluster_dict[existing_group_pattern[contain_groups]]
+
+                # its ok to delete duplicated cluster here, but in the end,
+                # we need to give out a file list to make it clear
+                real_cluster_name_map[existing_group_pattern[contain_groups]][0] = column
+                real_cluster_name_map[existing_group_pattern[contain_groups]][1] = cluster_uid
+
+                # in case of chain deletion, search all k:v to replace v to the final cluster_uid
+                for k, v in real_cluster_name_map.items():
+                    if v[1] == existing_group_pattern[contain_groups]:
+                        real_cluster_name_map[k][0] = column
+                        real_cluster_name_map[k][1] = cluster_uid
+
             existing_group_pattern[contain_groups] = cluster_uid
 
             cluster_dict[cluster_uid] = {
@@ -65,7 +82,7 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
                 'out_path': None,  # will be assign in _batch_merge_allc
                 'cluster_level': column
             }
-    return cell_group_dict, cluster_dict, dropped_cells, dropped_clusters
+    return cell_group_dict, cluster_dict, dropped_cells, dropped_clusters, real_cluster_name_map
 
 
 def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
@@ -82,7 +99,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         column_dir.mkdir()
 
     # generate merge dict
-    cell_group_dict, cluster_dict, dropped_cells, dropped_clusters = \
+    cell_group_dict, cluster_dict, dropped_cells, dropped_clusters, real_cluster_name_map = \
         _generate_merge_strategy(cluster_table, min_group)
 
     # generate cell_group merge commands
@@ -97,7 +114,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
               f'--out_path {group_allc_out_path} --cpu {cpu} --index tabix'
-        memory_gbs = min(int(cpu * 4), 30)
+        memory_gbs = min(int(cpu * 2), 30)
         cmd_dict = {
             'command': cmd,
             'pe smp': cpu,
@@ -122,8 +139,8 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
             cmd = f'cp {group_out_paths[0]} {cluster_allc_out_path}'
             cmd_dict = {
                 'command': cmd,
-                'pe smp': 1,
-                'l h_vmem': '3G'
+                'pe smp': 10,  # TODO: figure out a better way to limit IO bound jobs
+                'l h_vmem': '30G'
             }
         else:
             group_id_list_path = cluster_column_dir / f'{cluster_id}.group_list'
@@ -142,12 +159,25 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
     cluster_command_path = out_dir / 'cluster_merge.command.json'
     with cluster_command_path.open('w') as f:
         json.dump(records, f)
+
+    # if keep_unique_cluster = True in _generate_merge_strategy,
+    # some lower level duplicated cluster are dropped
+    # here provide a final cluster path table follow original column and cluster name
+    # where no cluster are dropped
+    records = []
+    for cluster_uid, (real_column, real_cluster_uid, column, cluster_name) in real_cluster_name_map.items():
+        real_file_path = out_dir / real_column / f'{real_cluster_uid}.allc.tsv.gz'
+        records.append([column, cluster_name, real_file_path])
+    final_cluster_path_df = pd.DataFrame(records,
+                                         columns=['column', 'cluster_name', 'cluster_allc_path'])
+    final_cluster_path_df.to_csv(out_dir / 'final_cluster_path.tsv', index=None, sep='\t')
     return
 
 
 def _batch_allc_profile(out_dir):
     records = []
-    allc_files = pathlib.Path(out_dir).absolute().glob('**/*allc.tsv.gz')
+    final_cluster_path_df = pd.read_table(out_dir / 'final_cluster_path.tsv', header=0)
+    allc_files = final_cluster_path_df['cluster_allc_path'].drop_duplicates()
     for allc_file in allc_files:
         cmd = f'yap allc-profile --allc_path {allc_file}'
         cmd_dict = {
@@ -164,7 +194,8 @@ def _batch_allc_profile(out_dir):
 
 def _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts):
     records = []
-    allc_files = pathlib.Path(out_dir).absolute().glob('**/*allc.tsv.gz')
+    final_cluster_path_df = pd.read_table(out_dir / 'final_cluster_path.tsv', header=0)
+    allc_files = final_cluster_path_df['cluster_allc_path'].drop_duplicates()
     for mc_context in mc_contexts:
         for allc_file in allc_files:
             out_path = str(allc_file).rstrip('allc.tsv.gz') + f'{mc_context}.bw'
@@ -186,7 +217,8 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
     if isinstance(mc_contexts, str):
         mc_contexts = [mc_contexts]
     records = []
-    allc_files = pathlib.Path(out_dir).absolute().glob('**/*allc.tsv.gz')
+    final_cluster_path_df = pd.read_table(out_dir / 'final_cluster_path.tsv', header=0)
+    allc_files = final_cluster_path_df['cluster_allc_path'].drop_duplicates()
     for mc_context in mc_contexts:
         for allc_file in allc_files:
             out_path = str(allc_file).rstrip('tsv.gz') + f'{mc_context}.tsv.gz'

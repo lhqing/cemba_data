@@ -117,6 +117,9 @@ class _Qsubmitter:
         self.finished_commands = []
         self.finish_count = 0
 
+        # TODO check whether command have been submitted before run self.submit()
+        # otherwise submitted command will still go through qstat sleep
+
         # submit jobs
         self.submit()
         return

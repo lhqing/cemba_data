@@ -229,6 +229,12 @@ def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
 
 
 def extract_context_allc(allc_path, out_path, merge_strand=True, mc_context='CGN'):
+    # TODO support multiple context
+    if isinstance(mc_context, list):
+        if len(mc_context) > 1:
+            raise NotImplementedError('TODO support multiple context')
+        mc_context = mc_context[0]
+
     if 'CG' not in mc_context:
         merge_strand = False
 
