@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def _parse_bismark_report(report_path_list):
+def _parse_bismark_report(report_path_dict):
     """
     Some ugly parser for bismark report... Hope Bismark won't change...
     # TODO make this independent to bismark
@@ -46,8 +46,7 @@ def _parse_bismark_report(report_path_list):
                  'C methylated in Unknown context (CN or CHN)': 'total_mcn_rate'}
 
     total_list = []
-    for report in report_path_list:
-        uid, index_name, read_type = report.name.split('.')[0].split('_')
+    for (uid, index_name, read_type), report in report_path_dict.items():
         with report.open() as rep:
             report_dict = {}
             for line in rep:
@@ -136,10 +135,16 @@ def bismark(fastq_final_result, out_dir, config):
         result.get()
 
     if len(ran_samples) != 0:
-        report_path_list = []
+        report_path_dict = {}
         for (uid, index_name) in ran_samples:
-            report_path_list += list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}*bismark_bt2*report.txt'))
-        bismark_result_df = _parse_bismark_report(report_path_list)
+            for read_type in fastq_final_result[(fastq_final_result['uid'] == uid) &
+                                                (fastq_final_result['index_name'] == index_name)]['read_type']:
+                report_file = list(pathlib.Path(out_dir).glob(f'{uid}_{index_name}_{read_type}*bismark_bt2*report.txt'))
+                if len(report_file) != 1:
+                    raise FileNotFoundError(f'Report file for {uid}_{index_name}_{read_type} not found.')
+                else:
+                    report_path_dict[(uid, index_name, read_type)] = report_file[0]
+        bismark_result_df = _parse_bismark_report(report_path_dict)
         return bismark_result_df
     else:
         # in rare case that all cells are dropped
