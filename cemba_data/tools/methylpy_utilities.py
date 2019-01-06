@@ -541,7 +541,6 @@ def merge_allc_files(allc_files,
                      num_procs=1,
                      mini_batch=DEFAULT_MAX_ALLC,
                      compress_output=True,
-                     skip_snp_info=True,
                      buffer_line_number=100000, index=True):
     increase_soft_fd_limit()
     # User input checks
@@ -561,8 +560,7 @@ def merge_allc_files(allc_files,
                                    output_file,
                                    query_chroms=None,
                                    mini_batch=mini_batch,
-                                   compress_output=compress_output,
-                                   skip_snp_info=skip_snp_info)
+                                   compress_output=compress_output)
         if index:
             index_allc_file(output_file)
         return 0
@@ -587,7 +585,6 @@ def merge_allc_files(allc_files,
                               "query_chroms": chrom,
                               "mini_batch": mini_batch,
                               "compress_output": False,
-                              "skip_snp_info": skip_snp_info,
                               }
                              )
         pool.close()
@@ -619,8 +616,7 @@ def merge_allc_files(allc_files,
         merge_allc_files_minibatch(allc_files,
                                    output_file,
                                    mini_batch=mini_batch,
-                                   compress_output=compress_output,
-                                   skip_snp_info=skip_snp_info)
+                                   compress_output=compress_output)
     # remove temporary files
     for chrom in set(chroms):
         tmp_file = glob.glob(output_file + "_" + str(chrom) + ".tsv")
@@ -638,8 +634,7 @@ def merge_allc_files_minibatch(allc_files,
                                output_file,
                                query_chroms=None,
                                mini_batch=DEFAULT_MAX_ALLC,
-                               compress_output=False,
-                               skip_snp_info=True):
+                               compress_output=False):
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
@@ -648,8 +643,7 @@ def merge_allc_files_minibatch(allc_files,
         merge_allc_files_worker(allc_files=allc_files,
                                 output_file=output_file,
                                 query_chroms=query_chroms,
-                                compress_output=compress_output,
-                                skip_snp_info=skip_snp_info)
+                                compress_output=compress_output)
         return 0
     except:
         print("Failed to merge all allc files at once. Do minibatch merging")
@@ -660,8 +654,7 @@ def merge_allc_files_minibatch(allc_files,
     merge_allc_files_worker(allc_files=allc_files[:mini_batch],
                             output_file=output_file,
                             query_chroms=query_chroms,
-                            compress_output=compress_output,
-                            skip_snp_info=skip_snp_info)
+                            compress_output=compress_output)
     # batch merge
     while len(remaining_allc_files) > 0:
         processing_allc_files = [output_file]
@@ -671,8 +664,7 @@ def merge_allc_files_minibatch(allc_files,
         merge_allc_files_worker(allc_files=processing_allc_files,
                                 output_file=output_tmp_file,
                                 query_chroms=query_chroms,
-                                compress_output=compress_output,
-                                skip_snp_info=skip_snp_info)
+                                compress_output=compress_output)
         subprocess.check_call(["mv", output_tmp_file, output_file])
         index_allc_file(output_file)
     return 0

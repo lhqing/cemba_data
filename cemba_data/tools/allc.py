@@ -201,7 +201,6 @@ def merge_allc(allc_paths, out_path, cpu=1, index='tabix'):
                          num_procs=cpu,
                          mini_batch=150,
                          compress_output=False,
-                         skip_snp_info=True,
                          buffer_line_number=100000,
                          index=False)
         # use bgzip and tabix
