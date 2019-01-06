@@ -222,7 +222,7 @@ from .open import open_allc
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
-DEFAULT_MAX_ALLC = HARD - 100
+DEFAULT_MAX_ALLC = int((HARD - 100) / 2)
 
 
 def increase_soft_fd_limit():
@@ -543,8 +543,7 @@ def merge_allc_files(allc_files,
                      compress_output=True,
                      skip_snp_info=True,
                      buffer_line_number=100000, index=True):
-    if len(allc_files) > SOFT:
-        increase_soft_fd_limit()
+    increase_soft_fd_limit()
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
