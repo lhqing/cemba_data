@@ -39,13 +39,17 @@ import codecs
 from subprocess import Popen, PIPE, run
 
 try:
-    run(['pigz', '--version'])
+    run(['pigz', '--version'],
+        stdout=PIPE,
+        stderr=PIPE)
     PIGZ = True
 except OSError:
     PIGZ = False
 
 try:
-    run(['bgzip', '--version'])
+    run(['bgzip', '--version'],
+        stdout=PIPE,
+        stderr=PIPE)
     BGZIP = True
 except OSError:
     BGZIP = False

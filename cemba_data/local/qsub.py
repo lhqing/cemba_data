@@ -148,6 +148,8 @@ class _Qsubmitter:
                     # wait longer and longer if the job is stuck
                     temp_gap += 5
                     self.check_running()
+                    future_cpu = self.running_cpu + command_cpu
+                    future_mem = self.running_mem + command_mem
                     if (future_cpu <= self.total_cpu) and (future_mem <= self.total_mem):
                         break
             command_obj.submit()
