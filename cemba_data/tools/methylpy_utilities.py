@@ -584,8 +584,7 @@ def merge_allc_files(allc_files,
                               "output_file": output_file + "_" + str(chrom) + ".tsv",
                               "query_chroms": chrom,
                               "mini_batch": mini_batch,
-                              "compress_output": False,
-                              }
+                              "compress_output": False}
                              )
         pool.close()
         pool.join()

@@ -69,7 +69,7 @@ def _get_running_job_id_qstat(user_name, id_set):
 
 class _Qsubmitter:
     def __init__(self, command_file_path, working_dir, project_name, force_redo=False,
-                 total_cpu=60, total_mem=100, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
+                 total_cpu=60, total_mem=500, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
         # TODO add running mem check too
         # prepare working_dir
         self.working_dir = working_dir
@@ -349,7 +349,7 @@ class _Command:
 
 
 def qsub(command_file_path, working_dir, project_name,
-         total_cpu=60, total_mem=100, force_redo=False,
+         total_cpu=60, total_mem=500, force_redo=False,
          submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
     if isinstance(command_file_path, str):
         command_file_path = [command_file_path]

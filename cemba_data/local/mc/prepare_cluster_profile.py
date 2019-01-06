@@ -97,7 +97,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
               f'--out_path {group_allc_out_path} --cpu {cpu} --index tabix'
-        memory_gbs = int(cpu * 4)
+        memory_gbs = min(int(cpu * 4), 30)
         cmd_dict = {
             'command': cmd,
             'pe smp': cpu,
@@ -132,7 +132,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
                     f.write(str(path) + '\n')
             cmd = f'yap merge-allc --allc_paths {group_id_list_path} ' \
                   f'--out_path {cluster_allc_out_path} --cpu {cpu} --index tabix'
-            memory_gbs = int(cpu * 4)
+            memory_gbs = min(int(cpu * 4), 30)
             cmd_dict = {
                 'command': cmd,
                 'pe smp': cpu,
@@ -239,7 +239,8 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name master ' \
                    f'--command_file_path {command_path} ' \
-                   f'--total_cpu 120'
+                   f'--total_cpu 120 ' \
+                   f'--total_mem 1000 '
 
     print(f"""
         The command file for prepare-cluster-profile is prepared
