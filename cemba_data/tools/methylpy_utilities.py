@@ -609,7 +609,7 @@ def merge_allc_files(allc_files,
         if line_counts > 0:
             g.write(out)
         g.close()
-    except:
+    except OSError:
         print("Failed to merge using multiple processors. " +
               "Do minibatch merging using single processor.")
         merge_allc_files_minibatch(allc_files,
