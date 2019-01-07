@@ -95,8 +95,7 @@ def qsub_register_subparser(subparser):
         type=int,
         required=False,
         default=30,
-        nargs='+',
-        help="Total CPU in qsub list, use space-separated list for multiple command.json files"
+        help="Total CPU in qsub list"
     )
 
     parser_opt.add_argument(
@@ -104,8 +103,7 @@ def qsub_register_subparser(subparser):
         type=int,
         required=False,
         default=500,
-        nargs='+',
-        help="Total MEM in qsub list, use space-separated list for multiple command.json files"
+        help="Total MEM in qsub list"
     )
     return
 

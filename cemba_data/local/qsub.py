@@ -358,13 +358,9 @@ def qsub(command_file_path, working_dir, project_name,
          submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
     if isinstance(command_file_path, str):
         command_file_path = [command_file_path]
-    if isinstance(total_cpu, int):
-        total_cpu = [total_cpu] * len(command_file_path)
-    if isinstance(total_mem, int):
-        total_mem = [total_mem] * len(command_file_path)
 
     # for multiple command files, run one by one
-    for i, (command_file, cpu, mem) in enumerate(zip(command_file_path, total_cpu, total_mem)):
+    for i, command_file in enumerate(command_file_path):
         print(f'Execute command file: {command_file}')
         _project_name = project_name
         if len(command_file_path) != 1:
@@ -372,8 +368,8 @@ def qsub(command_file_path, working_dir, project_name,
         submitter = _Qsubmitter(command_file_path=command_file,
                                 working_dir=working_dir,
                                 project_name=_project_name,
-                                total_cpu=cpu,
-                                total_mem=mem,
+                                total_cpu=total_cpu,
+                                total_mem=total_mem,
                                 submission_gap=submission_gap,
                                 qstat_gap=qstat_gap,
                                 force_redo=force_redo)
