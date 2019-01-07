@@ -12,7 +12,7 @@ setup(
     long_description=open('README.md').read(),
     include_package_data=True,
     install_requires=['pandas', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
-                      'matplotlib', 'seaborn', 'allensdk', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
+                      'matplotlib', 'seaborn', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
                       'six', 'xarray', 'statsmodels'],
     entry_points={
         'console_scripts': ['yap=cemba_data.__main__:main'],
