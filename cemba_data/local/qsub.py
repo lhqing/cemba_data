@@ -70,7 +70,6 @@ def _get_running_job_id_qstat(user_name, id_set):
 class _Qsubmitter:
     def __init__(self, command_file_path, working_dir, project_name, force_redo=False,
                  total_cpu=60, total_mem=500, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
-        # TODO add running mem check too
         # prepare working_dir
         self.working_dir = working_dir
         if project_name[0].isdigit():
@@ -117,11 +116,11 @@ class _Qsubmitter:
         self.finished_commands = []
         self.finish_count = 0
 
-        # TODO check whether command have been submitted before run self.submit()
-        # otherwise submitted command will still go through qstat sleep
-
         # submit jobs
         self.submit()
+
+        # get job reports
+        self.get_reports()
         return
 
     def _parse_command_file(self):
@@ -138,6 +137,10 @@ class _Qsubmitter:
     def submit(self):
         # job submission process:
         for command_obj in self.commands:
+            if command_obj.finish:
+                # happens when command_obj.status_path exist
+                self.finished_commands.append(command_obj)
+                continue
             command_cpu = int(command_obj.qsub_parameter['pe smp'])
             command_mem = int(command_obj.qsub_parameter['l h_vmem'].strip('G'))
             future_cpu = self.running_cpu + command_cpu
@@ -174,12 +177,12 @@ class _Qsubmitter:
             self.check_running()
             if self.running_cpu == 0:
                 break  # all job finished
-        self.get_reports()
         return
 
     def check_running(self):
         print('check running job: ', end='')
-        cur_running_qsub_id = _get_running_job_id_qstat(user_name=self.user_name, id_set=self.submitted_qsub_id)
+        cur_running_qsub_id = _get_running_job_id_qstat(user_name=self.user_name,
+                                                        id_set=self.submitted_qsub_id)
         # check every running obj
         cur_running_cpu = 0
         cur_running_mem = 0  # GBs
@@ -272,6 +275,8 @@ class _Command:
 
         # make command sh file
         self._make_script_file()
+        # if self.submit_status exist, self.submitted, self.finish will be true
+        self.check_submitted_status()
         return
 
     def _make_script_file(self):
@@ -308,7 +313,12 @@ class _Command:
             return
 
     def check_submitted_status(self):
+        if not os.path.exists(self.status_path):
+            # do noting
+            return None
+
         self.submitted = True
+        self.finish = True
         with open(self.status_path) as f:
             status_dict = json.load(f)
         self.qsub_id = status_dict['qsub_id']
