@@ -196,9 +196,13 @@ class MCDS(xr.Dataset):
             self[coord_name + '_coord'] = varm_df
         return
 
-    def add_dataframe_to_coords(self, df, index_dim):
+    def add_dataframe_to_coords(self, df, index_dim=None):
         # add columns to da.coords based on index and index_name
-        df.index.name = index_dim
+        if df.index.name not in self.dims:
+            if index_dim is None:
+                raise ValueError('Dataframe index name is not in dims, index_dim must be specified.')
+            else:
+                df.index.name = index_dim
         for col, data in df.iteritems():
             self.coords[col] = data
         return
@@ -210,5 +214,62 @@ class MCDS(xr.Dataset):
         self[da_name] = df
         return
 
-    def get_plot_data(self, genes=None, coord='tsne'):
-        return
+    def get_cell_tidy_data(self, tsne=True, umap=True, pca=True, pc_components=4,  # Select coordinates
+                           select_genes=None, gene_mc_type='CHN', add_gene_cov=True):
+        # A cell tidy dataframe need:
+        # - tsne, umap and pca coordinates
+        # - gene rate and gene cov
+        # - other cell metadata
+
+        cell_coord_da = self.coords['cell'].coords
+        records = [coord.to_series() for coord in cell_coord_da.coords.values()]
+        data = pd.DataFrame(records).T
+
+        all_dfs = [data]
+        if tsne:
+            if 'tsne_coord' not in self.data_vars:
+                print('tSNE coords do not exist, skip')
+            else:
+                coord_df = self['tsne_coord'].to_pandas()
+                all_dfs.append(coord_df)
+        if umap:
+            if 'umap_coord' not in self.data_vars:
+                print('UMAP coords do not exist, skip')
+            else:
+                coord_df = self['umap_coord'].to_pandas()
+                all_dfs.append(coord_df)
+        if pca:
+            if 'pca_coord' not in self.data_vars:
+                print('PCA coords do not exist, skip')
+            else:
+                coord_df = self['pca_coord'][:, :pc_components].to_pandas()
+                all_dfs.append(coord_df)
+
+        if select_genes is not None:
+            if isinstance(select_genes, str):
+                select_genes = [select_genes]
+            # select_genes must be gene_id used for gene coords.
+            # there is not transformation and will raise if gene id not found
+            gene_index = self.get_index('gene')
+            for gene in select_genes:
+                unknown_genes = []
+                if gene not in gene_index:
+                    unknown_genes.append(gene)
+                if len(unknown_genes) != 0:
+                    unknown_genes = ' '.join(unknown_genes)
+                    raise KeyError(f'{unknown_genes} not exist in gene coords')
+            if 'gene_da_rate' not in self.data_vars:
+                print('Gene rate dataarray do not exist, skip adding gene info')
+            if gene_mc_type not in self['gene_da_rate'].coords['mc_type']:
+                raise ValueError(f'Gene rate dataarray do not contain mC type {gene_mc_type}')
+
+            gene_df = self['gene_da_rate'].sel(mc_type=gene_mc_type, gene=select_genes).to_pandas()
+            all_dfs.append(gene_df)
+            if add_gene_cov:
+                gene_cov_df = self['gene_da'].sel(mc_type=gene_mc_type,
+                                                  count_type='cov',
+                                                  gene=select_genes).to_pandas()
+                all_dfs.append(gene_cov_df)
+
+        total_df = pd.concat(all_dfs, axis=1, sort=True)
+        return total_df

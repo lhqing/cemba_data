@@ -41,6 +41,19 @@ import logging
 log = logging.getLogger()
 
 
+# TODO make a MCAD class that overwrite AnnData function and use OOP in clustering
+# put recipe in this class
+class MCAD(AnnData):
+    def __init__(self, adata):
+        super().__init__(X=adata.X,
+                         obs=adata.obs, var=adata.var, uns=adata.uns,
+                         obsm=adata.obsm, varm=adata.varm,
+                         layers=adata.layers, raw=adata.raw,
+                         dtype=adata.dtype, shape=adata.shape,
+                         filename=adata.filename, filemode=adata.filemode)
+        return
+
+
 def highly_variable_feature(
         adata,
         min_disp=None, max_disp=None,
@@ -339,6 +352,8 @@ def rank_features_groups(
             rankings_gene_names.append(adata_comp.var_names[global_indices])
             rankings_gene_pvals.append(pvals[global_indices])
             rankings_gene_pvals_adj.append(pvals_adj[global_indices])
+    else:
+        raise NotImplementedError(f'{method} is not implemented, buy me a coffee I can implement')
 
     groups_order_save = [str(g) for g in groups_order]
     if (reference != 'rest' and method != 'logreg') or (method == 'logreg' and len(groups) == 2):
@@ -361,3 +376,59 @@ def rank_features_groups(
             [n for n in rankings_gene_pvals_adj],
             dtype=[(rn, 'float64') for rn in groups_order_save])
     return adata if copy else None
+
+
+def batch_correct_pc(adata, batch_series, correct=False,
+                     n_components=30, sigma=25, alpha=0, knn=30,
+                     **scanorama_kws):
+    """
+    Batch correction PCA based on scanorama
+
+    Parameters
+    ----------
+    adata
+        one major adata
+    batch_series
+        batch_series used for splitting adata
+    correct
+        if True, adata.X will be corrected inplace, otherwise only corrected PCs are added to adata.obsm['X_pca']
+    dimred
+        number of components in PCA
+    sigma
+        Correction smoothing parameter on Gaussian kernel.
+    alpha
+        Alignment score minimum cutoff.
+    knn
+        Number of nearest neighbors to use for matching.
+    scanorama_kws
+        Other Parameters passed to scanorama function
+    Returns
+    -------
+    adata
+    """
+    try:
+        import scanorama
+    except ModuleNotFoundError as e:
+        print('In order to use batch_correct_pc, you need to install scanorama, '
+              'https://github.com/brianhie/scanorama')
+        raise e
+
+    scanorama_kws['dimred'] = n_components
+    scanorama_kws['sigma'] = sigma
+    scanorama_kws['alpha'] = alpha
+    scanorama_kws['knn'] = knn
+
+    adata.obs['batch'] = batch_series
+    adata_list = []
+    for _, sub_df in adata.obs.groupby('batch'):
+        adata_list.append(adata[sub_df.index, :])
+
+    if correct:
+        integrated, corrected = scanorama.correct_scanpy(adata_list, **scanorama_kws)
+        adata.X = np.vstack([ann.X.toarray() for ann in corrected])
+    else:
+        integrated = scanorama.integrate_scanpy(adata_list, **scanorama_kws)
+    adata.obsm['X_pca'] = np.vstack(integrated)
+
+    # TODO fill up other PC related parts same as sc.tl.pca
+    return adata
