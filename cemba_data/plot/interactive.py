@@ -47,6 +47,7 @@ def pair_plot(data, hue=None, interactive=False, hue_overlay=False,
         g = hv.operation.gridmatrix(plot_data,
                                     chart_type=hv.Points)
         g = g.opts({'Points': {'plot': {'tools': ['box_select', 'lasso_select', 'hover']}}})
+
     else:
         # do not sample data for non-interactive plots
         if sns_kws is None:
@@ -56,13 +57,17 @@ def pair_plot(data, hue=None, interactive=False, hue_overlay=False,
         g = g.map_diag(sns.kdeplot, lw=2, legend=False, shade=True)
         g.fig.subplots_adjust(wspace=plot_space, hspace=plot_space)
         g.add_legend()
+
     return g
 
 
-def large_categorical_scatter(x, y, color, data=None, sample=3000, size=5,
-                              height=600, interactive=True, show_legend=False,
-                              plot_kws=None, style_kws=None):
+def categorical_scatter(x, y, color, data=None, sample=3000, size=5,
+                        height=600, interactive=False, show_legend=False,
+                        plot_kws=None, style_kws=None):
+    # TODO try datashader for large data
     if interactive:
+        # TODO interactive part is under review
+
         # sampling to speed up and prevent over-plotting
         data = sample_data(data, sample)
         key_dimensions = [x, color]
@@ -88,8 +93,8 @@ def large_categorical_scatter(x, y, color, data=None, sample=3000, size=5,
     return g
 
 
-def large_continuous_scatter(x, y, color, data=None, sample=3000, size=5,
-                             height=600, interactive=True, add_hist=True):
+def continuous_scatter(x, y, color, data=None, sample=3000, size=5,
+                       height=600, interactive=True, add_hist=True):
     if interactive:
         # sampling to speed up and prevent over-plotting
         data = sample_data(data, sample)
@@ -98,7 +103,7 @@ def large_continuous_scatter(x, y, color, data=None, sample=3000, size=5,
                                              scaling_factor=50,
                                              tools=['lasso_select'],
                                              height=height,
-                                             width=int(height*1.2),
+                                             width=int(height * 1.2),
                                              colorbar=True),
                                 'style': dict(cmap='viridis',
                                               size=size)}}
