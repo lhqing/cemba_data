@@ -41,10 +41,10 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
         if duplicated:
             if aggregation_func is None:
                 raise ValueError('Row after groupby is not unique, aggregation_func can not be None')
-            heatmap_data = sub_df.groupby([f'{plate_base}_col', f'{plate_base}_row'])[value_col]\
+            heatmap_data = sub_df.groupby([f'{plate_base}_col', f'{plate_base}_row'])[value_col] \
                 .apply(aggregation_func).unstack().fillna(-999)
         else:
-            heatmap_data = sub_df.set_index([f'{plate_base}_col', f'{plate_base}_row'])[value_col]\
+            heatmap_data = sub_df.set_index([f'{plate_base}_col', f'{plate_base}_row'])[value_col] \
                 .unstack().fillna(-999)
         heatmap_data_list.append(heatmap_data)
         if isinstance(plate, str):
@@ -111,3 +111,18 @@ def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
                    ax=ax)
     ax.tick_params(axis='x', rotation=90)
     return ax
+
+
+def plot_highly_variable_gene(data, ax_norm, ax_raw=None, **plot_kws):
+    plot_default_kws = dict(s=5, linewidth=0, alpha=0.5)
+    plot_default_kws.update(**plot_kws)
+    sns.scatterplot(ax=ax_norm, data=data, x='mean',
+                    y='dispersion_norm', hue='gene_subset', **plot_default_kws)
+    ax_norm.set(ylabel='lg Normalized-Dispersion')
+    if ax_raw is not None:
+        sns.scatterplot(ax=ax_raw, data=data, x='mean', legend=None,
+                        y='dispersion', hue='gene_subset', **plot_default_kws)
+        ax_raw.set(ylabel='lg Raw-Dispersion')
+        return ax_norm, ax_raw
+    else:
+        return ax_norm
