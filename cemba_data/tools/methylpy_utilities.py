@@ -264,6 +264,8 @@ def convert_allc_to_bigwig(input_allc_file,
             mc_type = [mc_type]
         else:
             exit("mc_type must be a list of string(s)")
+    # TODO add supports for multiple mc_type
+    mc_type = mc_type[0]
 
     if len(path_to_wigtobigwig):
         path_to_wigtobigwig += "/"
