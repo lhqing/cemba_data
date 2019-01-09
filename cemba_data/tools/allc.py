@@ -219,7 +219,6 @@ def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
                            mc_type=mc_type,
                            bin_size=100,
                            path_to_wigtobigwig="",
-                           path_to_samtools="",
                            min_bin_sites=0,
                            min_bin_cov=0,
                            max_site_cov=None,
