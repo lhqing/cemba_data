@@ -1,175 +1,372 @@
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as path_effects
-import scanpy.api as sc
-from cemba_data.local.zoo import *
+import pandas as pd
+import seaborn as sns
+import numpy as np
+import matplotlib as mpl
+from sklearn.neighbors import LocalOutlierFactor
+from matplotlib.cm import get_cmap
+from matplotlib.colors import Normalize, LogNorm
+from matplotlib.colorbar import ColorbarBase
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
-def get_feature_dispersion(ann, min_mean=0.2, max_mean=1.25, min_disp=0.3, n_bins=50):
-    filter_result = sc.pp.filter_genes_dispersion(ann.X, min_mean=min_mean,
-                                                  max_mean=max_mean, min_disp=min_disp, n_bins=n_bins)
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    fig.set_size_inches(10, 3)
-    axes[0].set_title('Feature Raw Dispersions')
-    axes[1].set_title('Feature Normalized Dispersions')
-    axes[0].set_ylabel('log Raw Dispersion')
-    axes[1].set_ylabel('log Norm Dispersion')
-    axes[0].set_xlabel('log1p Region mean mC%')
-    axes[1].set_xlabel('log1p Region mean mC%')
-    axes[0].scatter(x=filter_result.means,
-                    y=filter_result.dispersions,
-                    c=['black' if i else 'grey' for i in filter_result.gene_subset], s=1)
-    axes[1].scatter(x=filter_result.means,
-                    y=filter_result.dispersions_norm,
-                    c=['black' if i else 'grey' for i in filter_result.gene_subset], s=1)
-    fig.tight_layout()
-    print(f'{filter_result.gene_subset.sum()} features been selected.')
-    return filter_result
+def _robust_scale_0_1(coord, expand_border_scale=0.1, border_quantile=0.01):
+    """linear scale any coord range to [0, 1]"""
+    robust_min = coord.quantile(border_quantile)
+    robust_max = coord.quantile(1 - border_quantile)
+    expand_border = (robust_max - robust_min) * expand_border_scale
+    true_min = robust_min - expand_border
+    true_max = robust_max + expand_border
+    true_delta = true_max - true_min
+    true_coord = (coord - true_min) / true_delta
+    return true_coord
 
 
-def plot_feature_set(ann):
-    features = ['region', 'replicate', 'louvain', 'Mapped reads', 'overall_mch']
-    if 'manual_anno' in ann.obs_keys():
-        features.append('manual_anno')
-    colors = plt.get_cmap('Paired').colors
-    random.shuffle(list(colors))
+def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=5):
+    """this function assume coord is [0, 1]"""
+    # clean ax axises
+    ax.set(xticks=[], yticks=[], xlabel=None, ylabel=None)
+    sns.despine(ax=ax, left=True, bottom=True)
 
-    fig, axes = plt.subplots(nrows=2, ncols=len(features))
-    base_l = ['UMAP'] * len(features) + ['tSNE'] * len(features)
+    _arrow_kws = dict(width=0.003, linewidth=0, color='black')
+    if arrow_kws is not None:
+        _arrow_kws.update(arrow_kws)
 
-    x_l = [ann.obsm[f'X_{base.lower()}'][:, 0] for base in base_l]
-    y_l = [ann.obsm[f'X_{base.lower()}'][:, 1] for base in base_l]
-
-    for x, y, base, ax, feature in zip(x_l, y_l, base_l, np.ravel(axes), features * 2):
-        feature_value = ann.obs[feature]
-        if feature_value.dtype.name == 'object':
-            feature_value = ann.obs[feature].astype('category')
-        if feature_value.dtype.name != 'category':
-            if feature == 'overall_mch':
-                im = ax.scatter(x=x, y=y, alpha=0.5, s=10, c=feature_value.tolist(), cmap='viridis', vmin=0, vmax=0.03)
-            elif feature == 'Mapped reads':
-                im = ax.scatter(x=x, y=y, alpha=0.5, s=10, c=feature_value.tolist(), cmap='viridis', vmin=5e5, vmax=3e6)
-            else:
-                print(feature)
-                raise ValueError('Unknown feature name', feature)
-            fig.colorbar(im, ax=ax, orientation='vertical', format='%.0e')
-        else:
-            if feature in ['louvain', 'manual_anno']:
-                legend_loc = 'on data'
-            else:
-                legend_loc = 'right margin'
-            if base == 'tSNE':
-                sc.pl.tsne(ann, color=[feature], legend_loc=legend_loc, ax=ax, show=False, alpha=0.7)
-            else:
-                sc.pl.umap(ann, color=[feature], legend_loc=legend_loc, ax=ax, show=False, alpha=0.7)
-        ax.set_title(feature)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlabel(f'{base} 1')
-        ax.set_ylabel(f'{base} 2')
-    fig.set_size_inches(5 * len(features), 8)
-    fig.tight_layout()
-    return fig, axes
+    ax.arrow(0.06, 0.06, 0, 0.06, **_arrow_kws)
+    ax.arrow(0.06, 0.06, 0.06, 0, **_arrow_kws)
+    ax.text(0.09, 0.03, f'{coord_name} 1',
+            fontdict=dict(fontsize=fontsize,
+                          horizontalalignment='center',
+                          verticalalignment='center'))
+    ax.text(0.03, 0.09, f'{coord_name} 2',
+            fontdict=dict(fontsize=fontsize, rotation=90,
+                          horizontalalignment='center',
+                          verticalalignment='center'))
+    return
 
 
-def plot_marker_violin(ann, groups, n_gene=6):
-    nplot = len(groups)
-    fig, axes = plt.subplots(nrows=1, ncols=nplot)
-    if nplot == 1:
-        axes = [axes]
-    cat_set = set()
-    for ax, group in zip(axes, groups):
-        sc.pl.rank_genes_groups_violin(ann, groups=group, n_genes=n_gene, ax=ax, show=False)
-        gene_list = ann.uns['rank_genes_groups']['names'][group][:n_gene]
-        cat_list = [cat.get_gene_name(i) for i in gene_list]
-        [cat_set.add(i) for i in cat_list]
-        ax.set_xticklabels(cat_list)
-        ax.set_ylabel('Normalized mCH%')
-        # ax.set_ylim(0, 5)
-        ax.set_title(f'{group} vs. rest, top {n_gene} marker')
-        fig.set_size_inches(5 * nplot, 4)
-    return fig, axes, list(cat_set)
+def _dodge(point_array, max_movement=0.05):
+    """dodge point to prevent overlap (very naive)"""
+    # add some noise to prevent exact same points
+    noise = (np.random.random(size=point_array.shape) - 0.5) / 10000
+    point_array += noise
+
+    force_list = []
+    for point in point_array:
+        delta = point - point_array
+        delta = delta[delta.sum(axis=1) != 0]
+        # scale y axis to prefer movement on y
+        delta[:, 1] = delta[:, 1] / 2
+        distance = np.sqrt(np.sum(delta ** 2, axis=1))
+        force = (delta / (distance ** 5)[:, None]).sum(axis=0)  # exaggerate distance**4
+        force_list.append(force)
+    force_array = np.array(force_list)
+    movement_array = force_array / force_array.max() * max_movement  # max movement 0.05
+    adj_points = point_array + movement_array
+    return adj_points
 
 
-def plot_genes(gene_list, ann, s=1, vmin=0.01, vmax=0.99, species='mouse'):
-    marker_list = [cat.get_gene_name(i, species=species) for i in gene_list]
-    plot_number = len(marker_list)
+def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None):
+    """Add text annotation to a scatter plot"""
+    _text_anno_kws = dict(fontsize=6,
+                          fontweight='black',
+                          horizontalalignment='center',
+                          verticalalignment='center')
+    if text_anno_kws is not None:
+        _text_anno_kws.update(text_anno_kws)
 
-    fig, axes = plt.subplots(2, ncols=plot_number)
-    base_l = ['UMAP'] * len(gene_list) + ['tSNE'] * len(gene_list)
-
-    x_l = [ann.obsm[f'X_{base.lower()}'][:, 0] for base in base_l]
-    y_l = [ann.obsm[f'X_{base.lower()}'][:, 1] for base in base_l]
-
-    for x, y, base, ax, marker, title in zip(x_l, y_l, base_l, np.ravel(axes), marker_list * 2, gene_list * 2):
-        ax.scatter(x=x, y=y, s=s, c=list(np.ravel(ann[:, marker].X)), cmap='viridis', vmin=vmin, vmax=vmax)
-        ax.set_title(title)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlabel(f'{base} 1')
-        ax.set_ylabel(f'{base} 2')
-    fig.set_size_inches(3 * len(marker_list), 6)
-    fig.tight_layout()
-    return fig, axes
-
-
-def category_color_transfer(categories, cmap=None, shuffle=False):
-    category_set = set(categories)
-    if cmap is None:
-        if len(category_set) < 15:
-            cmap = 'tab10'
-        else:
-            cmap = 'tab20'
-    colors = list(plt.get_cmap(cmap).colors)
-    if shuffle:
-        random.shuffle(colors)
-    index_dict = {cat: i % len(colors) for i, cat in enumerate(category_set)}
-    return [colors[index_dict[i]] for i in categories]
-
-
-def plot_cat_scatter(ax, coord_df, colors, coord_name, title, alpha=0.8,
-                     xlim=None, ylim=None, text_size='small', linewidth=1,
-                     auto_border_quantile=0.99, auto_expand=0.1, cmap=None, s=10):
-    ax.scatter(x=coord_df.iloc[:, 0], y=coord_df.iloc[:, 1],
-               c=category_color_transfer(colors, cmap=cmap), s=s, alpha=alpha)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlabel(coord_name + ' 1')
-    ax.set_ylabel(coord_name + ' 2')
-    ax.set_title(title)
-
-    if xlim is not None:
-        ax.set_xlim(*xlim)
+    if dodge is None:
+        # text annotation
+        for text, sub_df in data.groupby(anno_col):
+            x, y = sub_df.median()
+            ax.text(x, y, text,
+                    fontdict=_text_anno_kws,
+                    bbox=dict(boxstyle="round",
+                              ec=(0.5, 0.5, 0.5, 0.2),
+                              fc=(0.8, 0.8, 0.8, 0.2)))
     else:
-        amin = coord_df.iloc[:, 0].quantile(1 - auto_border_quantile)
-        amax = coord_df.iloc[:, 0].quantile(auto_border_quantile)
-        ax.set_xlim(amin - (amax - amin) * auto_expand, amax + (amax - amin) * auto_expand)
-    if ylim is not None:
-        ax.set_ylim(*ylim)
+        # text annotation
+        points = []
+        texts = []
+        for text, sub_df in data.groupby(anno_col):
+            x, y = sub_df.median()
+            points.append((x, y))
+            texts.append(text)
+        points = np.array(points)
+
+        # force layout to make label separate
+        adj_points = _dodge(points, max_movement=dodge)
+        for text, (x, y), (adj_x, adj_y) in zip(texts, points, adj_points):
+            ax.text(adj_x, adj_y, text,
+                    fontdict=_text_anno_kws,
+                    bbox=dict(boxstyle="round",
+                              ec=(0.5, 0.5, 0.5, 0.2),
+                              fc=(0.9, 0.9, 0.9, 0.4)))
+            adj_distance = np.sqrt((adj_x - x) ** 2 + (adj_y - y) ** 2)
+            if adj_distance > 0.05:
+                ax.arrow(adj_x, adj_y, x - adj_x, y - adj_y,
+                         color=(0.5, 0.5, 0.5, 0.8),
+                         width=0.003, linewidth=0)
+    return
+
+
+def density_based_sample(data, coords, portion=None, size=None, seed=None):
+    clf = LocalOutlierFactor(n_neighbors=20, algorithm='auto',
+                             leaf_size=30, metric='minkowski',
+                             p=2, metric_params=None,
+                             contamination='auto', novelty=False,
+                             n_jobs=30)
+    data_coords = data[coords]
+    clf.fit(data_coords)
+    # original score is negative, the larger the denser
+    density_score = clf.negative_outlier_factor_
+    delta = density_score.max() - density_score.min()
+    # density score to probability: the denser the less probability to be picked up
+    probability_score = 1 - (density_score - density_score.min()) / delta
+    probability_score = np.sqrt(probability_score)
+    probability_score = probability_score / probability_score.sum()
+
+    if size is not None:
+        pass
+    elif portion is not None:
+        size = int(data_coords.index.size * portion)
     else:
-        amin = coord_df.iloc[:, 1].quantile(1 - auto_border_quantile)
-        amax = coord_df.iloc[:, 1].quantile(auto_border_quantile)
-        ax.set_ylim(amin - (amax - amin) * auto_expand, amax + (amax - amin) * auto_expand)
-    plot_cluster_text(coord_df, colors, ax, fontsize=text_size, linewidth=linewidth)
+        raise ValueError('Either portion or size should be provided.')
+    if seed is not None:
+        np.random.seed(seed)
+    selected_cell_index = np.random.choice(data_coords.index,
+                                           size=size,
+                                           replace=False,
+                                           p=probability_score)
+    return data.reindex(selected_cell_index)
+
+
+def _tight_hue_range(hue_data, portion):
+    """Automatic select a SMALLEST data range that covers [portion] of the data"""
+    hue_quantiles = hue_data.quantile(q=np.arange(0, 1, 0.01))
+    min_window_right = hue_quantiles.rolling(window=int(portion * 100)) \
+        .apply(lambda i: i.max() - i.min(), raw=True) \
+        .idxmin()
+    min_window_left = min_window_right - portion
+    tight_hue_norm = tuple(hue_data.quantile(q=[min_window_left,
+                                                min_window_right]))
+    return tight_hue_norm
+
+
+def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
+    """plot a triangle sizebar"""
+    from matplotlib.patches import PathPatch
+    from matplotlib.path import Path
+
+    # make triangle
+    verts = [(1, 0), (1, 1), (0, 1), (1, 0)]
+    codes = [Path.MOVETO] + (len(verts) - 1) * [Path.LINETO]
+    tri = Path(verts, codes)
+    triangle = PathPatch(tri, facecolor=color, lw=lw)
+    ax.add_patch(triangle)
+
+    sns.despine(ax=ax, bottom=True, left=True, right=True)
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position('right')
+
+    ax.set(ylim=(0, 1), xlim=(-0.1, 1), xticks=[], yticks=[])
     return ax
 
 
-def plot_cluster_text(coord_df, cluster, ax,
-                      fontsize='small', edgecolor='white', linewidth=2.5, facecolor='black',
-                      fix_outsider=True):
-    cur_xlim = ax.get_xlim()
-    cur_ylim = ax.get_ylim()
-    for c in cluster.groupby(cluster):
-        c_id = str(c[0])
-        cells = c[1].index
-        cell_cord = coord_df.loc[cells].median().tolist()
-        if fix_outsider:
-            cell_cord[0] = min(cell_cord[0], cur_xlim[1])
-            cell_cord[0] = max(cell_cord[0], cur_xlim[0])
-            cell_cord[1] = min(cell_cord[1], cur_ylim[1])
-            cell_cord[1] = max(cell_cord[1], cur_ylim[0])
+def categorical_scatter(data, ax, coord_base='tsne', hue=None,
+                        expand_border_scale=0.1, text_anno=None, dodge=None,
+                        scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
+    # TODO: better palette support
+    _scatter_kws = dict(linewidth=0, s=7)
+    if scatter_kws is not None:
+        _scatter_kws.update(scatter_kws)
 
-        t = ax.text(*cell_cord, c_id, fontsize=fontsize, fontweight='semibold')
-        t.set_path_effects([path_effects.PathPatchEffect(edgecolor=edgecolor,
-                                                         linewidth=linewidth,
-                                                         facecolor=facecolor)])
+    _coord_base = coord_base
+    coord_base = coord_base.lower()
+    if coord_base == 'tsne':
+        real_coord_name = 'tSNE'
+    elif coord_base == 'umap':
+        real_coord_name = 'UMAP'
+    elif coord_base in ['pca', 'pc']:
+        real_coord_name = 'PC'
+    else:
+        real_coord_name = _coord_base
+
+    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale)
+    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale)
+    _data = pd.DataFrame({'x': scaled_x,
+                          'y': scaled_y})
+    if hue is not None:
+        if isinstance(hue, str):
+            _data[hue] = data[hue]
+        else:
+            _data['hue'] = hue
+            hue = 'hue'
+    if text_anno is not None:
+        if isinstance(text_anno, str):
+            _data[text_anno] = data[text_anno]
+        else:
+            _data['text_anno'] = text_anno
+            text_anno = 'text_anno'
+
+    sns.scatterplot(x='x', y='y', hue=hue,
+                    data=_data, legend=None,
+                    ax=ax, **_scatter_kws)
+
+    # clean axis
+    if axis_format == 'tiny':
+        _make_tiny_axis_lable(ax, real_coord_name)
+    elif axis_format == 'despine':
+        sns.despine(ax=ax)
+    elif (axis_format == 'empty') or axis_format is None:
+        ax.set(xticks=[], yticks=[], xlabel=None, ylabel=None)
+        sns.despine(ax=ax, left=True, bottom=True)
+    elif axis_format == 'normal':
+        pass
+    else:
+        raise ValueError('axis_format need to be one of these: tiny, despine, empty.')
+
+    if text_anno:
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
+                           anno_col=text_anno, text_anno_kws=text_anno_kws)
     return ax
+
+
+def continuous_scatter(data, ax, coord_base='tsne',
+                       sample_portion=None, sample_size=None, seed=0,
+                       expand_border_scale=0.1, text_anno=None, dodge=None,
+                       hue=None, hue_portion=0.8, cmap='viridis', colorbar=True,
+                       size=None, size_portion=0.8, label_fontsize=5, sizebar=True,
+                       scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
+    if (sample_portion is not None) or (sample_size is not None):
+        data = density_based_sample(data.copy(),
+                                    coords=[f'{coord_base}_0', f'{coord_base}_1'],
+                                    portion=sample_portion, size=sample_size, seed=seed)
+
+    _coord_base = coord_base
+    coord_base = coord_base.lower()
+    if coord_base == 'tsne':
+        real_coord_name = 'tSNE'
+    elif coord_base == 'umap':
+        real_coord_name = 'UMAP'
+    elif coord_base in ['pca', 'pc']:
+        real_coord_name = 'PC'
+    else:
+        real_coord_name = _coord_base
+
+    _scatter_kws = dict(linewidth=0, s=7)
+    if scatter_kws is not None:
+        _scatter_kws.update(scatter_kws)
+
+    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale)
+    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale)
+    _data = pd.DataFrame({'x': scaled_x,
+                          'y': scaled_y})
+    if hue is not None:
+        if isinstance(hue, str):
+            _data[hue] = data[hue]
+        else:
+            _data['hue'] = hue
+            hue = 'hue'
+        # get the smallest range that include "hue_portion" of data
+        hue_norm = _tight_hue_range(_data[hue], hue_portion)
+        # from here, cmap become colormap object
+        cmap = mpl.cm.get_cmap(cmap)
+        # cnorm is the normalizer for color
+        cnorm = mpl.colors.Normalize(vmin=hue_norm[0],
+                                     vmax=hue_norm[1])
+        cmap.set_bad(color=(0.5, 0.5, 0.5, 0.5))
+    else:
+        hue_norm = None
+        cnorm = None
+
+    if size is not None:
+        if isinstance(size, str):
+            _data[size] = data[size]
+        else:
+            _data['size'] = size
+            size = 'size'
+        # get the smallest range that include "size_portion" of data
+        size_norm = _tight_hue_range(_data[hue], size_portion)
+        # snorm is the normalizer for size
+        # for size, LogNorm is more suitable
+        snorm = LogNorm(vmin=size_norm[0],
+                        vmax=size_norm[1])
+        # replace s with sizes
+        s = _scatter_kws.pop('s')
+        sizes = (1, s)
+    else:
+        size_norm = None
+        sizes = None
+        snorm = None
+
+    if text_anno is not None:
+        if isinstance(text_anno, str):
+            _data[text_anno] = data[text_anno]
+        else:
+            _data['text_anno'] = text_anno
+            text_anno = 'text_anno'
+
+    sns.scatterplot(x='x', y='y', data=_data,
+                    hue=hue, palette=cmap, hue_norm=cnorm,
+                    size=size, sizes=sizes, size_norm=snorm,
+                    ax=ax, legend=None, **_scatter_kws)
+
+    # clean axis
+    if axis_format == 'tiny':
+        _make_tiny_axis_lable(ax, real_coord_name)
+    elif axis_format == 'despine':
+        sns.despine(ax=ax)
+    elif (axis_format == 'empty') or axis_format is None:
+        ax.set(xticks=[], yticks=[], xlabel=None, ylabel=None)
+        sns.despine(ax=ax, left=True, bottom=True)
+    elif axis_format == 'normal':
+        pass
+    else:
+        raise ValueError('axis_format need to be one of these: tiny, despine, empty.')
+
+    return_axes = [ax]
+
+    if colorbar and (hue is not None):
+        # small ax for colorbar
+        # inset_axes add a special ax in figure level: mpl_toolkits.axes_grid1.parasite_axes.AxesHostAxes
+        # so there is not way to access cax within ax, we should return cax as well
+        # In matplotlib 3.0, ax.inset_axes() can access its own inset_axes, but it is experimental
+        cax = inset_axes(ax, width="3%", height="25%",
+                         loc='lower right', borderpad=0)
+        return_axes.append(cax)
+
+        colorbar = ColorbarBase(cax, cmap=cmap, norm=cnorm,
+                                orientation='vertical', extend='both')
+        colorbar.set_label('Normalized mCH%',
+                           labelpad=8,
+                           rotation=270,
+                           fontsize=label_fontsize)
+        colorbar_ticks = [hue_norm[0], sum(hue_norm) / 2, hue_norm[1]]
+        colorbar_ticklabels = list(map(lambda i: f'{i:.1f}', colorbar_ticks))
+        colorbar.set_ticks(colorbar_ticks)
+        colorbar.set_ticklabels(colorbar_ticklabels)
+        colorbar.outline.set_linewidth(0.5)
+        colorbar.ax.tick_params(size=label_fontsize, labelsize=label_fontsize,
+                                pad=1, width=0.5)
+
+    if sizebar and (size is not None):
+        # small ax for sizebar
+        sax = inset_axes(ax, width="3%", height="25%",
+                         loc='upper right', borderpad=0)
+        # same as cax, we should return this
+        return_axes.append(sax)
+
+        sax = _sizebar(sax)
+        sax.set_yticks([0, 0.5, 1])  # the y axis for sizebar is fixed
+        ticklabels = list(map(lambda i: f'{i:.0f}', [size_norm[0], sum(size_norm) / 2, size_norm[1]]))
+        sax.set_yticklabels(ticklabels)
+        sax.set_ylabel('cov', labelpad=10, rotation=270, fontsize=label_fontsize)
+        sax.yaxis.set_tick_params(labelsize=label_fontsize, width=0.5, pad=1)
+
+    if text_anno is not None:
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
+                           anno_col=text_anno, text_anno_kws=text_anno_kws)
+        # TODO adjust label color, turn white when background is dark
+    ax.hist
+    return tuple(return_axes)
+
