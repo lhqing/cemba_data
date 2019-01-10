@@ -155,3 +155,8 @@ def reshape_matrix_fix_step(adata, window, step):
 def split_bam():
     # TODO: given a cluster assignment, split bam file
     return
+
+
+def merge_cell():
+    # TODO: generate meta cell based on a given embedding or cell index
+    return
