@@ -64,6 +64,8 @@ def highly_variable_feature(
     """
     Adapted from Scanpy, see license above
     """
+    # TODO: add cov in bin average, basicaly a 3D scale,
+    # RNA is only scaled by mean, but methylation is scaled by both mean and cov
     log.info('extracting highly variable features')
 
     if not isinstance(adata, AnnData):
