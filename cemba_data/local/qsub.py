@@ -1,5 +1,7 @@
 """
 SGE qsub system auto-submitter
+# TODO add runtime parameter change, e.g. submitted using 100 CPU, change to 200 ad runtime
+# TODO add save_terminate, e.g. terminate after all current running job have been finished, but not submit new job
 """
 
 from subprocess import run, PIPE
