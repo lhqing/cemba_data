@@ -46,15 +46,15 @@ class MCDS(xr.Dataset):
         Parameters
         ----------
         dim
-            region dimension to sum
+            region dimension to mean
         da
             dataarray to do calculation
         mc_type
-            mc_type to sum
+            mc_type to mean
         min_cov
-            minimum cov sum, suggest to plot distribution first.
+            minimum cov mean, suggest to plot distribution first.
         max_cov
-            maximum cov sum, suggest ot plot distribution first.
+            maximum cov mean, suggest ot plot distribution first.
 
         Returns
         -------
@@ -62,14 +62,14 @@ class MCDS(xr.Dataset):
         """
         if dim not in self[da].dims:
             raise ValueError(f'{dim} is not a dimension of {da}')
-        cell_sum = self[da] \
+        cell_mean = self[da] \
             .sel(count_type='cov', mc_type=mc_type) \
             .squeeze() \
-            .sum(dim)
+            .mean(dim)
         if max_cov is None:
             max_cov = np.inf
-        cell_max = cell_sum < max_cov
-        cell_min = cell_sum > min_cov
+        cell_max = cell_mean < max_cov
+        cell_min = cell_mean > min_cov
         cell_mask = np.all(np.vstack([cell_max.values,
                                       cell_min.values]),
                            axis=0)
@@ -85,15 +85,15 @@ class MCDS(xr.Dataset):
         ----------
         dim
             region dimension to filter,
-            Note when filtering region, sum is always performed on cell.
+            Note when filtering region, mean is always performed on cell.
         da
             dataarray to do calculation
         mc_type
-            mc_type to sum
+            mc_type to mean
         min_cov
-            minimum cov sum, suggest to plot distribution first.
+            minimum cov mean, suggest to plot distribution first.
         max_cov
-            maximum cov sum, suggest ot plot distribution first.
+            maximum cov mean, suggest ot plot distribution first.
 
         Returns
         -------
@@ -101,14 +101,14 @@ class MCDS(xr.Dataset):
         """
         if dim not in self[da].dims:
             raise ValueError(f'{dim} is not a dimension of {da}')
-        region_sum = self[da] \
+        region_mean = self[da] \
             .sel(count_type='cov', mc_type=mc_type) \
             .squeeze() \
-            .sum('cell')
+            .mean('cell')
         if max_cov is None:
             max_cov = np.inf
-        region_max = region_sum < max_cov
-        region_min = region_sum > min_cov
+        region_max = region_mean < max_cov
+        region_min = region_mean > min_cov
         region_mask = np.all(np.vstack([region_max.values,
                                         region_min.values]),
                              axis=0)
