@@ -213,6 +213,8 @@ def rank_features_groups(
     Adapted from scanpy, the mainly modification is that, in scRNA, we try to find HEG,
     but in methylation, we try to find hypo-methylation
     """
+    # TODO add other tests, and check out https://github.com/theislab/diffxpy and other info mentioned here:
+    # https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html (marker finding part)
 
     log.info('ranking genes')
     avail_methods = {'t-test', 't-test_overestim_var'}
@@ -242,7 +244,7 @@ def rank_features_groups(
     groups_order, groups_masks = _select_groups(
         adata, groups_order, groupby)
 
-    key_added = 'rank_feature_groups'
+    key_added = 'rank_genes_groups'
     adata.uns[key_added] = {}
     adata.uns[key_added]['params'] = {
         'groupby': groupby,
