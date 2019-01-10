@@ -279,6 +279,7 @@ class MCDS(xr.Dataset):
                 gene_cov_df = self['gene_da'].sel(mc_type=gene_mc_type,
                                                   count_type='cov',
                                                   gene=select_genes).to_pandas()
+                gene_cov_df.columns = gene_cov_df.columns.map(lambda i: i+'_cov')
                 all_dfs.append(gene_cov_df)
 
         total_df = pd.concat(all_dfs, axis=1, sort=True)
