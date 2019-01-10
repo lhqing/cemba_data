@@ -144,7 +144,7 @@ class MCDS(xr.Dataset):
             raise KeyError(f'{dim} is not a dimension of {da}')
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
-
+        
         if method == 'bayes':
             rate = _calculate_posterior_mc_rate(mc_da=da_mc,
                                                 cov_da=da_cov,
@@ -232,7 +232,7 @@ class MCDS(xr.Dataset):
         # - other cell metadata
 
         cell_coord_da = self.coords['cell'].coords
-        records = [coord.to_series() for coord in cell_coord_da.coords.values()]
+        records = [coord.to_series() for coord in cell_coord_da.values()]
         data = pd.DataFrame(records).T
 
         all_dfs = [data]
