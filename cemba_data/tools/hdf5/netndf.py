@@ -135,7 +135,7 @@ class MCDS(xr.Dataset):
         self[da + "_" + rate_da_suffix] = rate
         return
 
-    def add_gene_rate(self, dim='gene', da='gene_da',
+    def add_gene_rate(self, dim='gene', da='gene_da', method='bayes',
                       normalize_per_cell=True, clip_norm_value=10,
                       rate_da_suffix='rate'):
         if da not in self.data_vars:
@@ -145,14 +145,24 @@ class MCDS(xr.Dataset):
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
 
-        # for gene, we just use normal rate
-        rate = da_mc / da_cov
+        if method == 'bayes':
+            rate = _calculate_posterior_mc_rate(mc_da=da_mc,
+                                                cov_da=da_cov,
+                                                var_dim=dim,
+                                                normalize_per_cell=normalize_per_cell,
+                                                clip_norm_value=clip_norm_value)
+        elif method == 'naive':
+            # for gene, we just use normal rate
+            rate = da_mc / da_cov
 
-        if normalize_per_cell:
-            cell_overall = da_mc.sum(dim='gene') / da_cov.sum(dim='gene')
-            rate = rate / cell_overall
-            if clip_norm_value is not None:
-                rate.values[np.where(rate.values > clip_norm_value)] = clip_norm_value
+            if normalize_per_cell:
+                cell_overall = da_mc.sum(dim='gene') / da_cov.sum(dim='gene')
+                rate = rate / cell_overall
+                if clip_norm_value is not None:
+                    rate.values[np.where(rate.values > clip_norm_value)] = clip_norm_value
+        else:
+            raise ValueError('Method can only be "bayes" or "naive"')
+
         self[da + "_" + rate_da_suffix] = rate
         return
 
