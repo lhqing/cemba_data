@@ -56,7 +56,6 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     -------
 
     """
-    # TODO return adata
     region_bed = pd.read_table(bed_path, index_col=-1,
                                header=None, names=['chrom', 'start', 'end', 'id'])
     if (not force_run) and (region_bed.shape[0] * adata.shape(0) > 1e10):
@@ -84,13 +83,19 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
                             result['region_id'].unique().size),
                            dtype=np.uint16)
     csc_data = adata.X.tocsc()
+    regions = []
     for col_idx, (region, sub_df) in enumerate(result.sort_values('bin_num').groupby('region_id')):
+        regions.append(region)
         cell_region_count = csc_data[:, slice(sub_df.iat[0, 7],
                                               sub_df.iat[-1, 7] + 1)].sum(axis=1)
         cell_region_count = cell_region_count.A1
         region_data[:, col_idx] = cell_region_count
     sparse_result = ss.csc_matrix(region_data)
-    return sparse_result
+
+    result_adata = AnnData(X=sparse_result,
+                           obs=adata.obs.copy(),
+                           var=pd.DataFrame([], index=pd.Index(regions)))
+    return result_adata
 
 
 def reshape_matrix_fix_step(adata, window, step):
@@ -125,7 +130,6 @@ def reshape_matrix_fix_step(adata, window, step):
     for chunk in chunk_generator:
         sub_data = chunk.toarray()
         n += 1
-        print(n)
         chrom_results = []
         for chrom_slice in chrom_slices:
             chrom_data = sub_data[:, chrom_slice]
@@ -146,7 +150,7 @@ def reshape_matrix_fix_step(adata, window, step):
     total_chrom_index = pd.Index(total_chrom_index)
 
     result_adata = AnnData(X=total_result,
-                           obs=adata.obs,
+                           obs=adata.obs.copy(),
                            var=pd.DataFrame([], index=total_chrom_index))
 
     return result_adata
@@ -157,6 +161,49 @@ def split_bam():
     return
 
 
-def merge_cell():
-    # TODO: generate meta cell based on a given embedding or cell index
-    return
+def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3, chunksize=500, seed=0):
+    from sklearn.neighbors import LocalOutlierFactor
+
+    # Calculate neighbor and density
+    clf = LocalOutlierFactor(n_neighbors=n_neighbors, algorithm='auto',
+                             leaf_size=30, metric='minkowski',
+                             p=2, metric_params=None, contamination='auto', novelty=False, n_jobs=30)
+    clf.fit(embedding_data)
+    scores = clf.negative_outlier_factor_
+    scores = (scores - scores.min()) / (scores.max() - scores.min())
+    probability = scores / scores.sum()
+    # density weighted cell selection
+    np.random.seed(seed)
+    cell_selection = np.random.choice(range(adata.obs_names.size), size=target,
+                                      replace=False, p=probability)
+    original_name = adata.obs_names[cell_selection]
+
+    # get neighbors
+    # TODO: try more fancy neighbor select
+    distance, points = clf.kneighbors(embedding_data)
+    distance = distance[cell_selection, :]
+    points = points[cell_selection, :]
+    distance_mask = distance < max_dist
+
+    # calculate neighbor sum
+    csr_data = adata.X.tocsr()
+    n = 0
+    chunk_result = np.zeros((chunksize, adata.shape[1]), dtype=np.uint32)
+    csr_chunk_results = []
+    for _dist, _point in zip(distance_mask, points):
+        _use_point = _point[_dist]
+        point_neigh_sum = csr_data[_use_point, :].sum(axis=0, dtype=np.uint32).A1
+        chunk_result[n, :] = point_neigh_sum
+        n += 1
+        if n % chunksize == 0:
+            n = 0
+            csr_chunk_results.append(ss.csr_matrix(chunk_result))
+            chunk_result = np.zeros((chunksize, adata.shape[1]), dtype=np.uint32)
+    csr_result = ss.vstack(csr_chunk_results)
+
+    cell_id = [f'METACELL_{i}' for i in range(csr_result.shape[0])]
+    meta_adata = AnnData(X=csr_result,
+                         obs=pd.DataFrame({'center_raw_id': original_name},
+                                          index=pd.Index(cell_id)),
+                         var=adata.var.copy())
+    return meta_adata
