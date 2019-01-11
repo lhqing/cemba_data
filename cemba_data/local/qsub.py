@@ -99,6 +99,7 @@ class _Qsubmitter:
 
         # auto detect user name
         self.user_name = run(['whoami'], stdout=PIPE, encoding='utf8').stdout.strip()
+        print(f'Username: {self.user_name}')
 
         # prepare project dir
         self.command_file_path = command_file_path
@@ -185,24 +186,34 @@ class _Qsubmitter:
         print('check running job: ', end='')
         cur_running_qsub_id = _get_running_job_id_qstat(user_name=self.user_name,
                                                         id_set=self.submitted_qsub_id)
+
         # check every running obj
         cur_running_cpu = 0
         cur_running_mem = 0  # GBs
         cur_running_command = []
         for command_obj in self.running_commands:
             if command_obj.qsub_id not in cur_running_qsub_id:
+                print(self.submitted_qsub_id)
+                print(cur_running_qsub_id)
+                print(run(['qstat', '-u', self.user_name],
+                          stdout=PIPE, encoding='utf8').stdout)
+                print(command_obj.qsub_id, command_obj.unique_id, 'finishing')
+                print(command_obj.qsub_id, command_obj.unique_id, 'finishing')
+                print(command_obj, 'finishing')
+
                 # command have finished
                 command_obj.finish = True
                 command_obj.check_output_log()
                 command_obj.write_status()
                 self.finish_count += 1
                 self.finished_commands.append(command_obj)
+                self.submitted_qsub_id.remove(command_obj.qsub_id)
             else:
                 cur_running_command.append(command_obj)
                 cur_running_cpu += int(command_obj.qsub_parameter['pe smp'])
                 cur_running_mem += int(command_obj.qsub_parameter['l h_vmem'].strip('G'))
 
-        print(f'{self.finish_count} / {len(self.commands)} job finished in this submission.')
+        print(f'{self.finish_count} job finished in this submission.')
         sys.stdout.flush()
 
         self.running_commands = cur_running_command
@@ -221,7 +232,7 @@ class _Qsubmitter:
             status_series['unique_id'] = command.unique_id
             status_series['submission_fail'] = command.submission_fail
             command_records.append(status_series)
-
+        
         status_df = pd.DataFrame(command_records)
         status_df.set_index('unique_id', inplace=True)
         status_df.to_csv(self.project_dir + '/summary_status.tsv', sep='\t')
@@ -258,7 +269,7 @@ class _Command:
         self.start_time = None  # will be datetime.datetime after check_output_log
         self.end_time = None  # will be datetime.datetime after check_output_log
         self.duration_second = .0
-        self.return_code = -1
+        self.return_code = -99
 
         # prepare command dict
         self.command_dict = _default_command_dict(name=self.unique_id,
@@ -307,6 +318,7 @@ class _Command:
         else:
             job_id_pattern = re.compile(r'(?<=Your job )\d+')
             return_obj = run(['qsub', self.script_path], stdout=PIPE, encoding='utf8')
+            print(f'Submitted {self.unique_id}, stdout: {return_obj.stdout}')
             try:
                 self.qsub_id = job_id_pattern.search(return_obj.stdout).group()
             except AttributeError:
@@ -319,10 +331,11 @@ class _Command:
             # do noting
             return None
 
-        self.submitted = True
-        self.finish = True
         with open(self.status_path) as f:
             status_dict = json.load(f)
+
+        self.submitted = True
+        self.finish = True
         self.qsub_id = status_dict['qsub_id']
         self.start_time = datetime.datetime.strptime(status_dict['start_time'],
                                                      "%H:%M:%S-%m/%d/%y")
@@ -357,11 +370,9 @@ class _Command:
                         self.return_code = int(line.split(' ')[-1])
                     else:
                         continue
-        if self.return_code == -1:
-            # didn't find return code line
-            self.return_code = 1
-        if (self.start_time is not None) and (self.end_time is not None):
-            self.duration_second = (self.end_time - self.start_time).total_seconds()
+        if (self.return_code == -99) or (self.start_time is None) or (self.end_time is None):
+            raise ValueError(f'Output log for job {self.qsub_id} {self.unique_id} is not complete')
+        self.duration_second = (self.end_time - self.start_time).total_seconds()
         return
 
 
