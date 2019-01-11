@@ -428,7 +428,8 @@ def batch_correct_pc(adata, batch_series, correct=False,
         adata_list.append(adata[sub_df.index, :])
 
     if correct:
-        integrated, corrected = scanorama.correct_scanpy(adata_list, **scanorama_kws)
+        integrated, corrected = scanorama.correct_scanpy(adata_list, return_dimred=True,
+                                                         **scanorama_kws)
         adata.X = np.vstack([ann.X.toarray() for ann in corrected])
     else:
         integrated = scanorama.integrate_scanpy(adata_list, **scanorama_kws)
