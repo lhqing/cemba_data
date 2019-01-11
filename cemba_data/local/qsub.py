@@ -2,6 +2,7 @@
 SGE qsub system auto-submitter
 # TODO add runtime parameter change, e.g. submitted using 100 CPU, change to 200 ad runtime
 # TODO add save_terminate, e.g. terminate after all current running job have been finished, but not submit new job
+# TODO deal with failed and incomplete json in resubmit
 """
 
 from subprocess import run, PIPE
@@ -141,6 +142,7 @@ class _Qsubmitter:
         # job submission process:
         for command_obj in self.commands:
             if command_obj.finish:
+                # TODO: check return code, whether to skip failed jobs
                 # happens when command_obj.status_path exist
                 self.finished_commands.append(command_obj)
                 continue
@@ -232,7 +234,7 @@ class _Qsubmitter:
             status_series['unique_id'] = command.unique_id
             status_series['submission_fail'] = command.submission_fail
             command_records.append(status_series)
-        
+
         status_df = pd.DataFrame(command_records)
         status_df.set_index('unique_id', inplace=True)
         status_df.to_csv(self.project_dir + '/summary_status.tsv', sep='\t')

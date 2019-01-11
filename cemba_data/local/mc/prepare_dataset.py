@@ -79,8 +79,8 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     with open(assemble_json_path, 'w') as f:
         json.dump([{
             'command': assemble_command,
-            'pe smp': 5,
-            'l h_vmem': '30G'
+            'pe smp': 10,
+            'l h_vmem': '50G'
         }], f)
 
     # submit master
@@ -88,7 +88,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name generate-dataset ' \
                    f'--command_file_path {command_paths} ' \
-                   f'--total_cpu 60 10'
+                   f'--total_cpu 30'
 
     print(f"""
             The command file for generate-dataset is prepared
