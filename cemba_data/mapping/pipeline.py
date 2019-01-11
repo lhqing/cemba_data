@@ -240,7 +240,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     if not out_dir.exists():
         out_dir.mkdir(parents=True, exist_ok=True)
     stat_dir = out_dir / 'stats'
-    stat_dir.mkdir()
+    stat_dir.mkdir(exist_ok=True)
 
     # fastq demultiplex
     log.info('Demultiplex fastq file.')
