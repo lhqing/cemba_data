@@ -21,7 +21,7 @@ Before install this package, please install [Anaconda](https://www.anaconda.com/
 # install
 git clone https://github.com/lhqing/cemba_data.git
 cd cemba_data
-python setup.py install
+pip install .
 
 # to use the command line interface
 yap -h
@@ -29,15 +29,6 @@ yap -h
 ```python
 # to use cemba_data as a python module
 import cemba_data as cd
-from cemba_data.data.dataset import Dataset, Study
-
-# read a dataset
-dataset = Dataset(path_to_dataset)
-
-# read a study 
-study = Study.from_file(path_to_study)
-# or from data
-study = Study(data, rows_dict, cols_dict, uns_dict, study_name)
 ```
 For more information, see the [documentation](https://cemba-data.readthedocs.io/en/latest).
 
