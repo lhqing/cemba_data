@@ -1,8 +1,10 @@
 """
 SGE qsub system auto-submitter
-# TODO add runtime parameter change, e.g. submitted using 100 CPU, change to 200 ad runtime
-# TODO add save_terminate, e.g. terminate after all current running job have been finished, but not submit new job
+# TODO add runtime parameter change, e.g. submitted using 100 CPU, change to 200 at runtime
+# TODO add safe_terminate, e.g. terminate after all current running job have been finished, but not submit new job
 # TODO deal with failed and incomplete json in resubmit
+# TODO add option to profile (qacct) several jobs as reference for next submission
+# TODO add test_run parameter to run N command and profile each and give report
 """
 
 from subprocess import run, PIPE
