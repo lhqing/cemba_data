@@ -157,7 +157,8 @@ class _Qsubmitter:
                 while True:
                     time.sleep(temp_gap)
                     # wait longer and longer if the job is stuck
-                    temp_gap += 5
+                    if temp_gap < 300:
+                        temp_gap += 5
                     self.check_running()
                     future_cpu = self.running_cpu + command_cpu
                     future_mem = self.running_mem + command_mem
@@ -178,7 +179,8 @@ class _Qsubmitter:
         temp_gap = self.qstat_gap
         while True:
             time.sleep(temp_gap)
-            temp_gap += 5
+            if temp_gap < 300:
+                temp_gap += 5
             self.check_running()
             if self.running_cpu == 0:
                 break  # all job finished
