@@ -74,6 +74,13 @@ def highly_variable_methylation_feature(
     if n_top_feature is not None:
         log.info('If you pass `n_top_feature`, all cutoffs are ignored.')
 
+    # warning for extremely low cov
+    low_cov_portion = (feature_mean_cov < 30).sum() / feature_mean_cov.size
+    if low_cov_portion > 0.2:
+        log.warning(f'{int(low_cov_portion * 100)}% feature with < 10 mean cov, '
+                    f'consider filter by cov before find highly variable feature. '
+                    f'Otherwise some low coverage feature may be elevated after normalization.')
+
     X = adata.X
     cov = feature_mean_cov
 
