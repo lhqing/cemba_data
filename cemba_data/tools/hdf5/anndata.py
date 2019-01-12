@@ -54,42 +54,28 @@ class MCAD(AnnData):
         return
 
 
-def highly_variable_feature(
-        adata,
-        min_disp=None, max_disp=None,
-        min_mean=None, max_mean=None,
-        n_top_feature=None,
-        n_bins=50,
-        no_info_cutoff=0.02):
+def highly_variable_methylation_feature(
+        adata, feature_mean_cov,
+        min_disp=0.5, max_disp=None,
+        min_mean=0, max_mean=5,
+        n_top_feature=None, bin_min_features=5,
     """
     Adapted from Scanpy, see license above
+    The main difference is that, this function normalize dispersion based on both mean and cov bins.
     """
-    # TODO: add cov in bin average, basicaly a 3D scale,
     # RNA is only scaled by mean, but methylation is scaled by both mean and cov
     log.info('extracting highly variable features')
 
     if not isinstance(adata, AnnData):
         raise ValueError(
-            '`highly_variable_feature` expects an `AnnData` argument, '
-            'pass `inplace=False` if you want to return a `np.recarray`.')
+            '`highly_variable_methylation_feature` expects an `AnnData` argument')
 
-    if n_top_feature is not None and not all([min_disp is None, max_disp is None,
-                                              min_mean is None, max_mean is None]):
+    if n_top_feature is not None:
         log.info('If you pass `n_top_feature`, all cutoffs are ignored.')
-    if min_disp is None:
-        min_disp = 0.5
-    if min_mean is None:
-        min_mean = 0.
-    if max_mean is None:
-        max_mean = 10
 
-    # X = np.expm1(adata.X) if flavor == 'seurat' else adata.X
-    # not doing any transform for X
-    total_X = adata.X
-    mean, var = get_mean_var(total_X)
-    # calculate total mean var 1st, filter out those region that have no coverage. (mean -> 1, var -> 0)
-    use_var = adata.var.index[(mean - 1) ** 2 + var > no_info_cutoff]
-    X = adata[:, use_var].X
+    X = adata.X
+    cov = feature_mean_cov
+
     mean, var = get_mean_var(X)
     # now actually compute the dispersion
     if 0 in mean:
@@ -101,32 +87,52 @@ def highly_variable_feature(
     dispersion = np.log(dispersion)
 
     # all of the following quantities are "per-feature" here
-    df = pd.DataFrame(index=use_var)
+    df = pd.DataFrame(index=adata.var_names)
     df['mean'] = mean
     df['dispersion'] = dispersion
+    df['cov'] = cov
 
-    # Seurat's flavor
-    df['mean_bin'] = pd.cut(df['mean'], bins=n_bins)
-    disp_grouped = df.groupby('mean_bin')['dispersion']
+    # instead of n_bins, use bin_size, because cov and mc are in different scale
+    df['mean_bin'] = (df['mean'] / mean_binsize).astype(int)
+    df['cov_bin'] = (df['cov'] / cov_binsize).astype(int)
+
+    # save bin_count df, gather bins with more than bin_min_features features
+    bin_count = df.groupby(['mean_bin', 'cov_bin']) \
+        .apply(lambda i: i.shape[0]) \
+        .reset_index() \
+        .sort_values(0, ascending=False)
+    bin_count.head()
+    bin_more_than = bin_count[bin_count[0] > bin_min_features]
+    if bin_more_than.shape[0] == 0:
+        raise ValueError(f'No bin have more than {bin_min_features} features, uss larger bin size.')
+
+    # for those bin have too less features, merge them with closest bin in manhattan distance
+    # this usually don't cause much difference (a few hundred features), but the scatter plot will look more nature
+    index_map = {}
+    for _, (mean_id, cov_id, count) in bin_count.iterrows():
+        if count > 1:
+            index_map[(mean_id, cov_id)] = (mean_id, cov_id)
+        manhattan_dist = (bin_more_than['mean_bin'] - mean_id).abs() + (bin_more_than['cov_bin'] - cov_id).abs()
+        closest_more_than = manhattan_dist.sort_values().index[0]
+        closest = bin_more_than.loc[closest_more_than]
+        index_map[(mean_id, cov_id)] = tuple(closest.tolist()[:2])
+    # apply index_map to original df
+    raw_bin = df[['mean_bin', 'cov_bin']].set_index(['mean_bin', 'cov_bin'])
+    raw_bin['use_mean'] = pd.Series(index_map).apply(lambda i: i[0])
+    raw_bin['use_cov'] = pd.Series(index_map).apply(lambda i: i[1])
+    df['mean_bin'] = raw_bin['use_mean'].values
+    df['cov_bin'] = raw_bin['use_cov'].values
+
+    # calculate bin mean and std, now disp_std_bin shouldn't have NAs
+    disp_grouped = df.groupby(['mean_bin', 'cov_bin'])['dispersion']
     disp_mean_bin = disp_grouped.mean()
     disp_std_bin = disp_grouped.std(ddof=1)
-    # retrieve those genes that have nan std, these are the ones where
-    # only a single gene fell in the bin and implicitly set them to have
-    # a normalized disperion of 1
-    one_gene_per_bin = disp_std_bin.isnull()
-    gen_indices = np.where(one_gene_per_bin[df['mean_bin']])[0].tolist()
-    if len(gen_indices) > 0:
-        log.info(
-            f'Gene indices {gen_indices} fell into a single bin: their '
-            f'normalized dispersion was set to 1.\n'
-            f'Decreasing `n_bins` will likely avoid this effect.')
-    # Circumvent pandas 0.23 bug. Both sides of the assignment have dtype==float32,
-    # but there’s still a dtype error without “.value”.
-    disp_std_bin[one_gene_per_bin] = disp_mean_bin[one_gene_per_bin].values
-    disp_mean_bin[one_gene_per_bin] = 0
+
     # actually do the normalization
+    _mean_norm = disp_mean_bin.loc[list(zip(df['mean_bin'], df['cov_bin']))]
+    _std_norm = disp_std_bin.loc[list(zip(df['mean_bin'], df['cov_bin']))]
     df['dispersion_norm'] = (df['dispersion'].values  # use values here as index differs
-                             - disp_mean_bin[df['mean_bin']].values) / disp_std_bin[df['mean_bin']].values
+                             - _mean_norm.values) / _std_norm.values
     dispersion_norm = df['dispersion_norm'].values.astype('float32')
 
     # Select n_top_feature
@@ -144,19 +150,6 @@ def highly_variable_feature(
                                              dispersion_norm < max_disp))
     df['gene_subset'] = gene_subset
     log.info('    finished')
-
-    # normalize only performed on use_var,
-    # add mean and minimum dispersion for those vars not passing no_info_cutoff
-    # these region must be filtered out anyway
-    other_var = adata[:, ~adata.var.index.isin(use_var)].X
-    other_mean, other_var = get_mean_var(other_var)
-    other_df = pd.DataFrame({
-        'mean': other_mean,
-        'dispersion': df['dispersion'].min(),
-        'dispersion_norm': df['dispersion_norm'].min(),
-        'gene_subset': False,
-    }, index=adata.var.index[~adata.var.index.isin(use_var)])
-    df = pd.concat([df, other_df], sort=True).reindex(adata.var.index)
     return df
 
 

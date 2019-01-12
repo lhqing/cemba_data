@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+from matplotlib import ticker
 
 
 def plot_on_plate(data, value_col, groupby, ncols=4,
@@ -113,16 +114,69 @@ def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
     return ax
 
 
-def plot_highly_variable_gene(data, ax_norm, ax_raw=None, **plot_kws):
-    plot_default_kws = dict(s=5, linewidth=0, alpha=0.5)
-    plot_default_kws.update(**plot_kws)
-    sns.scatterplot(ax=ax_norm, data=data, x='mean',
-                    y='dispersion_norm', hue='gene_subset', **plot_default_kws)
-    ax_norm.set(ylabel='lg Normalized-Dispersion')
-    if ax_raw is not None:
-        sns.scatterplot(ax=ax_raw, data=data, x='mean', legend=None,
-                        y='dispersion', hue='gene_subset', **plot_default_kws)
-        ax_raw.set(ylabel='lg Raw-Dispersion')
-        return ax_norm, ax_raw
+def plot_dispersion(data, hue='gene_subset',
+                    zlab='dispersion', data_quantile=(0.01, 0.99),
+                    save_animate_path=None, fig_kws=None):
+    @ticker.FuncFormatter
+    def mean_formatter(x, pos):
+        return f"{x:.1f}"
+
+    _fig_kws = dict(figsize=(12, 4), dpi=160)
+    if fig_kws is not None:
+        _fig_kws.update(fig_kws)
+
+    x = data['mean']
+    y = data['cov']
+    z = data[zlab]
+    xlim = tuple(np.quantile(x, data_quantile))
+    ylim = tuple(np.quantile(y, data_quantile))
+    zlim = tuple(np.quantile(z, data_quantile))
+
+    # directly apply lim on df
+    _df = data[(x < xlim[1]) & (x > xlim[0]) &
+               (y < ylim[1]) & (y > ylim[0]) &
+               (z < zlim[1]) & (z > zlim[0])]
+    color_dict = {True: 'steelblue',
+                  False: 'lightgray'}
+    color = _df[hue].map(color_dict).tolist()
+
+    fig = plt.figure(**_fig_kws)
+    if save_animate_path is None:
+        axes = [fig.add_subplot(int(f'13{i}'), projection='3d') for i in range(1, 4)]
+        view_inits = [(10, 10), (80, 45), (10, 80)]
+
+        for i, (ax, view) in enumerate(zip(axes, view_inits)):
+            ax.scatter(_df['mean'], _df['cov'], _df[zlab],
+                       c=color, s=0.2, alpha=0.6)
+            if i == 0:
+                ax.set_xlabel('Mean', labelpad=10)
+                ax.set_xticklabels([])
+                ax.set_ylabel('Cov', labelpad=10)
+                ax.ticklabel_format(style='sci', scilimits=(0, 0), axis='y')
+                ax.set_zlabel(zlab)
+            elif i == 1:
+                ax.set_xlabel('Mean', labelpad=10)
+                ax.xaxis.set_major_formatter(mean_formatter)
+                ax.set_ylabel('Cov', labelpad=10)
+                ax.ticklabel_format(style='sci', scilimits=(0, 0), axis='y')
+                ax.set_zticklabels([])
+            else:
+                ax.set_xlabel('Mean', labelpad=10)
+                ax.xaxis.set_major_formatter(mean_formatter)
+                ax.set_yticklabels([])
+                ax.set_ylabel('Cov', labelpad=10)
+                ax.set_zlabel(zlab)
+            ax.view_init(*view)
     else:
-        return ax_norm
+        axes = fig.add_subplot(111, projection='3d')
+        axes.scatter(_df['mean'], _df['cov'], _df[zlab],
+                     c=color, s=0.2, alpha=0.6)
+        from matplotlib import animation
+
+        def update(i):
+            axes.view_init(10, i)
+
+        ani = animation.FuncAnimation(fig, func=update,
+                                      frames=100, interval=10, blit=False)
+        ani.save(save_animate_path, writer='imagemagick')
+    return fig, axes
