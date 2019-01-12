@@ -15,7 +15,6 @@ def read_snap(file_path, bin_size=5000):
         bin_chrom = f[f'/AM/{bin_size}/binChrom'].value.astype(str)
         bin_start = f[f'/AM/{bin_size}/binStart'].value - 1  # 0 based bed format
         bin_end = f[f'/AM/{bin_size}/binStart'].value - 1 + bin_size  # 0 based bed format
-
         bin_id = np.core.defchararray.add(np.core.defchararray.add(bin_chrom, '-'),
                                           bin_start.astype(str))
 
@@ -42,7 +41,7 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     """
     Reshape adata.X columns into any region list, based on bedtools intersect.
     Return a CSC matrix. for 60K genes and 60K cells, take ~90s.
-    Note: This function internally generate a full matrix, don't use this for small regions.
+    Note: This function internally generate a full matrix, don't use this for >100k regions.
 
     Parameters
     ----------
@@ -67,8 +66,8 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     region_bt = pybedtools.BedTool.from_dataframe(region_bed.reset_index().iloc[:, [1, 2, 3, 0]])
     # for bin_id, instead of using text, use number
     bin_bt = pybedtools.BedTool.from_dataframe(adata.var
-                                               .reset_index()
-                                               .reset_index()
+                                               .reset_index()  # region_id
+                                               .reset_index()  # int id
                                                .iloc[:, [2, 3, 4, 0, 1]])
     if slop is None:
         intersected_bin = region_bt.intersect(bin_bt, wa=True, wb=True)
@@ -87,8 +86,7 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     for col_idx, (region, sub_df) in enumerate(result.sort_values('bin_num').groupby('region_id')):
         regions.append(region)
         cell_region_count = csc_data[:, slice(sub_df.iat[0, 7],
-                                              sub_df.iat[-1, 7] + 1)].sum(axis=1)
-        cell_region_count = cell_region_count.A1
+                                              sub_df.iat[-1, 7] + 1)].sum(axis=1).A1
         region_data[:, col_idx] = cell_region_count
     sparse_result = ss.csc_matrix(region_data)
 
@@ -105,6 +103,7 @@ def reshape_matrix_fix_step(adata, window, step):
     """
     batch = 3000
 
+    # prepare chrom_slices to separate chromosome columns
     chrom, start = zip(*adata.var_names.str.split('-'))
     cur_chrom = None
     chrom_start_cols = []
@@ -133,6 +132,9 @@ def reshape_matrix_fix_step(adata, window, step):
         chrom_results = []
         for chrom_slice in chrom_slices:
             chrom_data = sub_data[:, chrom_slice]
+            # slice the data based on window and step, sum to get result
+            # this slice dropped the last several bins in each chromosome, which is usually OK
+            # TODO: deal with last several bins to make this perfect, remember to change index slice too
             data_list = [chrom_data[:, slice(w, chrom_data.shape[1] - window + w, step)]
                          for w in range(window)]
             sum_of_data = np.sum(data_list, axis=0)
@@ -207,3 +209,4 @@ def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3,
                                           index=pd.Index(cell_id)),
                          var=adata.var.copy())
     return meta_adata
+
