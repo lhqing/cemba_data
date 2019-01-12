@@ -59,6 +59,7 @@ def highly_variable_methylation_feature(
         min_disp=0.5, max_disp=None,
         min_mean=0, max_mean=5,
         n_top_feature=None, bin_min_features=5,
+        mean_binsize=0.05, cov_binsize=100):
     """
     Adapted from Scanpy, see license above
     The main difference is that, this function normalize dispersion based on both mean and cov bins.
