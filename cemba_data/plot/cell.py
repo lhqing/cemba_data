@@ -176,7 +176,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
                         expand_border_scale=0.1, text_anno=None, dodge=None,
                         scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
     # TODO: better palette support
-    _scatter_kws = dict(linewidth=0, s=7)
+    _scatter_kws = dict(linewidth=0, s=7, legend=None)
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
 
@@ -209,8 +209,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
             text_anno = 'text_anno'
 
     sns.scatterplot(x='x', y='y', hue=hue,
-                    data=_data, legend=None,
-                    ax=ax, **_scatter_kws)
+                    data=_data, ax=ax, **_scatter_kws)
 
     # clean axis
     if axis_format == 'tiny':
@@ -253,7 +252,7 @@ def continuous_scatter(data, ax, coord_base='tsne',
     else:
         real_coord_name = _coord_base
 
-    _scatter_kws = dict(linewidth=0, s=7)
+    _scatter_kws = dict(linewidth=0, s=7, legend=None)
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
 
@@ -309,7 +308,7 @@ def continuous_scatter(data, ax, coord_base='tsne',
     sns.scatterplot(x='x', y='y', data=_data,
                     hue=hue, palette=cmap, hue_norm=cnorm,
                     size=size, sizes=sizes, size_norm=snorm,
-                    ax=ax, legend=None, **_scatter_kws)
+                    ax=ax, **_scatter_kws)
 
     # clean axis
     if axis_format == 'tiny':

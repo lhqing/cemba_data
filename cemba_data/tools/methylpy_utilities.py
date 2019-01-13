@@ -543,8 +543,7 @@ def merge_allc_files(allc_files,
                      num_procs=1,
                      mini_batch=DEFAULT_MAX_ALLC,
                      compress_output=True,
-                     skip_snp_info=True,
-                     buffer_line_number=100000):
+                     skip_snp_info=True):
     increase_soft_fd_limit()
     # User input checks
     if not isinstance(allc_files, list):
@@ -555,7 +554,7 @@ def merge_allc_files(allc_files,
 
     # check index
     index_allc_file_batch(allc_files,
-                          cpu=num_procs)
+                          cpu=min(num_procs, 10))
     print("Start merging")
     if not (num_procs > 1):
         merge_allc_files_minibatch(allc_files,

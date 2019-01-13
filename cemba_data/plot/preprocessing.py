@@ -117,6 +117,8 @@ def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
 def plot_dispersion(data, hue='gene_subset',
                     zlab='dispersion', data_quantile=(0.01, 0.99),
                     save_animate_path=None, fig_kws=None):
+    from mpl_toolkits.mplot3d import Axes3D
+
     @ticker.FuncFormatter
     def mean_formatter(x, pos):
         return f"{x:.1f}"

@@ -57,7 +57,7 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     """
     region_bed = pd.read_table(bed_path, index_col=-1,
                                header=None, names=['chrom', 'start', 'end', 'id'])
-    if (not force_run) and (region_bed.shape[0] * adata.shape(0) > 1e10):
+    if (not force_run) and (region_bed.shape[0] * adata.shape[0] > 1e10):
         raise ValueError('This function internally generate a full matrix, '
                          'do not use this for too many regions.')
     else:
