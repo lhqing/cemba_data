@@ -152,8 +152,8 @@ def summary_pipeline_stat(out_dir):
     bismark_result = pd.concat([bismark_r1, bismark_r2], sort=True, axis=1)
     bismark_result['TotalUniqueMappedReads'] = \
         bismark_result['R1UniqueMappedReads'] + bismark_result['R2UniqueMappedReads']
-    bismark_result['TotalMappedRatio'] = bismark_result['TotalUniqueMappedReads'] / bismark_result[
-        'R1TrimmedReads', 'R2TrimmedReads'].sum(axis=1)
+    bismark_result['TotalMappedRatio'] = bismark_result['TotalUniqueMappedReads'] / bismark_result[[
+        'R1TrimmedReads', 'R2TrimmedReads']].sum(axis=1)
 
     bam_result = result_dfs['bam_process_result'].groupby(['uid', 'index_name']) \
         .sum()[['UNPAIRED_READ_DUPLICATES', 'out_reads']] \

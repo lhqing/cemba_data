@@ -77,6 +77,8 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
     if dodge is None:
         # text annotation
         for text, sub_df in data.groupby(anno_col):
+            if (not isinstance(text, str)) or (text == ''):
+                continue
             x, y, *_ = sub_df.median()
             ax.text(x, y, text,
                     fontdict=_text_anno_kws,
