@@ -98,7 +98,7 @@ def summary_pipeline_stat(out_dir):
         result_dfs[k] = pd.concat(v, ignore_index=True, sort=True)
     # save all concatenated stats into out_dir level stats folder
     total_stats = out_dir / 'stats'
-    total_stats.mkdir()
+    total_stats.mkdir(exist_ok=True)
     for k, v in result_dfs.items():
         k_path = total_stats / f'{k}.tsv.gz'
         v.to_csv(str(k_path), sep='\t', compression='gzip')
