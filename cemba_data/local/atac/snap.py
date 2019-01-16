@@ -156,12 +156,33 @@ def reshape_matrix_fix_step(adata, window, step):
     result_adata = AnnData(X=total_result,
                            obs=adata.obs.copy(),
                            var=pd.DataFrame([], index=total_chrom_index))
-
     return result_adata
 
 
-def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir,
+def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir=None,
               keep_unknown=False, cpu=10, mapq_cutoff=10):
+    """
+
+    Parameters
+    ----------
+    bam_path
+
+    out_prefix
+
+    cell_to_cluster
+        A dict where the key is cell barcode, value is cluster assignment
+    out_dir
+
+    keep_unknown
+
+    cpu
+
+    mapq_cutoff
+
+    Returns
+    -------
+
+    """
     bam_path = pathlib.Path(bam_path).absolute()
     # get bam header text
     headers = subprocess.run(['samtools', 'view', '-H', str(bam_path)],
@@ -196,6 +217,7 @@ def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir,
                 continue
     for k, v in cluster_handle_dict.items():
         v.close()
+
     # transfer all split sam into bam
     for cluster in unique_clusters:
         out_sam = str(out_dir / f'{out_prefix}.{cluster}.sam')
@@ -203,18 +225,17 @@ def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir,
         dedup_bam = str(out_dir / f'{out_prefix}.{cluster}.dedup.bam')
         dedup_matrix = dedup_bam + '.matrix'
 
-        subprocess.run(['samtools', 'sort', '-@', str(cpu), '-q', mapq_cutoff, '-f', '2',
-                        out_sam, '-o', sort_bam],
-                       check=True)
-        subprocess.run(['rm', '-f', str(out_dir / f'{out_prefix}.{cluster}.sam')])
+        cmd = f'samtools sort -@ {cpu} -q {mapq_cutoff} -f 2 {out_sam} -o {sort_bam}'
+        subprocess.run(cmd.split(' '), check=True)
+        subprocess.run(['rm', '-f', out_sam])
         dedup_cmd = f'picard MarkDuplicates I={sort_bam} O={dedup_bam} ' \
                     f'M={dedup_matrix} REMOVE_DUPLICATES=true'
         subprocess.run(dedup_cmd.split(' '), check=True)
         cmd = ['samtools', 'index', str(bam_path)]
         subprocess.run(cmd, stderr=subprocess.PIPE)
         cmd = ['bamCoverage', '-b', str(bam_path), '-o',
-               str(bam_path)[:-3]+'bigwig', '--binSize', '50',
-               '-p', '20', '--normalizeUsing', 'CPM']
+               str(bam_path)[:-3] + 'bigwig', '--binSize', '50',
+               '-p', '1', '--normalizeUsing', 'CPM']
         subprocess.run(cmd, stderr=subprocess.PIPE)
     return
 
