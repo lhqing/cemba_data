@@ -4,6 +4,8 @@ import scipy.sparse as ss
 from anndata import AnnData
 import pybedtools
 import h5py
+import subprocess
+import pathlib
 
 
 def read_snap(file_path, bin_size=5000):
@@ -158,8 +160,62 @@ def reshape_matrix_fix_step(adata, window, step):
     return result_adata
 
 
-def split_bam():
-    # TODO: given a cluster assignment, split bam file
+def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir,
+              keep_unknown=False, cpu=10, mapq_cutoff=10):
+    bam_path = pathlib.Path(bam_path).absolute()
+    # get bam header text
+    headers = subprocess.run(['samtools', 'view', '-H', str(bam_path)],
+                             stderr=subprocess.PIPE, stdout=subprocess.PIPE, encoding='utf8').stdout
+
+    # set up out dir
+    if out_dir is None:
+        out_dir = bam_path.parent
+    else:
+        out_dir = pathlib.Path(out_dir).absolute()
+    # set up output handle for each cluster
+    unique_clusters = set(cell_to_cluster.values())
+    if keep_unknown:
+        unique_clusters.add('unknown')
+    cluster_handle_dict = {}
+    for cluster in unique_clusters:
+        out_handle = open(out_dir / f'{out_prefix}.{cluster}.sam', 'w')
+        out_handle.write(headers)
+        cluster_handle_dict[cluster] = out_handle
+
+    # read and split bam file
+    read_popen = subprocess.Popen(['samtools', 'view', str(bam_path)],
+                                  stdout=subprocess.PIPE, encoding='utf8')
+    for line in read_popen.stdout:
+        cell_id = line.split(':')[0]
+        try:
+            cluster_handle_dict[cell_to_cluster[cell_id]].write(line)
+        except KeyError:
+            if keep_unknown:
+                cluster_handle_dict['unknown'].write(line)
+            else:
+                continue
+    for k, v in cluster_handle_dict.items():
+        v.close()
+    # transfer all split sam into bam
+    for cluster in unique_clusters:
+        out_sam = str(out_dir / f'{out_prefix}.{cluster}.sam')
+        sort_bam = str(out_dir / f'{out_prefix}.{cluster}.sort.bam')
+        dedup_bam = str(out_dir / f'{out_prefix}.{cluster}.dedup.bam')
+        dedup_matrix = dedup_bam + '.matrix'
+
+        subprocess.run(['samtools', 'sort', '-@', str(cpu), '-q', mapq_cutoff, '-f', '2',
+                        out_sam, '-o', sort_bam],
+                       check=True)
+        subprocess.run(['rm', '-f', str(out_dir / f'{out_prefix}.{cluster}.sam')])
+        dedup_cmd = f'picard MarkDuplicates I={sort_bam} O={dedup_bam} ' \
+                    f'M={dedup_matrix} REMOVE_DUPLICATES=true'
+        subprocess.run(dedup_cmd.split(' '), check=True)
+        cmd = ['samtools', 'index', str(bam_path)]
+        subprocess.run(cmd, stderr=subprocess.PIPE)
+        cmd = ['bamCoverage', '-b', str(bam_path), '-o',
+               str(bam_path)[:-3]+'bigwig', '--binSize', '50',
+               '-p', '20', '--normalizeUsing', 'CPM']
+        subprocess.run(cmd, stderr=subprocess.PIPE)
     return
 
 
@@ -209,4 +265,3 @@ def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3,
                                           index=pd.Index(cell_id)),
                          var=adata.var.copy())
     return meta_adata
-
