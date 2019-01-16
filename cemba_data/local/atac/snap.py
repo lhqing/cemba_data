@@ -221,11 +221,13 @@ def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir=None,
     # transfer all split sam into bam
     for cluster in unique_clusters:
         out_sam = str(out_dir / f'{out_prefix}.{cluster}.sam')
+        out_bam = str(out_dir / f'{out_prefix}.{cluster}.bam')
         sort_bam = str(out_dir / f'{out_prefix}.{cluster}.sort.bam')
         dedup_bam = str(out_dir / f'{out_prefix}.{cluster}.dedup.bam')
         dedup_matrix = dedup_bam + '.matrix'
-
-        cmd = f'samtools sort -@ {cpu} -q {mapq_cutoff} -f 2 {out_sam} -o {sort_bam}'
+        cmd = f'samtools view -q {mapq_cutoff} -f 2 {out_sam} -o {out_bam}'
+        subprocess.run(cmd.split(' '), check=True)
+        cmd = f'samtools sort -@ {cpu} {out_bam} -o {sort_bam}'
         subprocess.run(cmd.split(' '), check=True)
         subprocess.run(['rm', '-f', out_sam])
         dedup_cmd = f'picard MarkDuplicates I={sort_bam} O={dedup_bam} ' \
