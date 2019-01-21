@@ -114,9 +114,7 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
 def density_based_sample(data, coords, portion=None, size=None, seed=None):
     clf = LocalOutlierFactor(n_neighbors=20, algorithm='auto',
                              leaf_size=30, metric='minkowski',
-                             p=2, metric_params=None,
-                             contamination='auto', novelty=False,
-                             n_jobs=30)
+                             p=2, metric_params=None)
     data_coords = data[coords]
     clf.fit(data_coords)
     # original score is negative, the larger the denser
@@ -148,7 +146,7 @@ def _tight_hue_range(hue_data, portion):
     min_window_right = hue_quantiles.rolling(window=int(portion * 100)) \
         .apply(lambda i: i.max() - i.min(), raw=True) \
         .idxmin()
-    min_window_left = min_window_right - portion
+    min_window_left = max(0, min_window_right - portion)
     tight_hue_norm = tuple(hue_data.quantile(q=[min_window_left,
                                                 min_window_right]))
     return tight_hue_norm
@@ -175,7 +173,7 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
 
 
 def categorical_scatter(data, ax, coord_base='tsne', hue=None,
-                        expand_border_scale=0.1, text_anno=None, dodge=None,
+                        expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
                         scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
     # TODO: better palette support
     _scatter_kws = dict(linewidth=0, s=7, legend=None)
@@ -193,8 +191,8 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
     else:
         real_coord_name = _coord_base
 
-    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale)
-    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale)
+    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale, border_quantile)
+    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale, border_quantile)
     _data = pd.DataFrame({'x': scaled_x,
                           'y': scaled_y})
     if hue is not None:
@@ -234,7 +232,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
 
 def continuous_scatter(data, ax, coord_base='tsne',
                        sample_portion=None, sample_size=None, seed=0,
-                       expand_border_scale=0.1, text_anno=None, dodge=None,
+                       expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
                        hue=None, hue_portion=0.8, cmap='viridis', colorbar=True,
                        size=None, size_portion=0.8, label_fontsize=5, sizebar=True,
                        scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
@@ -258,8 +256,8 @@ def continuous_scatter(data, ax, coord_base='tsne',
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
 
-    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale)
-    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale)
+    scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale, border_quantile)
+    scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale, border_quantile)
     _data = pd.DataFrame({'x': scaled_x,
                           'y': scaled_y})
     if hue is not None:
@@ -368,6 +366,25 @@ def continuous_scatter(data, ax, coord_base='tsne',
         _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
         # TODO adjust label color, turn white when background is dark
-    ax.hist
     return tuple(return_axes)
+
+
+def generate_tree_dict(data):
+    childrens = []
+    if data.shape[1] == 1:
+        cell_counts = data.iloc[:, 0].value_counts()
+        for children, count in cell_counts.items():
+            childrens.append({
+                'name': children,
+                'value': count
+            })
+    else:
+        for children, sub_df in data.groupby(data.columns[0]):
+            count = sub_df.shape[0]
+            childrens.append({
+                'name': children,
+                'value': count,
+                'children': generate_tree_dict(sub_df.iloc[:, 1:])
+            })
+    return childrens
 

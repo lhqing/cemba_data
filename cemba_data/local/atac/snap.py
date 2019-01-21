@@ -233,10 +233,10 @@ def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir=None,
         dedup_cmd = f'picard MarkDuplicates I={sort_bam} O={dedup_bam} ' \
                     f'M={dedup_matrix} REMOVE_DUPLICATES=true'
         subprocess.run(dedup_cmd.split(' '), check=True)
-        cmd = ['samtools', 'index', str(bam_path)]
+        cmd = ['samtools', 'index', str(dedup_bam)]
         subprocess.run(cmd, stderr=subprocess.PIPE)
-        cmd = ['bamCoverage', '-b', str(bam_path), '-o',
-               str(bam_path)[:-3] + 'bigwig', '--binSize', '50',
+        cmd = ['bamCoverage', '-b', str(dedup_bam), '-o',
+               str(dedup_bam)[:-3] + 'bigwig', '--binSize', '50',
                '-p', '1', '--normalizeUsing', 'CPM']
         subprocess.run(cmd, stderr=subprocess.PIPE)
     return
