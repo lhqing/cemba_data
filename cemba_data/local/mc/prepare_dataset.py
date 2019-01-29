@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# TODO: require id in generate dataset
+
 
 def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
                      context_pattern, genome_size_path, max_cov_cutoff, dataset_name):
@@ -80,7 +82,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
         json.dump([{
             'command': assemble_command,
             'pe smp': 10,
-            'l h_vmem': '50G'
+            'l h_vmem': '8G'
         }], f)
 
     # submit master
@@ -88,7 +90,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name generate-dataset ' \
                    f'--command_file_path {command_paths} ' \
-                   f'--total_cpu 30'
+                   f'--total_cpu 10'
 
     print(f"""
             The command file for generate-dataset is prepared

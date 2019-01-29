@@ -141,8 +141,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
         command_dict = {
             'command': uid_cmd,
             'pe smp': 20,  # cpu for each command
-            'l h_vmem': '100G'
-            # TODO set cpu number more clever
+            'l h_vmem': '5G'
         }
         cmd_list.append(command_dict)
     cmd_json_path = out_dir / 'command.json'

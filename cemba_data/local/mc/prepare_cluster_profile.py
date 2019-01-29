@@ -114,7 +114,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
               f'--out_path {group_allc_out_path} --cpu {cpu} --index tabix'
-        memory_gbs = min(int(cpu * 2), 30)
+        memory_gbs = int(min(cpu * 2, 30) / cpu)
         cmd_dict = {
             'command': cmd,
             'pe smp': cpu,
@@ -140,7 +140,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
             cmd_dict = {
                 'command': cmd,
                 'pe smp': 10,  # TODO: figure out a better way to limit IO bound jobs
-                'l h_vmem': '30G'
+                'l h_vmem': '3G'
             }
         else:
             group_id_list_path = cluster_column_dir / f'{cluster_id}.group_list'
@@ -149,7 +149,7 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
                     f.write(str(path) + '\n')
             cmd = f'yap merge-allc --allc_paths {group_id_list_path} ' \
                   f'--out_path {cluster_allc_out_path} --cpu {cpu} --index tabix'
-            memory_gbs = min(int(cpu * 4), 30)
+            memory_gbs = int(min(cpu * 4, 30) / cpu)
             cmd_dict = {
                 'command': cmd,
                 'pe smp': cpu,
