@@ -216,10 +216,10 @@ Output: allc dataframe
 import subprocess
 import shlex
 import pathlib
-import gzip
 import pandas as pd
 import multiprocessing
 import collections
+from ..tools.open import open_allc
 
 
 def _read_faidx(faidx_path):
@@ -252,7 +252,8 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
 
 def _call_methylated_sites_worker(bam_path, reference_fasta,
                                   num_upstr_bases, num_downstr_bases,
-                                  buffer_line_number, min_mapq, min_base_quality):
+                                  buffer_line_number, min_mapq, min_base_quality,
+                                  threads=5, compress_level=5, idx=True, tabix=True):
     """
     Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
     and pipe to this function to generate mC and cov count. Only for single cell, not base level statistics.
@@ -300,7 +301,9 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     file_dir = input_path.parent
     allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
     output_path = str(file_dir / allc_name)
-    output_file_handler = gzip.open(output_path, 'wt')
+
+    output_file_handler = open_allc(output_path, mode='w',
+                                    compresslevel=compress_level, threads=threads)
 
     # initialize variables
     complement = {"A": "T",
@@ -422,10 +425,15 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     result_handle.close()
     output_file_handler.close()
 
-    with open(output_path + '.idx', 'w') as idx_f:
-        for (chrom, out_pos) in chr_out_pos_list:
-            idx_f.write(f'{chrom}\t{out_pos}\n')
-        idx_f.write('#eof\n')  # methylpy idx end
+    if idx:
+        with open(output_path + '.idx', 'w') as idx_f:
+            for (chrom, out_pos) in chr_out_pos_list:
+                idx_f.write(f'{chrom}\t{out_pos}\n')
+            idx_f.write('#eof\n')  # methylpy idx end
+
+    if tabix:
+        subprocess.run(shlex.split(f'tabix -b 2 -e 2 -s 1 {output_path}'),
+                       check=True)
 
     count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
     count_df['mc_rate'] = count_df['mc'] / count_df['cov']
