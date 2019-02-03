@@ -487,6 +487,6 @@ def batch_standardize_allc(allc_dir, genome_size_path, compress_level=6,
             md5_dict[str(allc_path)] = data
 
     with open(allc_dir + '/md5_list.txt', 'w') as f:
-        for k, v in md5_dict:
+        for k, v in md5_dict.items():
             f.write('\t'.join([k, v]))
     return md5_dict
