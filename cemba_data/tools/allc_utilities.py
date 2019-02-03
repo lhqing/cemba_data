@@ -442,7 +442,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
 
     # remove all batch allc but the last
     for out_file in out_paths[:-1]:  # last file is the final merged allc
-        subprocess.run(['rm', '-f', out_file + '*'])
+        subprocess.run(['rm', '-f', out_file + '*'], shell=True)
     return
 
 
@@ -649,9 +649,7 @@ def _merge_allc_files_idx(allc_files,
         tmp_file = glob.glob(output_file + "_" + str(chrom) + ".tsv")
         if tmp_file:
             tmp_file = tmp_file[0]
-            subprocess.check_call(["rm", tmp_file])
-            index_file = tmp_file + '.idx'
-            subprocess.check_call(["rm", index_file])
+            subprocess.run(["rm", tmp_file])
     # index output allc file
     _index_allc_file(output_file)
     return 0
