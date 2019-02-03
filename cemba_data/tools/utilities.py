@@ -78,7 +78,8 @@ def genome_region_chunks(chrom_size_file, bin_length=10000000):
     record_lengths = []
     for chrom, chrom_length in chrom_size_dict.items():
         while cur_chrom_pos + bin_length <= chrom_length:
-            records.append(f'{chrom}:{cur_chrom_pos}-{cur_chrom_pos+bin_length}')
+            # tabix region is 1 based and inclusive
+            records.append(f'{chrom}:{cur_chrom_pos}-{cur_chrom_pos+bin_length-1}')
             cur_chrom_pos += bin_length
             record_lengths.append(bin_length)
         else:

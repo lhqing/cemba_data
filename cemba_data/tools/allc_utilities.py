@@ -388,7 +388,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         allc_files_batches = []
         out_paths = []
         for batch_id, i in enumerate(range(0, len(allc_files), batch_allc)):
-            allc_files_batches.append(allc_files[i, i + batch_allc])
+            allc_files_batches.append(allc_files[i:i + batch_allc])
             out_paths.append(out_file + f'batch_{batch_id}.tmp.tsv.gz')
             if batch_id > 0:
                 # merge last batch's merged allc into next batch
@@ -435,9 +435,10 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                     out_handle.write(data)
                     print('write', regions[cur_id], 'Cached:', len(temp_dict))
                     cur_id += 1
-            print('Merge finished.')
         # after merge, tabix output
+        print('Tabix output ALLC file')
         subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file])
+    print('Merge finished.')
 
     # remove all batch allc but the last
     for out_file in out_paths[:-1]:  # last file is the final merged allc
