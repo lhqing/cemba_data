@@ -216,16 +216,17 @@ import multiprocessing
 import gzip
 import glob
 import resource
-from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks
+from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks, parse_file_paths
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
+
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
 DEFAULT_MAX_ALLC = int((HARD - 100) / 2)
 
 
-def increase_soft_fd_limit():
+def _increase_soft_fd_limit():
     """
     Increase soft file descriptor limit to hard limit,
     this is the maximum a process can do
@@ -237,14 +238,6 @@ def increase_soft_fd_limit():
     https://stackoverflow.com/questions/6774724/why-python-has-limit-for-count-of-file-handles/6776345
     """
     resource.setrlimit(resource.RLIMIT_NOFILE, (HARD, HARD))
-
-
-def _open_allc_file(allc_file):
-    if allc_file.endswith(".gz"):
-        f = gzip.open(allc_file, 'rt')
-    else:
-        f = open(allc_file, 'r')
-    return f
 
 
 def convert_allc_to_bigwig(input_allc_file,
@@ -359,69 +352,111 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
 
 
-def batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_length, cpu=10):
-    # TODO check_bgzip_and_tabix before merge
+def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000, cpu=10):
+    allc_files = parse_file_paths(allc_paths)
+
+    try:
+        _check_tabix(allc_files)
+        _batch_merge_allc_files_tabix(allc_files=allc_files,
+                                      out_file=out_path,
+                                      chrom_size_file=chrom_size_file,
+                                      bin_length=bin_length,
+                                      cpu=cpu)
+    except FileNotFoundError:
+        print('Some ALLC file do not have tabix, use the old merge function with .idx.'
+              'This function is slower and introduce much higher IO. Consider use bgzip/tabix')
+        _merge_allc_files_idx(allc_files,
+                              out_path,
+                              num_procs=cpu,
+                              mini_batch=DEFAULT_MAX_ALLC,
+                              compress_output=True,
+                              skip_snp_info=True)
+    return
+
+
+def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_length, cpu=10):
     regions = genome_region_chunks(chrom_size_file, bin_length=bin_length)
     print(f'Split genome into {len(regions)} regions, each is {bin_length}bp')
 
-    with open_allc(out_file, 'w', threads=3) as out_handle:
-        with ProcessPoolExecutor(max_workers=cpu) as executor:
-            future_merge_result = {executor.submit(merge_allc_files,
-                                                   allc_files=allc_files,
-                                                   out_file=None,
-                                                   chrom_size_file=chrom_size_file,
-                                                   query_region=region,
-                                                   buffer_line_number=100000): region_id
-                                   for region_id, region in enumerate(regions)}
-            cur_id = 0
-            temp_dict = {}
-            # future may return in any order
-            # save future.result into temp_dict 1st
-            # write data in order by region_id
-            # so the out file is ordered
-            for future in as_completed(future_merge_result):
-                region_id = future_merge_result[future]
-                try:
-                    temp_dict[region_id] = future.result()
-                except Exception as exc:
-                    print('%r generated an exception: %s' % (region_id, exc))
-                else:
+    _increase_soft_fd_limit()
+    if len(allc_files) > DEFAULT_MAX_ALLC:
+        # deal with too many allc files
+        # merge in batches
+        allc_fold = len(allc_files) // DEFAULT_MAX_ALLC + 1
+        batch_allc = len(allc_files) // allc_fold + 1
+
+        allc_files_batches = []
+        out_paths = []
+        for batch_id, i in enumerate(range(0, len(allc_files), batch_allc)):
+            allc_files_batches.append(allc_files[i, i + batch_allc])
+            out_paths.append(out_file + f'batch_{batch_id}.tmp.tsv.gz')
+            if batch_id > 0:
+                # merge last batch's merged allc into next batch
+                allc_files_batches[batch_id].append(out_paths[batch_id - 1])
+        out_paths[-1] = out_file
+    else:
+        allc_files_batches = [allc_files]
+        out_paths = [out_file]
+
+    for allc_files, out_file in zip(allc_files_batches, out_paths):
+        with open_allc(out_file, 'w', threads=3) as out_handle:
+            with ProcessPoolExecutor(max_workers=cpu) as executor:
+                future_merge_result = {executor.submit(_merge_allc_files_tabix,
+                                                       allc_files=allc_files,
+                                                       out_file=None,
+                                                       chrom_size_file=chrom_size_file,
+                                                       query_region=region,
+                                                       buffer_line_number=100000): region_id
+                                       for region_id, region in enumerate(regions)}
+                cur_id = 0
+                temp_dict = {}
+                # future may return in any order
+                # save future.result into temp_dict 1st
+                # write data in order by region_id
+                # so the out file is ordered
+                for future in as_completed(future_merge_result):
+                    region_id = future_merge_result[future]
                     try:
-                        while len(temp_dict) > 0:
-                            data = temp_dict.pop(cur_id)
-                            out_handle.write(data)
-                            print('write', regions[cur_id], 'Cached:', len(temp_dict))
-                            cur_id += 1
-                    except KeyError:
-                        continue
-            # write last pieces of data
-            while len(temp_dict) > 0:
-                data = temp_dict.pop(cur_id)
-                out_handle.write(data)
-                print('write', regions[cur_id], 'Cached:', len(temp_dict))
-                cur_id += 1
-        print('Merge finished.')
-    # TODO after merge, tabix output
+                        temp_dict[region_id] = future.result()
+                    except Exception as exc:
+                        print('%r generated an exception: %s' % (region_id, exc))
+                    else:
+                        try:
+                            while len(temp_dict) > 0:
+                                data = temp_dict.pop(cur_id)
+                                out_handle.write(data)
+                                print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                                cur_id += 1
+                        except KeyError:
+                            continue
+                # write last pieces of data
+                while len(temp_dict) > 0:
+                    data = temp_dict.pop(cur_id)
+                    out_handle.write(data)
+                    print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                    cur_id += 1
+            print('Merge finished.')
+        # after merge, tabix output
+        subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file])
+
+    # remove all batch allc but the last
+    for out_file in out_paths[:-1]:  # last file is the final merged allc
+        subprocess.run(['rm', '-f', out_file + '*'])
     return
 
 
-def check_bgzip_and_tabix(allc_files):
-    # TODO check file gzip type and tabix existence
+def _check_tabix(allc_files):
+    for allc_path in allc_files:
+        if not os.path.exists(allc_path + '.tbi'):
+            raise FileNotFoundError(f'Tabix for {allc_path} not found')
     return
 
 
-def fix_bgzip_and_tabix(allc_files):
-    # TODO fix file bgzip type and tabix
-    return
-
-
-def merge_allc_files_tabix(allc_files,
-                           out_file,
-                           chrom_size_file,
-                           query_region=None,
-                           buffer_line_number=100000):
-    # TODO deal with too many file open or too many process problem
-    # TODO merge iteratively if too many
+def _merge_allc_files_tabix(allc_files,
+                            out_file,
+                            chrom_size_file,
+                            query_region=None,
+                            buffer_line_number=100000):
     # only use bgzip and tabix
     # automatically take care the too many file open issue
     # do merge iteratively if file number exceed limit
@@ -538,13 +573,13 @@ def merge_allc_files_tabix(allc_files,
         return
 
 
-def merge_allc_files(allc_files,
-                     output_file,
-                     num_procs=1,
-                     mini_batch=DEFAULT_MAX_ALLC,
-                     compress_output=True,
-                     skip_snp_info=True):
-    increase_soft_fd_limit()
+def _merge_allc_files_idx(allc_files,
+                          output_file,
+                          num_procs=1,
+                          mini_batch=DEFAULT_MAX_ALLC,
+                          compress_output=True,
+                          skip_snp_info=True):
+    _increase_soft_fd_limit()
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
@@ -553,24 +588,24 @@ def merge_allc_files(allc_files,
         output_file += ".gz"
 
     # check index
-    index_allc_file_batch(allc_files,
-                          cpu=min(num_procs, 10))
+    _index_allc_file_batch(allc_files,
+                           cpu=min(num_procs, 10))
     print("Start merging")
     if not (num_procs > 1):
-        merge_allc_files_minibatch(allc_files,
-                                   output_file,
-                                   query_chroms=None,
-                                   mini_batch=mini_batch,
-                                   compress_output=compress_output,
-                                   skip_snp_info=skip_snp_info)
-        index_allc_file(output_file)
+        _merge_allc_files_idx_minibatch(allc_files,
+                                        output_file,
+                                        query_chroms=None,
+                                        mini_batch=mini_batch,
+                                        compress_output=compress_output,
+                                        skip_snp_info=skip_snp_info)
+        _index_allc_file(output_file)
         return 0
 
     # parallel merging
     print("Getting chromosome names")
     chroms = set([])
     for allc_file in allc_files:
-        c_p = read_allc_index(allc_file)
+        c_p = _read_allc_index(allc_file)
         for chrom in c_p.keys():
             chroms.add(chrom)
     try:
@@ -579,7 +614,7 @@ def merge_allc_files(allc_files,
         # int(float(mini_batch)/float(len(allc_files)))))
         print("Merging allc files")
         for chrom in chroms:
-            pool.apply_async(merge_allc_files_minibatch,
+            pool.apply_async(_merge_allc_files_idx_minibatch,
                              (),
                              {"allc_files": allc_files,
                               "output_file": output_file + "_" + str(chrom) + ".tsv",
@@ -587,8 +622,7 @@ def merge_allc_files(allc_files,
                               "mini_batch": mini_batch,
                               "compress_output": False,
                               "skip_snp_info": skip_snp_info,
-                              }
-                             )
+                              })
         pool.close()
         pool.join()
         # output
@@ -596,7 +630,7 @@ def merge_allc_files(allc_files,
         file_list = []
         for chrom in chroms:
             file_list.append(output_file + "_" + chrom + ".tsv")
-        cat_process = subprocess.Popen(['cat']+file_list,
+        cat_process = subprocess.Popen(['cat'] + file_list,
                                        stdout=subprocess.PIPE)
         with open(output_file, 'w') as f:
             subprocess.run(['pigz'], stdin=cat_process.stdout,
@@ -604,45 +638,40 @@ def merge_allc_files(allc_files,
     except:
         print("Failed to merge using multiple processors. " +
               "Do minibatch merging using single processor.")
-        merge_allc_files_minibatch(allc_files,
-                                   output_file,
-                                   mini_batch=mini_batch,
-                                   compress_output=compress_output,
-                                   skip_snp_info=skip_snp_info)
+        _merge_allc_files_idx_minibatch(allc_files,
+                                        output_file,
+                                        mini_batch=mini_batch,
+                                        compress_output=compress_output,
+                                        skip_snp_info=skip_snp_info)
     # remove temporary files
     for chrom in set(chroms):
         tmp_file = glob.glob(output_file + "_" + str(chrom) + ".tsv")
         if tmp_file:
             tmp_file = tmp_file[0]
             subprocess.check_call(["rm", tmp_file])
-            remove_allc_index(tmp_file)
+            index_file = tmp_file + '.idx'
+            subprocess.check_call(["rm", index_file])
     # index output allc file
-    index_allc_file(output_file)
+    _index_allc_file(output_file)
     return 0
 
 
-def remove_allc_index(allc_file):
-    index_file = allc_file + '.idx'
-    if glob.glob(index_file):
-        subprocess.check_call(["rm", index_file])
-
-
-def merge_allc_files_minibatch(allc_files,
-                               output_file,
-                               query_chroms=None,
-                               mini_batch=100,
-                               compress_output=False,
-                               skip_snp_info=True):
+def _merge_allc_files_idx_minibatch(allc_files,
+                                    output_file,
+                                    query_chroms=None,
+                                    mini_batch=100,
+                                    compress_output=False,
+                                    skip_snp_info=True):
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
     # merge all files at once
     try:
-        merge_allc_files_worker(allc_files=allc_files,
-                                output_file=output_file,
-                                query_chroms=query_chroms,
-                                compress_output=compress_output,
-                                skip_snp_info=skip_snp_info)
+        _merge_allc_files_idx_worker(allc_files=allc_files,
+                                     output_file=output_file,
+                                     query_chroms=query_chroms,
+                                     compress_output=compress_output,
+                                     skip_snp_info=skip_snp_info)
         return 0
     except:
         print("Failed to merge all allc files at once. Do minibatch merging")
@@ -650,41 +679,33 @@ def merge_allc_files_minibatch(allc_files,
     # init
     remaining_allc_files = list(allc_files[mini_batch:])
     output_tmp_file = output_file + ".tmp"
-    merge_allc_files_worker(allc_files=allc_files[:mini_batch],
-                            output_file=output_file,
-                            query_chroms=query_chroms,
-                            compress_output=compress_output,
-                            skip_snp_info=skip_snp_info)
+    _merge_allc_files_idx_worker(allc_files=allc_files[:mini_batch],
+                                 output_file=output_file,
+                                 query_chroms=query_chroms,
+                                 compress_output=compress_output,
+                                 skip_snp_info=skip_snp_info)
     # batch merge
     while len(remaining_allc_files) > 0:
         processing_allc_files = [output_file]
         while len(remaining_allc_files) > 0 \
                 and len(processing_allc_files) < mini_batch:
             processing_allc_files.append(remaining_allc_files.pop())
-        merge_allc_files_worker(allc_files=processing_allc_files,
-                                output_file=output_tmp_file,
-                                query_chroms=query_chroms,
-                                compress_output=compress_output,
-                                skip_snp_info=skip_snp_info)
+        _merge_allc_files_idx_worker(allc_files=processing_allc_files,
+                                     output_file=output_tmp_file,
+                                     query_chroms=query_chroms,
+                                     compress_output=compress_output,
+                                     skip_snp_info=skip_snp_info)
         subprocess.check_call(["mv", output_tmp_file, output_file])
-        index_allc_file(output_file)
+        _index_allc_file(output_file)
     return 0
 
 
-def open_allc_file(allc_file):
-    if allc_file[-3:] == ".gz":
-        f = gzip.open(allc_file,'rt')
-    else:
-        f = open(allc_file,'r')
-    return(f)
-
-
-def merge_allc_files_worker(allc_files,
-                            output_file,
-                            query_chroms=None,
-                            compress_output=False,
-                            skip_snp_info=True,
-                            buffer_line_number=100000):
+def _merge_allc_files_idx_worker(allc_files,
+                                 output_file,
+                                 query_chroms=None,
+                                 compress_output=False,
+                                 skip_snp_info=True,
+                                 buffer_line_number=100000):
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
@@ -696,8 +717,8 @@ def merge_allc_files_worker(allc_files,
     chroms = set([])
     try:
         for index, allc_file in enumerate(allc_files):
-            fhandles.append(open_allc_file(allc_file))
-            chrom_pointer.append(read_allc_index(allc_file))
+            fhandles.append(_open_allc_file(allc_file))
+            chrom_pointer.append(_read_allc_index(allc_file))
             for chrom in chrom_pointer[index].keys():
                 chroms.add(chrom)
     except:
@@ -743,7 +764,6 @@ def merge_allc_files_worker(allc_files,
                     continue
                 # SNP information is missing
                 if len(cur_fields[index]) < 9:
-
                     skip_snp_info = True
                     break
                 # init contex_len
@@ -753,13 +773,13 @@ def merge_allc_files_worker(allc_files,
                 if context_len != len(cur_fields[index][7].split(",")) or \
                         context_len != len(cur_fields[index][8].split(",")):
                     print("Inconsistent sequence context length: "
-                                + allc_file + "\n")
+                          + allc_file + "\n")
         # merge
         line_counts = 0
         while num_remaining_allc > 0:
             mc, h = 0, 0
             if not skip_snp_info:
-                matches = [0 for index in range(context_len)]
+                matches = [0 for _ in range(context_len)]
                 mismatches = list(matches)
             c_info = None
             for index in np.where(cur_pos == np.nanmin(cur_pos))[0]:
@@ -795,30 +815,29 @@ def merge_allc_files_worker(allc_files,
                 out = ""
     if line_counts > 0:
         g.write(out)
-        out = ""
     g.close()
     for index in range(len(allc_files)):
         fhandles[index].close()
     return 0
 
 
-def index_allc_file_batch(allc_files, cpu=1):
+def _index_allc_file_batch(allc_files, cpu=1):
     if isinstance(allc_files, str):
         allc_files = glob.glob(allc_files)
 
     if cpu == 1:
         for allc_file in allc_files:
-            index_allc_file(allc_file)
+            _index_allc_file(allc_file)
     else:
         pool = multiprocessing.Pool(min(cpu, len(allc_files), 48))
         for allc_file in allc_files:
-            pool.apply_async(index_allc_file, (allc_file,))
+            pool.apply_async(_index_allc_file, (allc_file,))
         pool.close()
         pool.join()
     return 0
 
 
-def index_allc_file(allc_file):
+def _index_allc_file(allc_file):
     index_file = str(allc_file) + '.idx'
     if os.path.exists(index_file):
         # backward compatibility
@@ -867,9 +886,9 @@ def index_allc_file(allc_file):
     return
 
 
-def read_allc_index(allc_file):
+def _read_allc_index(allc_file):
     index_file = str(allc_file) + ".idx"
-    index_allc_file(allc_file)
+    _index_allc_file(allc_file)
     with open(index_file, 'r') as f:
         chrom_pointer = {}
         for line in f:
@@ -877,3 +896,11 @@ def read_allc_index(allc_file):
                 fields = line.rstrip().split("\t")
                 chrom_pointer[fields[0]] = int(fields[1])
     return chrom_pointer
+
+
+def _open_allc_file(allc_file):
+    if allc_file.endswith(".gz"):
+        f = gzip.open(allc_file, 'rt')
+    else:
+        f = open(allc_file, 'r')
+    return f

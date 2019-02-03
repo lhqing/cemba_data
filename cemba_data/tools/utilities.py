@@ -56,7 +56,21 @@ def parse_chrom_size(path, remove_chr_list=None):
     return chrom_dict
 
 
-def genome_region_chunks(chrom_size_file, bin_length):
+def genome_region_chunks(chrom_size_file, bin_length=10000000):
+    """
+    Split the whole genome into bins, where each bin is {bin_length} bp. Used for tabix region query
+
+    Parameters
+    ----------
+    chrom_size_file
+        Path of UCSC genome size file
+    bin_length
+        length of each bin
+
+    Returns
+    -------
+    list of records in tabix query format
+    """
     chrom_size_dict = parse_chrom_size(chrom_size_file)
 
     cur_chrom_pos = 0
@@ -104,3 +118,24 @@ def get_mean_var(X):
     # enforce R convention (unbiased estimator) for variance
     var = (mean_sq - mean ** 2) * (X.shape[0] / (X.shape[0] - 1))
     return mean, var
+
+
+def parse_file_paths(input_file_paths):
+    if isinstance(input_file_paths, list):
+        if len(input_file_paths) > 1:
+            return input_file_paths
+        else:
+            input_file_paths = input_file_paths[0]
+
+    if isinstance(input_file_paths, str):
+        if '*' in input_file_paths:
+            import glob
+            file_list = glob.glob(input_file_paths)
+        else:
+            file_list = []
+            with open(input_file_paths) as f:
+                for line in f:
+                    file_list.append(line.strip('\n'))
+        return file_list
+    else:
+        raise TypeError('File paths input is neither str nor list.')

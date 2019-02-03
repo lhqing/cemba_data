@@ -8,9 +8,7 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
-import json
 import pathlib
-from .methylpy_utilities import merge_allc_files
 from .open import open_allc
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -187,36 +185,9 @@ def map_to_region(allc_path, out_path_prefix,
     return
 
 
-def merge_allc(allc_paths, out_path, cpu=1, index='tabix'):
-    """
-    Just a wrapper of methylpy merge allc
-    :param allc_paths:
-    :param out_path:
-    :param cpu:
-    :param index:
-    :return:
-    """
-    if len(allc_paths) == 1:
-        with open(allc_paths[0]) as f:
-            allc_paths = [i.strip('\n') for i in f.readlines()]
-    out_path = out_path.rstrip('.gz')
-    if not os.path.exists(out_path + '.gz'):
-        merge_allc_files(allc_paths,
-                         out_path,
-                         num_procs=cpu,
-                         mini_batch=150,
-                         compress_output=False)
-        # use bgzip and tabix
-        run(['bgzip', out_path])
-
-        if index == 'tabix':
-            run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_path + '.gz'])
-    return
-
-
 def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
     # TODO add allc to bigwig COV version, not calculate mC but only compute cov
-    from .methylpy_utilities import convert_allc_to_bigwig
+    from .allc_utilities import convert_allc_to_bigwig
     convert_allc_to_bigwig(allc_path,
                            out_path,
                            chrom_size,

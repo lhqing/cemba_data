@@ -316,9 +316,8 @@ def assemble_dataset_register_subparser(subparser):
 def merge_allc_register_subparser(subparser):
     parser = subparser.add_parser('merge-allc',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Just a wrapper of methylpy merge_allc_files, "
-                                       "without doing methylpy's index. "
-                                       "But use bgzip and tabix instead")
+                                  help="Merge ALLC files, will be faster if files all have tabix, "
+                                       "otherwise use the old .idx files")
 
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
@@ -339,20 +338,27 @@ def merge_allc_register_subparser(subparser):
         help="Output path for the merged ALLC file"
     )
 
+    parser_req.add_argument(
+        "--chrom_size_file",
+        type=str,
+        required=True,
+        help="Output path for the merged ALLC file"
+    )
+
     parser_opt.add_argument(
         "--cpu",
         type=int,
         required=False,
-        default=1,
-        help="Number of CPUs for merge ALLC, parallel on chrom bins level."
+        default=10,
+        help="Number of CPUs for merge ALLC, parallel on genome bins level."
     )
 
     parser_opt.add_argument(
-        "--index",
-        type=str,
+        "--bin_length",
+        type=int,
         required=False,
-        default='tabix',
-        help="methylpy default index, not doing it by default."
+        default=10000000,
+        help="Length of each genome bin to parallel, use default is usually fine."
     )
 
 
@@ -782,7 +788,7 @@ def main():
     elif cur_command == 'allc-to-bigwig':
         from .tools.allc import allc_to_bigwig as func
     elif cur_command == 'merge-allc':
-        from .tools.allc import merge_allc as func
+        from .tools.allc_utilities import merge_allc_files as func
     elif cur_command == 'allc-profile':
         from .tools.allc import get_allc_profile as func
     elif cur_command == 'simulate-long-reads-coverage':
