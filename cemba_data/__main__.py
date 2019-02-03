@@ -791,6 +791,8 @@ def main():
         from .tools.simulation import simulate_allc as func
     elif cur_command == 'allc-extract':
         from .tools.allc import extract_context_allc as func
+    elif cur_command == 'allc-standardize':
+        from .tools.allc import batch_standardize_allc as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
