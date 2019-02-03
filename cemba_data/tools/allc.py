@@ -2,12 +2,17 @@ from .utilities import *
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
-from subprocess import run
+from subprocess import run, PIPE
+import shlex
 from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
+import json
+import pathlib
 from .methylpy_utilities import merge_allc_files
+from .open import open_allc
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
@@ -200,8 +205,7 @@ def merge_allc(allc_paths, out_path, cpu=1, index='tabix'):
                          out_path,
                          num_procs=cpu,
                          mini_batch=150,
-                         compress_output=False,
-                         buffer_line_number=100000)
+                         compress_output=False)
         # use bgzip and tabix
         run(['bgzip', out_path])
 
@@ -370,3 +374,119 @@ def get_allc_profile(allc_path, drop_n=True, n_rows=100000000, out_path=None):
         return None
     else:
         return profile_df
+
+
+def tabix_allc(allc_path, reindex=False):
+    if os.path.exists(f'{allc_path}.tbi') and not reindex:
+        return
+    run(shlex.split(f'tabix -b 2 -e 2 -s 1 {allc_path}'),
+        check=True)
+    return
+
+
+def get_md5(file_path):
+    file_md5 = run(shlex.split(f'md5sum {file_path}'), stdout=PIPE, encoding='utf8', check=True).stdout
+    file_md5 = file_md5.split(' ')[0]
+    return file_md5
+
+
+def standardize_allc(allc_path, genome_size_path, compress_level=6,
+                     idx=True, remove_additional_chrom=False):
+    # if tabix exist and newer than allc, skip and return md5
+    if os.path.exists(allc_path + '.tbi'):
+        tbi_time = os.path.getmtime(allc_path + '.tbi')
+        allc_time = os.path.getmtime(allc_path)
+        if allc_time < tbi_time:
+            file_md5 = get_md5(allc_path)
+            return file_md5
+
+    genome_dict = parse_chrom_size(genome_size_path)
+    if 'chr1' in genome_dict:
+        raw_add_chr = True
+    else:
+        raw_add_chr = False
+    with open_allc(allc_path) as f, \
+            open_allc(allc_path + '.tmp.gz', mode='w',
+                      compresslevel=compress_level) as wf:
+        cur_chrom = "TOTALLY_NOT_A_CHROM"
+        cur_start = cur_chrom + '\t'
+        cur_pointer = 0
+        index_lines = []
+        buffer_lines = ''
+        line_count = 0
+        add_chr = raw_add_chr
+        for line in f:
+            if line_count == 0:
+                # for very old allc files, which contain header line
+                ll = line.split('\t')
+                try:
+                    int(ll[1])  # pos
+                    int(ll[4])  # mc
+                    int(ll[5])  # cov
+                except ValueError:
+                    # The first line is header, remove header
+                    continue
+            if line_count < 2:
+                # 1st line could be header that startswith chr
+                # so check 1st and 2nd row
+                if line.startswith('chr'):
+                    add_chr = False
+            if add_chr:
+                line = 'chr' + line
+            if not line.startswith(cur_start):
+                fields = line.split("\t")
+                cur_chrom = fields[0]
+                if (cur_chrom not in genome_dict) and (not remove_additional_chrom):
+                    raise KeyError(f'{cur_chrom} not exist in genome size file, '
+                                   f'set remove_additional_chrom=True if want to remove additional chroms')
+                index_lines.append(cur_chrom + "\t" + str(cur_pointer) + "\n")
+                cur_start = cur_chrom + '\t'
+            cur_pointer += len(line)
+            buffer_lines += line
+            line_count += 1
+            if line_count % 50000 == 0:
+                wf.write(buffer_lines)
+                buffer_lines = ''
+        wf.write(buffer_lines)
+
+    run(shlex.split(f'mv {allc_path} {allc_path}.bp'), check=True)
+    run(shlex.split(f'mv {allc_path}.tmp.gz {allc_path}'), check=True)
+    run(shlex.split(f'rm -f {allc_path}.bp'), check=True)
+    if idx:
+        # backward compatibility
+        index_lines.append("#eof\n")
+        with open(allc_path + '.idx', 'w') as idxf:
+            idxf.writelines(index_lines)
+    else:
+        if os.path.exists(allc_path + '.idx'):
+            run(shlex.split(f'rm -f {allc_path}.idx'), check=True)
+    tabix_allc(allc_path, reindex=True)
+
+    file_md5 = get_md5(allc_path)
+    return file_md5
+
+
+def batch_standardize_allc(allc_dir, genome_size_path, compress_level=6,
+                           idx=True, remove_additional_chrom=False, process=10):
+    allc_paths = list(pathlib.Path(allc_dir).glob('**/allc*tsv.gz'))
+    with ProcessPoolExecutor(max_workers=process) as executor:
+        future_result = {executor.submit(standardize_allc,
+                                         allc_path=str(allc_path),
+                                         genome_size_path=genome_size_path,
+                                         idx=idx, remove_additional_chrom=remove_additional_chrom,
+                                         compress_level=compress_level): allc_path
+                         for allc_path in allc_paths}
+    md5_dict = {}
+    for future in as_completed(future_result):
+        allc_path = future_result[future]
+        try:
+            data = future.result()
+        except OSError as exc:
+            print(f'{allc_path} generated an exception: {exc}')
+        else:
+            md5_dict[str(allc_path)] = data
+
+    with open(allc_dir + '/md5_list.txt', 'w') as f:
+        for k, v in md5_dict:
+            f.write('\t'.join([k, v]))
+    return md5_dict

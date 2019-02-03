@@ -661,6 +661,71 @@ def extract_context_allc_register_subparser(subparser):
     )
 
 
+def standardize_allc_register_subparser(subparser):
+    parser = subparser.add_parser('allc-standardize',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Standardize ALLC files in a whole directory by: "
+                                       "1. use bgzip; "
+                                       "2. tabix ALLC file; "
+                                       "3. remove header line because ALLC columns are always fixed; "
+                                       "4. fix 'chr' problem in first column. "
+                                       "Use whatever same as the UCSC genome size file provided; "
+                                       "5. Generate md5 sum for each processed file and "
+                                       "save to md5_list.txt in the same dir.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_dir",
+        type=str,
+        required=True,
+        help="Path of the ALLC directory."
+    )
+
+    parser_req.add_argument(
+        "--genome_size_path",
+        type=str,
+        required=True,
+        help="Path of UCSC genome size file, used for check chromosome names. "
+             "You should use the same file as the genome you used for mapping "
+             "and never change chromosome name by no means."
+    )
+
+    parser_opt.add_argument(
+        "--compress_level",
+        type=int,
+        required=False,
+        default=6,
+        help="Level of ALLC compression level"
+    )
+
+    parser_opt.add_argument(
+        "--idx",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether add the .idx file for back compatibility."
+    )
+
+    parser_opt.add_argument(
+        "--remove_additional_chrom",
+        type=bool,
+        required=False,
+        default=False,
+        help="Whether remove chroms in ALLC that are not exist in genome size file, "
+             "if False and unknown chrom find, will raise error."
+    )
+
+    parser_opt.add_argument(
+        "--process",
+        type=int,
+        required=False,
+        default=10,
+        help="Number of processes to use in parallel."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG)

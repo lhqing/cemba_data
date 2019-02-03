@@ -253,7 +253,7 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
 def _call_methylated_sites_worker(bam_path, reference_fasta,
                                   num_upstr_bases, num_downstr_bases,
                                   buffer_line_number, min_mapq, min_base_quality,
-                                  threads=5, compress_level=5, idx=True, tabix=True):
+                                  compress_level=5, idx=True, tabix=True):
     """
     Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
     and pipe to this function to generate mC and cov count. Only for single cell, not base level statistics.
@@ -303,7 +303,7 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     output_path = str(file_dir / allc_name)
 
     output_file_handler = open_allc(output_path, mode='w',
-                                    compresslevel=compress_level, threads=threads)
+                                    compresslevel=compress_level)
 
     # initialize variables
     complement = {"A": "T",
