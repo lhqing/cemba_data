@@ -86,6 +86,8 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
 
 
 def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
+    # TODO This function need to be changed for new merge-allc CLI
+    raise NotImplementedError
     """
     Batch merge ALLC function, also accept multilayer cluster assignment.
     """

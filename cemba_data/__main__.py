@@ -13,7 +13,37 @@ import logging
 log = logging.getLogger()
 
 DESCRIPTION = """
-yap (yet another pipeline) is a toolkit for single cell sequencing analysis
+yap (yet another pipeline) is a toolkit for single cell methylation sequencing analysis
+
+This toolkit contain functions for 3-stage analysis:
+    Stage 1 Preprocessing: Mapping FASTQ, generate single cell ALLC
+    Stage 2 Cell Level Analysis: Prepare MCDS dataset for cell based analysis
+    Stage 3 Cluster Level Analysis: merge ALLC and ALLC related functions
+    Other functions: qsub submitter for SGE QSUB; simulation functions
+
+STAGE 1
+    mapping - Actual mapping function
+    default-mapping-config - Print the default mapping config
+    mapping-qsub - Qsub wrapper for mapping that run with "yap qsub" 
+    mapping-summary - Summary mapping output directory after mapping
+
+STAGE 2
+    map-to-region - Map ALLC file into a region BED file
+    assemble-dataset - Assemble all cell-region BED file into MCDS
+    generate-dataset - Wrapper for map-to-region and assemble-dataset that run with "yap qsub"
+
+STAGE 3
+    merge-allc - Merge single cell ALLC files into cluster ALLC.
+    allc-profile - Generate summary statistics for a ALLC file.
+    allc-to-bigwig - ALLC to BIGWIG.
+    allc-extract - Extract ALLC file information. 
+    
+Qsub
+    qsub - Qsubmitter for SGE QSUB.
+
+SIMULATION (exp)
+    simulate-allc - Simulate single cell ALLC based on given high coverage ALLC.
+    simulate-long-reads-coverage - Simulate genome coverage BED file for long reads.
 """
 # TODO add DESCRIPTION for structured functional groups
 # mapping
@@ -732,6 +762,21 @@ def standardize_allc_register_subparser(subparser):
     )
 
 
+def mapping_summary_register_subparser(subparser):
+    parser = subparser.add_parser('mapping-summary',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Summary mapping output. Just a convenient function after mapping.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="Output directory after mapping."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG)
@@ -799,6 +844,8 @@ def main():
         from .tools.allc import extract_context_allc as func
     elif cur_command == 'allc-standardize':
         from .tools.allc import batch_standardize_allc as func
+    elif cur_command == 'mapping-summary':
+        from .mapping.pipeline import summary_pipeline_stat as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
