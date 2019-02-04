@@ -13,37 +13,37 @@ import logging
 log = logging.getLogger()
 
 DESCRIPTION = """
-yap (yet another pipeline) is a toolkit for single cell methylation sequencing analysis\n
-\n
-This toolkit contain functions for 3-stage analysis:\n
-\tStage 1 Preprocessing: Mapping FASTQ, generate single cell ALLC\n
-\tStage 2 Cell Level Analysis: Prepare MCDS dataset for cell based analysis\n
-\tStage 3 Cluster Level Analysis: merge ALLC and ALLC related functions\n
-\tOther functions: qsub submitter for SGE QSUB; simulation functions\n
-\n
-STAGE 1\n
-\tmapping - Actual mapping function\n
-\tdefault-mapping-config - Print the default mapping config\n
-\tmapping-qsub - Qsub wrapper for mapping that run with "yap qsub" \n
-\tmapping-summary - Summary mapping output directory after mapping\n
-\n
-STAGE 2\n
-\tmap-to-region - Map ALLC file into a region BED file\n
-\tassemble-dataset - Assemble all cell-region BED file into MCDS\n
-\tgenerate-dataset - Wrapper for map-to-region and assemble-dataset that run with "yap qsub"\n
-\n
-STAGE 3\n
-\tmerge-allc - Merge single cell ALLC files into cluster ALLC.\n
-\tallc-profile - Generate summary statistics for a ALLC file.\n
-\tallc-to-bigwig - ALLC to BIGWIG.\n
-\tallc-extract - Extract ALLC file information. \n
-\n
-Qsub\n
-\tqsub - Qsubmitter for SGE QSUB.\n
-\n
-SIMULATION (exp)\n
-\tsimulate-allc - Simulate single cell ALLC based on given high coverage ALLC.\n
-\tsimulate-long-reads-coverage - Simulate genome coverage BED file for long reads.\n
+yap (yet another pipeline) is a toolkit for single cell methylation sequencing analysis
+
+This toolkit contain functions for 3-stage analysis:
+    Stage 1 Preprocessing: Mapping FASTQ, generate single cell ALLC
+    Stage 2 Cell Level Analysis: Prepare MCDS dataset for cell based analysis
+    Stage 3 Cluster Level Analysis: merge ALLC and ALLC related functions
+    Other functions: qsub submitter for SGE QSUB; simulation functions
+
+STAGE 1
+    mapping - Actual mapping function
+    default-mapping-config - Print the default mapping config
+    mapping-qsub - Qsub wrapper for mapping that run with "yap qsub" 
+    mapping-summary - Summary mapping output directory after mapping
+
+STAGE 2
+    map-to-region - Map ALLC file into a region BED file
+    assemble-dataset - Assemble all cell-region BED file into MCDS
+    generate-dataset - Wrapper for map-to-region and assemble-dataset that run with "yap qsub"
+
+STAGE 3
+    merge-allc - Merge single cell ALLC files into cluster ALLC.
+    allc-profile - Generate summary statistics for a ALLC file.
+    allc-to-bigwig - ALLC to BIGWIG.
+    allc-extract - Extract ALLC file information. 
+    
+Qsub
+    qsub - Qsubmitter for SGE QSUB.
+
+SIMULATION (exp)
+    simulate-allc - Simulate single cell ALLC based on given high coverage ALLC.
+    simulate-long-reads-coverage - Simulate genome coverage BED file for long reads.
 """
 # TODO add DESCRIPTION for structured functional groups
 # mapping
@@ -779,7 +779,9 @@ def mapping_summary_register_subparser(subparser):
 
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
-                                     epilog=EPILOG)
+                                     epilog=EPILOG,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     )
     subparsers = parser.add_subparsers(
         title="functions",
         dest="command",
