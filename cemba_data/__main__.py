@@ -14,6 +14,7 @@ log = logging.getLogger()
 
 DESCRIPTION = """
 yap (yet another pipeline) is a toolkit for single cell methylation sequencing analysis
+Author: Hanqing Liu, hanliu@salk.edu
 
 This toolkit contain functions for 3-stage analysis:
     Stage 1 Preprocessing: Mapping FASTQ, generate single cell ALLC
