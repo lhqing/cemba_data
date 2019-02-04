@@ -356,6 +356,12 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000,
     allc_files = parse_file_paths(allc_paths)
 
     try:
+        with open(out_path, 'w') as f:
+            pass
+    except IOError:
+        print("Can't create out_path")
+
+    try:
         _check_tabix(allc_files)
         _batch_merge_allc_files_tabix(allc_files=allc_files,
                                       out_file=out_path,
