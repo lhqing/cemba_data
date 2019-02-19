@@ -38,14 +38,14 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
     heatmap_names = []
     for plate, sub_df in data.groupby(groupby):
         # check if plate base are duplicated
-        duplicated = sub_df[[f'{plate_base}_col', f'{plate_base}_row']].duplicated().sum() != 0
+        duplicated = sub_df[[f'Col{plate_base}', f'Row{plate_base}']].duplicated().sum() != 0
         if duplicated:
             if aggregation_func is None:
                 raise ValueError('Row after groupby is not unique, aggregation_func can not be None')
-            heatmap_data = sub_df.groupby([f'{plate_base}_col', f'{plate_base}_row'])[value_col] \
+            heatmap_data = sub_df.groupby([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
                 .apply(aggregation_func).unstack().fillna(-999)
         else:
-            heatmap_data = sub_df.set_index([f'{plate_base}_col', f'{plate_base}_row'])[value_col] \
+            heatmap_data = sub_df.set_index([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
                 .unstack().fillna(-999)
         heatmap_data_list.append(heatmap_data)
         if isinstance(plate, str):

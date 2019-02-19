@@ -7,7 +7,7 @@ SGE qsub system auto-submitter
 # TODO add test_run parameter to run N command and profile each and give report
 """
 
-from subprocess import run, PIPE
+from subprocess import run, PIPE, CalledProcessError
 import os
 import json
 import datetime
@@ -50,8 +50,23 @@ def _get_running_job_id_qstat(user_name, id_set):
     -------
     Id list of all current running id
     """
-    qstat_result_string = run(['qstat', '-u', user_name],
-                              stdout=PIPE, encoding='utf8').stdout
+
+    while True:
+        tried = 0
+        try:
+            qstat_result_string = run(['qstat', '-u', user_name],
+                                      stdout=PIPE, encoding='utf8', check=True).stdout
+            break
+        except CalledProcessError as e:
+            # TODO: there seems to be a bug for qstat occasionally happen in mapping,
+            # qstat return through an unknown error about
+            # ERROR: failed receiving gdi request response for mid=1 (got syncron message receive timeout error)
+            tried += 1
+            time.sleep(30)
+            if tried > 10:
+                print(f'Qstat failed {tried} times continuously, '
+                      f'seems that the qsub system have some problem')
+                raise e
     if 'job' not in qstat_result_string:
         # qstat print nothing, all job finished
         return []
@@ -199,13 +214,9 @@ class _Qsubmitter:
         cur_running_command = []
         for command_obj in self.running_commands:
             if command_obj.qsub_id not in cur_running_qsub_id:
-                print(self.submitted_qsub_id)
-                print(cur_running_qsub_id)
-                print(run(['qstat', '-u', self.user_name],
-                          stdout=PIPE, encoding='utf8').stdout)
-                print(command_obj.qsub_id, command_obj.unique_id, 'finishing')
-                print(command_obj.qsub_id, command_obj.unique_id, 'finishing')
-                print(command_obj, 'finishing')
+                # print(self.submitted_qsub_id)
+                # print(cur_running_qsub_id)
+                # print(command_obj.qsub_id, command_obj.unique_id, 'finishing')
 
                 # command have finished
                 command_obj.finish = True
@@ -377,6 +388,9 @@ class _Command:
                     else:
                         continue
         if (self.return_code == -99) or (self.start_time is None) or (self.end_time is None):
+            print('Job {self.qsub_id} return code: {self.return_code} (default init is -99)')
+            print('Job {self.qsub_id} start time: {self.start_time} (default is None)')
+            print('Job {self.qsub_id} end time: {self.end_time} (default is None)')
             raise ValueError(f'Output log for job {self.qsub_id} {self.unique_id} is not complete')
         self.duration_second = (self.end_time - self.start_time).total_seconds()
         return
