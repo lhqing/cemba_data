@@ -149,8 +149,14 @@ def _tight_hue_range(hue_data, portion):
     min_window_left = max(0, min_window_right - portion)
     vmin, vmax = tuple(hue_data.quantile(q=[min_window_left,
                                             min_window_right]))
-    vmin = max(hue_data.min(), vmin)
-    vmax = min(hue_data.max(), vmax)
+    if np.isnan(vmin):
+        vmin = hue_data.min()
+    else:
+        vmin = max(hue_data.min(), vmin)
+    if np.isnan(vmax):
+        vmax = hue_data.max()
+    else:
+        vmax = min(hue_data.max(), vmax)
     return vmin, vmax
 
 
