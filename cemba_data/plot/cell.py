@@ -147,9 +147,11 @@ def _tight_hue_range(hue_data, portion):
         .apply(lambda i: i.max() - i.min(), raw=True) \
         .idxmin()
     min_window_left = max(0, min_window_right - portion)
-    tight_hue_norm = tuple(hue_data.quantile(q=[min_window_left,
-                                                min_window_right]))
-    return tight_hue_norm
+    vmin, vmax = tuple(hue_data.quantile(q=[min_window_left,
+                                            min_window_right]))
+    vmin = max(hue_data.min(), vmin)
+    vmax = min(hue_data.max(), vmax)
+    return vmin, vmax
 
 
 def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):

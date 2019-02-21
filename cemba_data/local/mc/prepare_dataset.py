@@ -51,6 +51,8 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     region_paths = ' '.join(region_bed_path)
     region_names = ' '.join(region_name)
     for f in allc_files:
+        if 'stats/' in f:
+            continue
         f = pathlib.Path(f)
         out_path_prefix = str(out_dir / f.stem)
         _context_pattern = ' '.join(context_pattern)
