@@ -46,7 +46,7 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
     real_cluster_name_map = {}
     for column_num, column in enumerate(cluster_table.columns):
         for cluster_name, sub_df in cluster_table.groupby(column):
-            cluster_uid = f'{column}-{cluster_name}'
+            cluster_uid = f'{column}_{cluster_name}'
 
             # [real_column_dir, real_cluster_uid, original column, original cluster_name]
             # the 1st 2 items are used for make real path, last 2 items are used for sync original cluster table
@@ -85,9 +85,9 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
     return cell_group_dict, cluster_dict, dropped_cells, dropped_clusters, real_cluster_name_map
 
 
-def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
+def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu, chrom_size_file):
     # TODO This function need to be changed for new merge-allc CLI
-    raise NotImplementedError
+    # raise NotImplementedError
     """
     Batch merge ALLC function, also accept multilayer cluster assignment.
     """
@@ -115,7 +115,8 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu):
         group_allc_out_path = group_dir / f'{group_id}.allc.tsv.gz'
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
-              f'--out_path {group_allc_out_path} --cpu {cpu} --index tabix'
+              f'--out_path {group_allc_out_path} --cpu {cpu} ' \
+              f'--chrom_size_file {chrom_size_file}'
         memory_gbs = int(min(cpu * 2, 30) / cpu)
         cmd_dict = {
             'command': cmd,
@@ -255,7 +256,8 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
 
     out_dir = pathlib.Path(out_dir).absolute()
     _batch_merge_allc(cluster_table, cell_path_series=cell_path_series,
-                      out_dir=out_dir, min_group=min_group, cpu=min(cpu // 8, 30))
+                      out_dir=out_dir, min_group=min_group, cpu=min(cpu // 8, 30),
+                      chrom_size_file=chrom_size_path)
     _batch_allc_profile(out_dir=out_dir)
     _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts=bigwig_contexts)
     _batch_extract_mc(out_dir, mc_contexts=extract_contexts, merge_strand=merge_strand)

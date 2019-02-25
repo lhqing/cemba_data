@@ -91,7 +91,8 @@ def _process_one_path(ds_path,
         if dataarray_select is not None:
             for da in dataarray_select:
                 if da not in selected_ds.data_vars:
-                    raise ValueError(da, 'not in dataset.data_vars')
+                    raise ValueError(f'{da} not in dataset.data_vars, '
+                                     f'the acceptable data_vars are {selected_ds.data_vars}')
             selected_ds = selected_ds[dataarray_select]
         # really load selected data
         selected_ds.load()
@@ -167,16 +168,25 @@ def prepare_study(netcdf_files,
     Parameters
     ----------
     netcdf_files
-
+        List of MCDS paths for checking cell_list
     cell_list
+        List of cell_ids used for filtering MCDS cell dimension
     region_select_dict
+        List of region/feature ids use for filtering MCDS corresponding dimension
     dataarray_select
+        Str/List of dataarray_name
     mc_type
+        Str/List of mc_types
     count_type
+        Str/List of count_types
     save_path
+        Output path if you want to save the study
     compression
+        Compression the MCDS output
     compression_level
+        Compression level
     iter_chunksize
+        If not None, this function will return a iterator with this chunksize
 
     Returns
     -------
