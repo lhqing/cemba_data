@@ -119,7 +119,7 @@ def _batch_merge_allc(cluster_table, cell_path_series,
               f'--out_path {group_allc_out_path} --cpu {cpu} ' \
               f'--chrom_size_file {chrom_size_file} ' \
               f'--bin_length {bin_length}'
-        memory_gbs = int(min(cpu * 2, 30) / cpu)
+        memory_gbs = 5
         cmd_dict = {
             'command': cmd,
             'pe smp': cpu,
@@ -154,7 +154,7 @@ def _batch_merge_allc(cluster_table, cell_path_series,
                     f.write(str(path) + '\n')
             cmd = f'yap merge-allc --allc_paths {group_id_list_path} ' \
                   f'--out_path {cluster_allc_out_path} --cpu {cpu} --index tabix'
-            memory_gbs = int(min(cpu * 4, 30) / cpu)
+            memory_gbs = 5
             cmd_dict = {
                 'command': cmd,
                 'pe smp': cpu,
