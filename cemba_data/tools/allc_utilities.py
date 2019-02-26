@@ -216,6 +216,7 @@ import multiprocessing
 import gzip
 import glob
 import resource
+import psutil
 from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks, parse_file_paths
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
@@ -418,6 +419,8 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         log.info(f'Run batch {batch_num}, '
                  f'{len(allc_files)} allc files, '
                  f'output to {out_file}')
+        process = psutil.Process(os.getpid())
+
         with open_allc(out_file, 'w', threads=3) as out_handle:
             with ProcessPoolExecutor(max_workers=cpu) as executor:
                 future_merge_result = {executor.submit(_merge_allc_files_tabix,
@@ -444,7 +447,9 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                             while len(temp_dict) > 0:
                                 data = temp_dict.pop(cur_id)
                                 out_handle.write(data)
-                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}')
+                                cur_vmem = f'{process.memory_info().vms/(1024**3):.2f}'
+                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
+                                         f'Current memory: {cur_vmem}')
                                 cur_id += 1
                         except KeyError:
                             continue
@@ -452,7 +457,9 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                 while len(temp_dict) > 0:
                     data = temp_dict.pop(cur_id)
                     out_handle.write(data)
-                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}')
+                    cur_vmem = f'{process.memory_info().vms/(1024**3):.2f}'
+                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
+                             f'Current memory: {cur_vmem}')
                     cur_id += 1
         # after merge, tabix output
         log.info('Tabix output ALLC file')
