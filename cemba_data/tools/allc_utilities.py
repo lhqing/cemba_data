@@ -360,7 +360,7 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=1000000, 
     allc_files = parse_file_paths(allc_paths)
 
     try:
-        with open(out_path, 'w') as f:
+        with open(out_path, 'w'):
             pass
     except IOError:
         log.info("Can't create out_path")
@@ -438,7 +438,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                             while len(temp_dict) > 0:
                                 data = temp_dict.pop(cur_id)
                                 out_handle.write(data)
-                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict))}')
+                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}')
                                 cur_id += 1
                         except KeyError:
                             continue
@@ -446,7 +446,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                 while len(temp_dict) > 0:
                     data = temp_dict.pop(cur_id)
                     out_handle.write(data)
-                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict))}')
+                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}')
                     cur_id += 1
         # after merge, tabix output
         log.info('Tabix output ALLC file')
