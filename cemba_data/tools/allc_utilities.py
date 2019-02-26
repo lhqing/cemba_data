@@ -219,11 +219,15 @@ import resource
 from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks, parse_file_paths
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
+import logging
 
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
-DEFAULT_MAX_ALLC = int((HARD - 100) / 2)
+DEFAULT_MAX_ALLC = 200
 
 
 def _increase_soft_fd_limit():
@@ -359,7 +363,7 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000,
         with open(out_path, 'w') as f:
             pass
     except IOError:
-        print("Can't create out_path")
+        log.info("Can't create out_path")
 
     try:
         _check_tabix(allc_files)
@@ -369,8 +373,8 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000,
                                       bin_length=bin_length,
                                       cpu=cpu)
     except FileNotFoundError:
-        print('Some ALLC file do not have tabix, use the old merge function with .idx.'
-              'This function is slower and introduce much higher IO. Consider use bgzip/tabix')
+        log.info('Some ALLC file do not have tabix, use the old merge function with .idx.'
+                 'This function is slower and introduce much higher IO. Consider use bgzip/tabix')
         _merge_allc_files_idx(allc_files,
                               out_path,
                               num_procs=cpu,
@@ -382,10 +386,10 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000,
 
 def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_length, cpu=10):
     regions = genome_region_chunks(chrom_size_file, bin_length=bin_length)
-    print(f'Merge ALLC files with {cpu} processes')
-    print(f'Split genome into {len(regions)} regions, each is {bin_length}bp')
-    print(f'{len(allc_files)} to merge, the default ALLC file handel in 1 run is {DEFAULT_MAX_ALLC}')
-    print(f'Process FH soft limit {SOFT}, hard limit {HARD}')
+    log.info(f'Merge ALLC files with {cpu} processes')
+    log.info(f'Split genome into {len(regions)} regions, each is {bin_length}bp')
+    log.info(f'{len(allc_files)} to merge, the default ALLC file handel in 1 run is {DEFAULT_MAX_ALLC}')
+    log.info(f'Process FH soft limit {SOFT}, hard limit {HARD}')
 
     _increase_soft_fd_limit()
     if len(allc_files) > DEFAULT_MAX_ALLC:
@@ -415,7 +419,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                                                        out_file=None,
                                                        chrom_size_file=chrom_size_file,
                                                        query_region=region,
-                                                       buffer_line_number=100000): region_id
+                                                       buffer_line_number=10000): region_id
                                        for region_id, region in enumerate(regions)}
                 cur_id = 0
                 temp_dict = {}
@@ -428,13 +432,13 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                     try:
                         temp_dict[region_id] = future.result()
                     except Exception as exc:
-                        print('%r generated an exception: %s' % (region_id, exc))
+                        log.info('%r generated an exception: %s' % (region_id, exc))
                     else:
                         try:
                             while len(temp_dict) > 0:
                                 data = temp_dict.pop(cur_id)
                                 out_handle.write(data)
-                                print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict))}')
                                 cur_id += 1
                         except KeyError:
                             continue
@@ -442,14 +446,14 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                 while len(temp_dict) > 0:
                     data = temp_dict.pop(cur_id)
                     out_handle.write(data)
-                    print('write', regions[cur_id], 'Cached:', len(temp_dict))
+                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict))}')
                     cur_id += 1
         # after merge, tabix output
-        print('Tabix output ALLC file')
+        log.info('Tabix output ALLC file')
         subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file])
-    print('Merge finished.')
+    log.info('Merge finished.')
 
-    # remove all batch allc but the last
+    # remove all batch allc but the last (final allc)
     for out_file in out_paths[:-1]:  # last file is the final merged allc
         subprocess.run(['rm', '-f', out_file + '*'], shell=True)
     return
@@ -466,7 +470,7 @@ def _merge_allc_files_tabix(allc_files,
                             out_file,
                             chrom_size_file,
                             query_region=None,
-                            buffer_line_number=100000):
+                            buffer_line_number=10000):
     # only use bgzip and tabix
     # automatically take care the too many file open issue
     # do merge iteratively if file number exceed limit
@@ -600,7 +604,7 @@ def _merge_allc_files_idx(allc_files,
     # check index
     _index_allc_file_batch(allc_files,
                            cpu=min(num_procs, 10))
-    print("Start merging")
+    log.info("Start merging")
     if not (num_procs > 1):
         _merge_allc_files_idx_minibatch(allc_files,
                                         output_file,
@@ -612,7 +616,7 @@ def _merge_allc_files_idx(allc_files,
         return 0
 
     # parallel merging
-    print("Getting chromosome names")
+    log.info("Getting chromosome names")
     chroms = set([])
     for allc_file in allc_files:
         c_p = _read_allc_index(allc_file)
@@ -622,7 +626,7 @@ def _merge_allc_files_idx(allc_files,
         pool = multiprocessing.Pool(min(num_procs,
                                         len(chroms)))  # ,
         # int(float(mini_batch)/float(len(allc_files)))))
-        print("Merging allc files")
+        log.info("Merging allc files")
         for chrom in chroms:
             pool.apply_async(_merge_allc_files_idx_minibatch,
                              (),
@@ -636,7 +640,7 @@ def _merge_allc_files_idx(allc_files,
         pool.close()
         pool.join()
         # output
-        print("Merging outputs")
+        log.info("Merging outputs")
         file_list = []
         for chrom in chroms:
             file_list.append(output_file + "_" + chrom + ".tsv")
@@ -646,8 +650,8 @@ def _merge_allc_files_idx(allc_files,
             subprocess.run(['pigz'], stdin=cat_process.stdout,
                            stdout=f)
     except:
-        print("Failed to merge using multiple processors. " +
-              "Do minibatch merging using single processor.")
+        log.info("Failed to merge using multiple processors. " +
+                 "Do minibatch merging using single processor.")
         _merge_allc_files_idx_minibatch(allc_files,
                                         output_file,
                                         mini_batch=mini_batch,
@@ -682,7 +686,7 @@ def _merge_allc_files_idx_minibatch(allc_files,
                                      skip_snp_info=skip_snp_info)
         return 0
     except:
-        print("Failed to merge all allc files at once. Do minibatch merging")
+        log.info("Failed to merge all allc files at once. Do minibatch merging")
 
     # init
     remaining_allc_files = list(allc_files[mini_batch:])
@@ -780,8 +784,8 @@ def _merge_allc_files_idx_worker(allc_files,
                 # check whether contex length are the same
                 if context_len != len(cur_fields[index][7].split(",")) or \
                         context_len != len(cur_fields[index][8].split(",")):
-                    print("Inconsistent sequence context length: "
-                          + allc_file + "\n")
+                    log.info("Inconsistent sequence context length: "
+                             + allc_file + "\n")
         # merge
         line_counts = 0
         while num_remaining_allc > 0:
