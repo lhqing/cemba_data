@@ -382,7 +382,10 @@ def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000,
 
 def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_length, cpu=10):
     regions = genome_region_chunks(chrom_size_file, bin_length=bin_length)
+    print(f'Merge ALLC files with {cpu} processes')
     print(f'Split genome into {len(regions)} regions, each is {bin_length}bp')
+    print(f'{len(allc_files)} to merge, the default ALLC file handel in 1 run is {DEFAULT_MAX_ALLC}')
+    print(f'Process FH soft limit {SOFT}, hard limit {HARD}')
 
     _increase_soft_fd_limit()
     if len(allc_files) > DEFAULT_MAX_ALLC:
