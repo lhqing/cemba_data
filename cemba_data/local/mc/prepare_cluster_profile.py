@@ -122,7 +122,7 @@ def _batch_merge_allc(cluster_table, cell_path_series,
         memory_gbs = 5
         cmd_dict = {
             'command': cmd,
-            'pe smp': cpu,
+            'pe smp': int(cpu * 1.1),
             'l h_vmem': f'{memory_gbs}G'
         }
         records.append(cmd_dict)
@@ -157,7 +157,7 @@ def _batch_merge_allc(cluster_table, cell_path_series,
             memory_gbs = 5
             cmd_dict = {
                 'command': cmd,
-                'pe smp': cpu,
+                'pe smp': int(cpu * 1.1),
                 'l h_vmem': f'{memory_gbs}G'
             }
         records.append(cmd_dict)
