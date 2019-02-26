@@ -222,6 +222,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
 import logging
 import gc
+import sys
 
 # logger
 log = logging.getLogger(__name__)
@@ -229,7 +230,7 @@ log.addHandler(logging.NullHandler())
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
-DEFAULT_MAX_ALLC = 100
+DEFAULT_MAX_ALLC = 10
 PROCESS = psutil.Process(os.getpid())
 
 
@@ -422,50 +423,51 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                  f'{len(allc_files)} allc files, '
                  f'output to {out_file}')
         with open_allc(out_file, 'w', threads=3) as out_handle:
-            with ProcessPoolExecutor(max_workers=cpu) as executor:
-                future_merge_result = {executor.submit(_merge_allc_files_tabix,
-                                                       allc_files=allc_files,
-                                                       out_file=None,
-                                                       chrom_size_file=chrom_size_file,
-                                                       query_region=region,
-                                                       buffer_line_number=10000): region_id
-                                       for region_id, region in enumerate(regions)}
-                cur_id = 0
-                temp_dict = {}
-                # future may return in any order
-                # save future.result into temp_dict 1st
-                # write data in order by region_id
-                # so the out file is ordered
-                for future in as_completed(future_merge_result):
-                    region_id = future_merge_result[future]
-                    try:
-                        temp_dict[region_id] = future.result()
-                    except Exception as exc:
-                        log.info('%r generated an exception: %s' % (region_id, exc))
-                    else:
+            parallel_section = 50
+            for i in range(0, len(regions), parallel_section):
+                cur_regions = regions[i:min(i + parallel_section, len(regions))]
+                with ProcessPoolExecutor(max_workers=cpu) as executor:
+                    future_merge_result = {executor.submit(_merge_allc_files_tabix,
+                                                           allc_files=allc_files,
+                                                           out_file=None,
+                                                           chrom_size_file=chrom_size_file,
+                                                           query_region=region,
+                                                           buffer_line_number=10000): region_id
+                                           for region_id, region in enumerate(cur_regions)}
+                    cur_id = 0
+                    temp_dict = {}
+                    # future may return in any order
+                    # save future.result into temp_dict 1st
+                    # write data in order by region_id
+                    # so the out file is ordered
+                    for future in as_completed(future_merge_result):
+                        region_id = future_merge_result[future]
                         try:
-                            while len(temp_dict) > 0:
-                                data = temp_dict.pop(cur_id)
-                                out_handle.write(data)
-                                gc.collect()
-                                cur_vmem = f'{PROCESS.memory_info().vms/(1024**3):.2f}'
-                                log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
-                                         f'Current memory: {cur_vmem}')
-                                cur_id += 1
-                        except KeyError:
-                            continue
-                # write last pieces of data
-                while len(temp_dict) > 0:
-                    data = temp_dict.pop(cur_id)
-                    out_handle.write(data)
-                    gc.collect()
-                    cur_vmem = f'{PROCESS.memory_info().vms/(1024**3):.2f}'
-                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
-                             f'Current memory: {cur_vmem}')
-                    cur_id += 1
+                            temp_dict[region_id] = future.result()
+                        except Exception as exc:
+                            log.info('%r generated an exception: %s' % (region_id, exc))
+                        else:
+                            try:
+                                while len(temp_dict) > 0:
+                                    data = temp_dict.pop(cur_id)
+                                    out_handle.write(data)
+                                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
+                                             f'Current memory size: {PROCESS.memory_info().rss/(1024**3):.2f}')
+                                    cur_id += 1
+                            except KeyError:
+                                continue
+                    # write last pieces of data
+                    while len(temp_dict) > 0:
+                        data = temp_dict.pop(cur_id)
+                        out_handle.write(data)
+                        log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
+                                 f'Current memory size: {PROCESS.memory_info().rss/(1024**3):.2f}')
+                        cur_id += 1
+                gc.collect()
         # after merge, tabix output
         log.info('Tabix output ALLC file')
         subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file])
+        log.info(f'Current memory size: {PROCESS.memory_info().rss/(1024**3):.2f}')
     log.info('Merge finished.')
 
     # remove all batch allc but the last (final allc)
