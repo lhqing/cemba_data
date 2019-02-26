@@ -411,7 +411,13 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         allc_files_batches = [allc_files]
         out_paths = [out_file]
 
-    for allc_files, out_file in zip(allc_files_batches, out_paths):
+    log.info(f'Run merge in {len(allc_files_batches)} batches')
+    log.info(' '.join(out_paths))
+
+    for batch_num, (allc_files, out_file) in enumerate(zip(allc_files_batches, out_paths)):
+        log.info(f'Run batch {batch_num}, '
+                 f'{len(allc_files)} allc files, '
+                 f'output to {out_file}')
         with open_allc(out_file, 'w', threads=3) as out_handle:
             with ProcessPoolExecutor(max_workers=cpu) as executor:
                 future_merge_result = {executor.submit(_merge_allc_files_tabix,
