@@ -242,7 +242,7 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
 
 
 def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
-                           chrom_size_path, bin_length=1000000,
+                           chrom_size_path, bin_length=2000000,
                            bigwig_contexts=('CGN', 'CHN'),
                            extract_contexts=('CGN',), merge_strand=True,
                            min_group=10, cpu=50):
