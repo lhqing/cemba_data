@@ -228,7 +228,7 @@ log.addHandler(logging.NullHandler())
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
-DEFAULT_MAX_ALLC = 200
+DEFAULT_MAX_ALLC = 100
 
 
 def _increase_soft_fd_limit():
