@@ -222,7 +222,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
 import logging
 import gc
-import sys
 
 # logger
 log = logging.getLogger(__name__)
@@ -230,7 +229,7 @@ log.addHandler(logging.NullHandler())
 
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
-DEFAULT_MAX_ALLC = 10
+DEFAULT_MAX_ALLC = 100
 PROCESS = psutil.Process(os.getpid())
 
 
@@ -423,9 +422,12 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                  f'{len(allc_files)} allc files, '
                  f'output to {out_file}')
         with open_allc(out_file, 'w', threads=3) as out_handle:
+
+            # as_complete don't release, run total regions in sections to prevent too large memory
             parallel_section = 50
             for i in range(0, len(regions), parallel_section):
                 cur_regions = regions[i:min(i + parallel_section, len(regions))]
+                print(f'Running region from {cur_regions[0]} to {cur_regions[-1]}')
                 with ProcessPoolExecutor(max_workers=cpu) as executor:
                     future_merge_result = {executor.submit(_merge_allc_files_tabix,
                                                            allc_files=allc_files,
@@ -451,7 +453,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                                 while len(temp_dict) > 0:
                                     data = temp_dict.pop(cur_id)
                                     out_handle.write(data)
-                                    log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
+                                    log.info(f'write {cur_regions[cur_id]} Cached: {len(temp_dict)}, '
                                              f'Current memory size: {PROCESS.memory_info().rss/(1024**3):.2f}')
                                     cur_id += 1
                             except KeyError:
