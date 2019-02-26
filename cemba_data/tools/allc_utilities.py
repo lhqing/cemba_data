@@ -221,6 +221,7 @@ from .utilities import parse_mc_pattern, parse_chrom_size, genome_region_chunks,
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .open import open_allc
 import logging
+import gc
 
 # logger
 log = logging.getLogger(__name__)
@@ -229,6 +230,7 @@ log.addHandler(logging.NullHandler())
 # get the system soft and hard limit of file handle
 SOFT, HARD = resource.getrlimit(resource.RLIMIT_NOFILE)
 DEFAULT_MAX_ALLC = 100
+PROCESS = psutil.Process(os.getpid())
 
 
 def _increase_soft_fd_limit():
@@ -419,8 +421,6 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         log.info(f'Run batch {batch_num}, '
                  f'{len(allc_files)} allc files, '
                  f'output to {out_file}')
-        process = psutil.Process(os.getpid())
-
         with open_allc(out_file, 'w', threads=3) as out_handle:
             with ProcessPoolExecutor(max_workers=cpu) as executor:
                 future_merge_result = {executor.submit(_merge_allc_files_tabix,
@@ -447,7 +447,8 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                             while len(temp_dict) > 0:
                                 data = temp_dict.pop(cur_id)
                                 out_handle.write(data)
-                                cur_vmem = f'{process.memory_info().vms/(1024**3):.2f}'
+                                gc.collect()
+                                cur_vmem = f'{PROCESS.memory_info().vms/(1024**3):.2f}'
                                 log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
                                          f'Current memory: {cur_vmem}')
                                 cur_id += 1
@@ -457,7 +458,8 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                 while len(temp_dict) > 0:
                     data = temp_dict.pop(cur_id)
                     out_handle.write(data)
-                    cur_vmem = f'{process.memory_info().vms/(1024**3):.2f}'
+                    gc.collect()
+                    cur_vmem = f'{PROCESS.memory_info().vms/(1024**3):.2f}'
                     log.info(f'write {regions[cur_id]} Cached: {len(temp_dict)}, '
                              f'Current memory: {cur_vmem}')
                     cur_id += 1
