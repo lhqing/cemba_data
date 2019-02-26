@@ -356,7 +356,7 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
 
 
-def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=10000000, cpu=10):
+def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=1000000, cpu=10):
     allc_files = parse_file_paths(allc_paths)
 
     try:

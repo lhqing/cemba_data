@@ -85,7 +85,8 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
     return cell_group_dict, cluster_dict, dropped_cells, dropped_clusters, real_cluster_name_map
 
 
-def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu, chrom_size_file):
+def _batch_merge_allc(cluster_table, cell_path_series,
+                      out_dir, min_group, cpu, chrom_size_file, bin_length):
     # TODO This function need to be changed for new merge-allc CLI
     # raise NotImplementedError
     """
@@ -116,7 +117,8 @@ def _batch_merge_allc(cluster_table, cell_path_series, out_dir, min_group, cpu, 
         cell_group_dict[group_id]['out_path'] = group_allc_out_path
         cmd = f'yap merge-allc --allc_paths {cell_id_list_path} ' \
               f'--out_path {group_allc_out_path} --cpu {cpu} ' \
-              f'--chrom_size_file {chrom_size_file}'
+              f'--chrom_size_file {chrom_size_file} ' \
+              f'--bin_length {bin_length}'
         memory_gbs = int(min(cpu * 2, 30) / cpu)
         cmd_dict = {
             'command': cmd,
@@ -240,7 +242,8 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
 
 
 def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
-                           chrom_size_path, bigwig_contexts=('CGN', 'CHN'),
+                           chrom_size_path, bin_length=1000000,
+                           bigwig_contexts=('CGN', 'CHN'),
                            extract_contexts=('CGN',), merge_strand=True,
                            min_group=10, cpu=50):
     """
@@ -257,7 +260,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     out_dir = pathlib.Path(out_dir).absolute()
     _batch_merge_allc(cluster_table, cell_path_series=cell_path_series,
                       out_dir=out_dir, min_group=min_group, cpu=min(cpu // 8, 30),
-                      chrom_size_file=chrom_size_path)
+                      chrom_size_file=chrom_size_path, bin_length=bin_length)
     _batch_allc_profile(out_dir=out_dir)
     _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts=bigwig_contexts)
     _batch_extract_mc(out_dir, mc_contexts=extract_contexts, merge_strand=merge_strand)
