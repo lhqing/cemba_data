@@ -359,7 +359,7 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
 
 
-def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=1000000, cpu=10):
+def merge_allc_files(allc_paths, out_path, chrom_size_file, bin_length=5000000, cpu=10):
     allc_files = parse_file_paths(allc_paths)
 
     try:
@@ -424,7 +424,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         with open_allc(out_file, 'w', threads=3) as out_handle:
 
             # as_complete don't release, run total regions in sections to prevent too large memory
-            parallel_section = 50
+            parallel_section = 100
             for i in range(0, len(regions), parallel_section):
                 cur_regions = regions[i:min(i + parallel_section, len(regions))]
                 print(f'Running region from {cur_regions[0]} to {cur_regions[-1]}')
@@ -434,7 +434,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                                                            out_file=None,
                                                            chrom_size_file=chrom_size_file,
                                                            query_region=region,
-                                                           buffer_line_number=10000): region_id
+                                                           buffer_line_number=100000): region_id
                                            for region_id, region in enumerate(cur_regions)}
                     cur_id = 0
                     temp_dict = {}
