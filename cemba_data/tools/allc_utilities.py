@@ -424,7 +424,7 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
         with open_allc(out_file, 'w', threads=3) as out_handle:
 
             # as_complete don't release, run total regions in sections to prevent too large memory
-            parallel_section = 100
+            parallel_section = min(2 * cpu, 128)
             for i in range(0, len(regions), parallel_section):
                 cur_regions = regions[i:min(i + parallel_section, len(regions))]
                 print(f'Running region from {cur_regions[0]} to {cur_regions[-1]}')

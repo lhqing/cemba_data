@@ -141,12 +141,17 @@ def _batch_merge_allc(cluster_table, cell_path_series,
         if len(group_out_paths) == 1:
             # no need to merge, copy the file instead,
             # through increase space usage, but most straightforward
-            cmd = f'cp {group_out_paths[0]} {cluster_allc_out_path}'
-            cmd_dict = {
-                'command': cmd,
+            cmd1 = f'cp {group_out_paths[0]} {cluster_allc_out_path}'
+            cmd2 = f'cp {group_out_paths[0]}.tbi {cluster_allc_out_path}.tbi'
+            cmd_dicts = [{
+                'command': cmd1,
                 'pe smp': 10,  # TODO: figure out a better way to limit IO bound jobs
                 'l h_vmem': '3G'
-            }
+            }, {
+                'command': cmd2,
+                'pe smp': 10,  # TODO: figure out a better way to limit IO bound jobs
+                'l h_vmem': '3G'
+            }]
         else:
             group_id_list_path = cluster_column_dir / f'{cluster_id}.group_list'
             with group_id_list_path.open('w') as f:
@@ -157,12 +162,12 @@ def _batch_merge_allc(cluster_table, cell_path_series,
                   f'--chrom_size_file {chrom_size_file} ' \
                   f'--bin_length {bin_length}'
             memory_gbs = 5
-            cmd_dict = {
+            cmd_dicts = [{
                 'command': cmd,
                 'pe smp': int(cpu * 1.1),
                 'l h_vmem': f'{memory_gbs}G'
-            }
-        records.append(cmd_dict)
+            }]
+        records += cmd_dicts
     cluster_command_path = out_dir / 'cluster_merge.command.json'
     with cluster_command_path.open('w') as f:
         json.dump(records, f)
@@ -247,7 +252,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
                            chrom_size_path, bin_length=1000000,
                            bigwig_contexts=('CGN', 'CHN'),
                            extract_contexts=('CGN',), merge_strand=True,
-                           min_group=10, cpu=80):
+                           min_group=10, merge_allc_cpu=20, total_cpu=80):
     """
     TODO: clustering name system, also OS path safe characters
     """
@@ -261,7 +266,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
 
     out_dir = pathlib.Path(out_dir).absolute()
     _batch_merge_allc(cluster_table, cell_path_series=cell_path_series,
-                      out_dir=out_dir, min_group=min_group, cpu=min(cpu // 8, 30),
+                      out_dir=out_dir, min_group=min_group, cpu=merge_allc_cpu,
                       chrom_size_file=chrom_size_path, bin_length=bin_length)
     _batch_allc_profile(out_dir=out_dir)
     _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts=bigwig_contexts)
@@ -280,7 +285,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
                    f'--project_name master ' \
                    f'--command_file_path {command_path} ' \
-                   f'--total_cpu {cpu} ' \
+                   f'--total_cpu {total_cpu} ' \
                    f'--total_mem 1000 '
 
     print(f"""

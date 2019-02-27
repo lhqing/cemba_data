@@ -120,7 +120,7 @@ def qsub_register_subparser(subparser):
         nargs='+',
         help="One or space-separated paths of the command.json file."
     )
-
+    
     parser_opt.add_argument(
         "--total_cpu",
         type=int,
@@ -135,6 +135,15 @@ def qsub_register_subparser(subparser):
         required=False,
         default=500,
         help="Total MEM in qsub list"
+    )
+
+    parser_opt.add_argument(
+        "--force_redo",
+        type=bool,
+        required=False,
+        default=False,
+        help="By default, the finished job (which has an accompanying .json file with the command.sh file) "
+             "will not be submitted again, but if you want to force resubmit all jobs, set this to true. "
     )
     return
 
