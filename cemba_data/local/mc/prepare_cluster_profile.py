@@ -153,7 +153,9 @@ def _batch_merge_allc(cluster_table, cell_path_series,
                 for path in group_out_paths:
                     f.write(str(path) + '\n')
             cmd = f'yap merge-allc --allc_paths {group_id_list_path} ' \
-                  f'--out_path {cluster_allc_out_path} --cpu {cpu} --index tabix'
+                  f'--out_path {cluster_allc_out_path} --cpu {cpu} ' \
+                  f'--chrom_size_file {chrom_size_file} ' \
+                  f'--bin_length {bin_length}'
             memory_gbs = 5
             cmd_dict = {
                 'command': cmd,
@@ -184,7 +186,7 @@ def _batch_allc_profile(out_dir):
     final_cluster_path_df = pd.read_table(out_dir / 'final_cluster_path.tsv', header=0)
     allc_files = final_cluster_path_df['cluster_allc_path'].drop_duplicates()
     for allc_file in allc_files:
-        cmd = f'yap allc-profile --allc_path {allc_file}'
+        cmd = f'yap allc-profile --allc_path {allc_file} --out_path {allc_file}.profile'
         cmd_dict = {
             'command': cmd,
             'pe smp': 1,
@@ -203,7 +205,7 @@ def _batch_allc_to_bigwig(out_dir, chrom_size_path, mc_contexts):
     allc_files = final_cluster_path_df['cluster_allc_path'].drop_duplicates()
     for mc_context in mc_contexts:
         for allc_file in allc_files:
-            out_path = str(allc_file).rstrip('allc.tsv.gz') + f'{mc_context}.bw'
+            out_path = str(allc_file).rstrip('tsv.gz') + f'{mc_context}.bw'
             cmd = f'yap allc-to-bigwig --allc_path {allc_file} ' \
                   f'--out_path {out_path} --chrom_size {chrom_size_path} --mc_type {mc_context}'
             cmd_dict = {
@@ -242,10 +244,10 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
 
 
 def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
-                           chrom_size_path, bin_length=2000000,
+                           chrom_size_path, bin_length=1000000,
                            bigwig_contexts=('CGN', 'CHN'),
                            extract_contexts=('CGN',), merge_strand=True,
-                           min_group=10, cpu=50):
+                           min_group=10, cpu=80):
     """
     TODO: clustering name system, also OS path safe characters
     """

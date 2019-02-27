@@ -101,8 +101,8 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
             ax.text(adj_x, adj_y, text,
                     fontdict=_text_anno_kws,
                     bbox=dict(boxstyle="round",
-                              ec=(0.5, 0.5, 0.5, 0.2),
-                              fc=(0.9, 0.9, 0.9, 0.4)))
+                              ec=(0.5, 0.5, 0.5, 0.4),
+                              fc=(0.9, 0.9, 0.9, 0.6)))
             adj_distance = np.sqrt((adj_x - x) ** 2 + (adj_y - y) ** 2)
             if adj_distance > 0.05:
                 ax.arrow(adj_x, adj_y, x - adj_x, y - adj_y,
@@ -349,7 +349,8 @@ def continuous_scatter(data, ax, coord_base='tsne',
                            rotation=270,
                            fontsize=label_fontsize)
         colorbar_ticks = [hue_norm[0], sum(hue_norm) / 2, hue_norm[1]]
-        colorbar_ticklabels = list(map(lambda i: f'{i:.1f}', colorbar_ticks))
+        # TODO automatic ticklabel format, auto sci-format, float trim etc
+        colorbar_ticklabels = list(map(lambda i: f'{i:.2f}', colorbar_ticks))
         colorbar.set_ticks(colorbar_ticks)
         colorbar.set_ticklabels(colorbar_ticklabels)
         colorbar.outline.set_linewidth(0.5)
