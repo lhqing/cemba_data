@@ -236,7 +236,7 @@ def _open_gz(filename, mode, compresslevel, threads, region):
 
 
 def open_allc(filename, mode='r', compresslevel=3, threads=1,
-              region=None, auto_bgzip=False, auto_index=False):
+              region=None):
     """
     A replacement for the "open" function that can also open files that have
     been compressed with gzip, bzip2 or xz. If the filename is '-', standard
@@ -271,24 +271,12 @@ def open_allc(filename, mode='r', compresslevel=3, threads=1,
         if not filename.endswith('gz'):
             raise ValueError('File must be compressed by bgzip to use region query.')
         # normal gzipped file
-        if not is_bgzip(filename):
-            if auto_bgzip:
-                print('File is compressed by normal gzip, use bgzip to redo the compress.')
-                rezip_use_bgzip(filename)
-            else:
-                raise ValueError(f'Tried inspect {filename}, '
-                                 'File is compressed by normal gzip, but region query only apply to bgzip')
+        if not has_tabix(filename):
+            raise ValueError(f'Tried inspect {filename}, '
+                             'File is compressed by normal gzip, but region query only apply to bgzip')
 
         if not os.path.exists(filename + '.tbi'):
-            if auto_index:
-                try:
-                    print('ALLC tbi index not found, indexing...')
-                    run(['tabix', '-b', '2', '-e', '2', '-s', '1', filename],
-                        check=True)
-                except OSError:
-                    raise OSError('Fail to create tbi index.')
-            else:
-                raise FileNotFoundError('Tbi index not found')
+            raise FileNotFoundError('region query provided, but .tbi index not found')
 
     if filename.endswith('gz'):
         return _open_gz(filename, mode, compresslevel, threads, region=region)
@@ -318,6 +306,11 @@ def rezip_use_bgzip(filename):
 
 
 def is_bgzip(filename):
+    # TODO This function is not perfect, figure out a more substantial way to determine bgzip
+    # a bad example is here, its bgziped, but file provide something strange
+    # /gale/raidix/rdx-4/CEMBA_RS1/4C/CEMBA180417_4C/allc/
+    # allc_180605_CEMBA_mm_P56_P63_4C_CEMBA180417_4C_7_CEMBA180417_4C_8_C8_AD001_indexed.tsv.gz
+    print('Warning: is_bgzip(), This function is not perfect, figure out a more substantial way to determine bgzip')
     if not filename.endswith('gz'):
         return False
 
@@ -328,6 +321,14 @@ def is_bgzip(filename):
     # for normal gzip, result looks like:
     # test.tsv.gz: gzip compressed data, was "test.tsv", from Unix, last modified: Fri Jan  4 17:17:31 2019
     if 'gzip compressed data, extra field' in file_type_descript:
+        return True
+    else:
+        return False
+
+
+def has_tabix(filename):
+    tabix_path = filename + '.tbi'
+    if os.path.exists(tabix_path):
         return True
     else:
         return False
