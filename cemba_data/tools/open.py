@@ -276,7 +276,8 @@ def open_allc(filename, mode='r', compresslevel=3, threads=1,
                 print('File is compressed by normal gzip, use bgzip to redo the compress.')
                 rezip_use_bgzip(filename)
             else:
-                raise ValueError('File is compressed by normal gzip, but region query only apply to bgzip')
+                raise ValueError(f'Tried inspect {filename}, '
+                                 'File is compressed by normal gzip, but region query only apply to bgzip')
 
         if not os.path.exists(filename + '.tbi'):
             if auto_index:

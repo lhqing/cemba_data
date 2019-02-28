@@ -120,7 +120,7 @@ def qsub_register_subparser(subparser):
         nargs='+',
         help="One or space-separated paths of the command.json file."
     )
-    
+
     parser_opt.add_argument(
         "--total_cpu",
         type=int,
