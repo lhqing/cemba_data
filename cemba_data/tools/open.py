@@ -221,7 +221,7 @@ class PipedGzipReader(Closing):
         return data
 
 
-def open_gz(filename, mode, compresslevel, threads, region):
+def open_gz(filename, mode='r', compresslevel=6, threads=1, region=None):
     if 'r' in mode:
         try:
             return PipedGzipReader(filename, region=region, mode=mode)
