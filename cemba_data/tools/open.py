@@ -221,7 +221,7 @@ class PipedGzipReader(Closing):
         return data
 
 
-def _open_gz(filename, mode, compresslevel, threads, region):
+def open_gz(filename, mode, compresslevel, threads, region):
     if 'r' in mode:
         try:
             return PipedGzipReader(filename, region=region, mode=mode)
@@ -279,7 +279,7 @@ def open_allc(filename, mode='r', compresslevel=3, threads=1,
             raise FileNotFoundError('region query provided, but .tbi index not found')
 
     if filename.endswith('gz'):
-        return _open_gz(filename, mode, compresslevel, threads, region=region)
+        return open_gz(filename, mode, compresslevel, threads, region=region)
     else:
         return open(filename, mode)
 
