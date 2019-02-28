@@ -468,13 +468,15 @@ def _batch_merge_allc_files_tabix(allc_files, out_file, chrom_size_file, bin_len
                 gc.collect()
         # after merge, tabix output
         log.info('Tabix output ALLC file')
-        subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file], check=True)
+        subprocess.run(['tabix', '-b', '2', '-e', '2', '-s', '1', out_file],
+                       check=True)
         log.info(f'Current memory size: {PROCESS.memory_info().rss/(1024**3):.2f}')
     log.info('Merge finished.')
 
     # remove all batch allc but the last (final allc)
     for out_file in out_paths[:-1]:  # last file is the final merged allc
-        subprocess.run(shlex.split(f'rm -f {out_file} {out_file}.tbi'))
+        # subprocess.run(shlex.split(f'rm -f {out_file} {out_file}.tbi'))
+        print(out_file)
     return
 
 
