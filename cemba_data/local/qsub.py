@@ -262,7 +262,7 @@ class _Qsubmitter:
 
         # part 2: core_signal_dict
         try:
-            with open(self.core_signal_dict) as f:
+            with open(self.core_signal_path) as f:
                 self.core_signal_dict = json.load(f)
                 print(f'Core signal dict: {self.core_signal_dict}, '
                       f'{type(self.core_signal_dict)}')
