@@ -264,10 +264,12 @@ class _Qsubmitter:
         try:
             with open(self.core_signal_path) as f:
                 self.core_signal_dict = json.load(f)
-                print(f'Core signal dict: {self.core_signal_dict}, '
-                      f'{type(self.core_signal_dict)}')
-                self.total_mem = self.core_signal_dict['total_mem']
-                self.total_cpu = self.core_signal_dict['total_cpu']
+                if self.total_mem != self.core_signal_dict['total_mem']:
+                    print(f"Change the queue total MEM to {self.core_signal_dict['total_mem']}")
+                    self.total_mem = self.core_signal_dict['total_mem']
+                if self.total_cpu != self.core_signal_dict['total_cpu']:
+                    print(f"Change the queue total CPU to {self.core_signal_dict['total_cpu']}")
+                    self.total_cpu = self.core_signal_dict['total_cpu']
                 self.alive = self.core_signal_dict['alive']
         except OSError:
             print(f'Warning: Unable to load CORE SIGNAL json file, '
