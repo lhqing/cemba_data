@@ -264,6 +264,8 @@ class _Qsubmitter:
         try:
             with open(self.command_file_path) as f:
                 self.core_signal_dict = json.load(f)
+                print(f'Core signal dict: {self.core_signal_dict}, '
+                      f'{type(self.core_signal_dict)}')
                 self.total_mem = self.core_signal_dict['total_mem']
                 self.total_cpu = self.core_signal_dict['total_cpu']
                 self.alive = self.core_signal_dict['alive']
@@ -431,11 +433,33 @@ class _Command:
         return
 
 
-def qsub(command_file_path, working_dir, project_name,
+def qsub(command_file_path, working_dir, project_name, wait_until=None,
          total_cpu=60, total_mem=500, force_redo=False,
          submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
     if isinstance(command_file_path, str):
         command_file_path = [command_file_path]
+
+    if wait_until is not None:
+        snap = 60
+        while True:
+            if isinstance(wait_until, str):
+                wait_until = {wait_until}
+            elif isinstance(wait_until, list):
+                wait_until = set(wait_until)
+            else:
+                raise TypeError(f'wait_until should either be str or list, '
+                                f'got {type(wait_until)}')
+            user_name = run(['whoami'], stdout=PIPE, encoding='utf8').stdout.strip()
+            cur_running_qsub_id = _get_running_job_id_qstat(user_name, id_set=wait_until)
+            if len(cur_running_qsub_id) == 0:
+                break
+            print(f'Still waiting {len(cur_running_qsub_id)} jobs to finish ', end='')
+            if len(cur_running_qsub_id) < 10:
+                job_ids = ' '.join(cur_running_qsub_id)
+                print(f'Their qsub id is: {job_ids}')
+            time.sleep(snap)
+            snap += 60
+            snap = min(snap, 600)
 
     # for multiple command files, run one by one
     for i, command_file in enumerate(command_file_path):

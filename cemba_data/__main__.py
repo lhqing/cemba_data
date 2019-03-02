@@ -138,6 +138,15 @@ def qsub_register_subparser(subparser):
     )
 
     parser_opt.add_argument(
+        "--wait_until",
+        type=str,
+        nargs='+',
+        required=False,
+        help="If provided with a space separate job id(s), "
+             "this job will wait until those job finish first."
+    )
+
+    parser_opt.add_argument(
         "--force_redo",
         type=bool,
         required=False,
