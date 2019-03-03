@@ -283,7 +283,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     # submit master of master
     command_path = '"' + '" "'.join(map(str, command_path_list)) + '"'
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
-                   f'--project_name master ' \
+                   f'--project_name merge ' \
                    f'--command_file_path {command_path} ' \
                    f'--total_cpu {total_cpu} ' \
                    f'--total_mem 1000 '

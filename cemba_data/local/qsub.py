@@ -442,15 +442,16 @@ def qsub(command_file_path, working_dir, project_name, wait_until=None,
         command_file_path = [command_file_path]
 
     if wait_until is not None:
+        if isinstance(wait_until, str):
+            wait_until = {wait_until}
+        elif isinstance(wait_until, list):
+            wait_until = set(wait_until)
+        else:
+            raise TypeError(f'wait_until should either be str or list, '
+                            f'got {type(wait_until)}')
+
         snap = 60
         while True:
-            if isinstance(wait_until, str):
-                wait_until = {wait_until}
-            elif isinstance(wait_until, list):
-                wait_until = set(wait_until)
-            else:
-                raise TypeError(f'wait_until should either be str or list, '
-                                f'got {type(wait_until)}')
             user_name = run(['whoami'], stdout=PIPE, encoding='utf8').stdout.strip()
             cur_running_qsub_id = _get_running_job_id_qstat(user_name, id_set=wait_until)
             if len(cur_running_qsub_id) == 0:
@@ -458,7 +459,7 @@ def qsub(command_file_path, working_dir, project_name, wait_until=None,
             print(f'Still waiting {len(cur_running_qsub_id)} jobs to finish ', end='')
             if len(cur_running_qsub_id) < 10:
                 job_ids = ' '.join(cur_running_qsub_id)
-                print(f'Their qsub id is: {job_ids}')
+                print(f'Their qsub ids are: {job_ids}')
             time.sleep(snap)
             snap += 60
             snap = min(snap, 600)
