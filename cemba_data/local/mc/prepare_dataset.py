@@ -91,7 +91,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     # submit master
     command_paths = ' '.join([str(cmd_json_path), str(assemble_json_path)])
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
-                   f'--project_name generate-dataset ' \
+                   f'--project_name mcds ' \
                    f'--command_file_path {command_paths} ' \
                    f'--total_cpu 10'
 
