@@ -149,7 +149,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
         json.dump(cmd_list, f)
 
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
-                   f'--project_name mapping ' \
+                   f'--project_name allc ' \
                    f'--command_file_path {cmd_json_path} ' \
                    f'--total_cpu 160'
 
