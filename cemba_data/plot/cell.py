@@ -184,7 +184,13 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
 def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
                         expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
                         scatter_kws=None, text_anno_kws=None, axis_format='tiny',
-                        show_legend=False, legend_kws=None):
+                        show_legend=False, legend_kws=None, max_points=None):
+    # down sample plot data if needed.
+    if max_points is not None:
+        if data.shape[0] > max_points:
+            data = density_based_sample(data, seed=1, size=max_points,
+                                        coords=[f'{coord_base}_0',
+                                                f'{coord_base}_1'])
     _scatter_kws = dict(linewidth=0, s=7, legend=None, palette=palette)
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
@@ -210,7 +216,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
         else:
             _data['hue'] = hue
             hue = 'hue'
-        
+
         # deal with color palette
         palette = _scatter_kws['palette']
         if isinstance(palette, str) or isinstance(palette, list):
@@ -263,7 +269,14 @@ def continuous_scatter(data, ax, coord_base='tsne',
                        expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
                        hue=None, hue_portion=0.8, cmap='viridis', colorbar=True,
                        size=None, size_portion=0.8, label_fontsize=5, sizebar=True,
-                       scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
+                       scatter_kws=None, text_anno_kws=None, axis_format='tiny', max_points=None):
+    # down sample plot data if needed.
+    if max_points is not None:
+        if data.shape[0] > max_points:
+            data = density_based_sample(data, seed=1, size=max_points,
+                                        coords=[f'{coord_base}_0',
+                                                f'{coord_base}_1'])
+
     if (sample_portion is not None) or (sample_size is not None):
         data = density_based_sample(data.copy(),
                                     coords=[f'{coord_base}_0', f'{coord_base}_1'],
