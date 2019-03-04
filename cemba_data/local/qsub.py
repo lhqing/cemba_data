@@ -374,7 +374,7 @@ class _Command:
         else:
             job_id_pattern = re.compile(r'(?<=Your job )\d+')
             return_obj = run(['qsub', self.script_path], stdout=PIPE, encoding='utf8')
-            print(f'Submitted {self.unique_id}, stdout: {return_obj.stdout}')
+            print(f'Submitted {self.unique_id}, stdout: {return_obj.stdout.strip()}')
             try:
                 self.qsub_id = job_id_pattern.search(return_obj.stdout).group()
             except AttributeError:

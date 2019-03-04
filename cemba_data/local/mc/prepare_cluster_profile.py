@@ -87,7 +87,6 @@ def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True)
 
 def _batch_merge_allc(cluster_table, cell_path_series,
                       out_dir, min_group, cpu, chrom_size_file, bin_length):
-    # TODO This function need to be changed for new merge-allc CLI
     # raise NotImplementedError
     """
     Batch merge ALLC function, also accept multilayer cluster assignment.
@@ -254,8 +253,40 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
                            extract_contexts=('CGN',), merge_strand=True,
                            min_group=10, merge_allc_cpu=20, total_cpu=80):
     """
-    TODO: clustering name system, also OS path safe characters
+    Merge allc and generate bigwig pipeline
+
+    Parameters
+    ----------
+    cluster_table_path
+        Path to the cluster table. The first column must be cell id. The other columns
+        are different levels of cluster assignments. From left to right, sub to major.
+    cell_path_file
+        Path to the ALLC path table. The first column must be cell id. The second column
+        is the ALLC file path for each cell.
+    out_dir
+        Output directory, must not exist.
+    chrom_size_path
+        Path to UCSC chrom size file, used for guide merge and bigwig generation
+    bin_length
+        Length of the chrom bin size when do parallel merging. The larger the more MEM usage.
+        The default value is usually fine.
+    bigwig_contexts
+        mC contexts used for generate bigwig
+    extract_contexts
+        mC contexts used for extract sub ALLC
+    merge_strand
+        Whether to merge adjacent CG site methylation info
+    min_group
+        Minimum number of cells for a cell group to be considered.
+    merge_allc_cpu
+        CPU used in each merge allc job.
+    total_cpu
+        Total CPU used in qsub queue
+    Returns
+    -------
+    
     """
+
     cluster_table = pd.read_table(cluster_table_path, index_col=0, header=0)
     if cluster_table.columns.duplicated().sum() != 0:
         raise ValueError('Cluster table have duplicated columns')
