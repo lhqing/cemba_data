@@ -62,6 +62,8 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
 
     cmap = plt.cm.viridis
     cmap.set_under(color='#FFFFFF')
+    if heatmap_kws is None:
+        heatmap_kws = {}
     for heatmap_data, heatmap_name, ax in zip(heatmap_data_list, heatmap_names, np.ravel(axes)):
         sns.heatmap(heatmap_data, vmin=vmin, vmax=vmax,
                     cmap=cmap, ax=ax, **heatmap_kws)

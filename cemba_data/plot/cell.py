@@ -7,6 +7,7 @@ from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize, LogNorm
 from matplotlib.colorbar import ColorbarBase
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from .color import level_one_palette
 
 
 def _robust_scale_0_1(coord, expand_border_scale=0.1, border_quantile=0.01):
@@ -180,11 +181,11 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
     return ax
 
 
-def categorical_scatter(data, ax, coord_base='tsne', hue=None,
+def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
                         expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
-                        scatter_kws=None, text_anno_kws=None, axis_format='tiny'):
-    # TODO: better palette support
-    _scatter_kws = dict(linewidth=0, s=7, legend=None)
+                        scatter_kws=None, text_anno_kws=None, axis_format='tiny',
+                        show_legend=False, legend_kws=None):
+    _scatter_kws = dict(linewidth=0, s=7, legend=None, palette=palette)
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
 
@@ -209,6 +210,18 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
         else:
             _data['hue'] = hue
             hue = 'hue'
+        
+        # deal with color palette
+        palette = _scatter_kws['palette']
+        if isinstance(palette, str) or isinstance(palette, list):
+            palette_dict = level_one_palette(_data[hue], order=None, palette=palette)
+        elif isinstance(palette, dict):
+            palette_dict = palette
+        else:
+            raise TypeError(f'Palette can only be str, list or dict, '
+                            f'got {type(palette)}')
+        _scatter_kws['palette'] = palette_dict
+
     if text_anno is not None:
         if isinstance(text_anno, str):
             _data[text_anno] = data[text_anno]
@@ -235,6 +248,13 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None,
     if text_anno:
         _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
+
+    if show_legend:
+        hue_length = len(_data[hue])
+        _legend_kws = dict(ncol=(1 if hue_length <= 14 else 2 if hue_length <= 30 else 3))
+        if legend_kws is not None:
+            _legend_kws.update(legend_kws)
+        ax.legend(**_legend_kws)
     return ax
 
 
@@ -379,6 +399,17 @@ def continuous_scatter(data, ax, coord_base='tsne',
 
 
 def generate_tree_dict(data):
+    """
+    Helper function for echarts tree structures
+
+    Parameters
+    ----------
+    data
+
+    Returns
+    -------
+
+    """
     childrens = []
     if data.shape[1] == 1:
         cell_counts = data.iloc[:, 0].value_counts()
