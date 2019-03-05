@@ -258,10 +258,10 @@ def cluster_merge_pipeline(cluster_table_path, allc_path_file, out_dir,
     Parameters
     ----------
     cluster_table_path
-        Path to the cluster table. The first column must be cell id. The other columns
+        Path to the cluster table WITH 1 HEADER ROW. The first column must be cell id. The other columns
         are different levels of cluster assignments. From left to right, sub to major.
     allc_path_file
-        Path to the ALLC path table. The first column must be cell id. The second column
+        Path to the ALLC path table WITHOUT HEADER. The first column must be cell id. The second column
         is the ALLC file path for each cell.
     out_dir
         Output directory, must not exist.

@@ -5,9 +5,9 @@ import matplotlib as mpl
 from sklearn.neighbors import LocalOutlierFactor
 from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize, LogNorm
-from matplotlib.colorbar import ColorbarBase
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from .color import level_one_palette
+from .utilities import tight_hue_range, plot_colorbar
 
 
 def _robust_scale_0_1(coord, expand_border_scale=0.1, border_quantile=0.01):
@@ -110,26 +110,6 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
                          color=(0.5, 0.5, 0.5, 0.8),
                          width=0.003, linewidth=0)
     return
-
-
-def _tight_hue_range(hue_data, portion):
-    """Automatic select a SMALLEST data range that covers [portion] of the data"""
-    hue_quantiles = hue_data.quantile(q=np.arange(0, 1, 0.01))
-    min_window_right = hue_quantiles.rolling(window=int(portion * 100)) \
-        .apply(lambda i: i.max() - i.min(), raw=True) \
-        .idxmin()
-    min_window_left = max(0, min_window_right - portion)
-    vmin, vmax = tuple(hue_data.quantile(q=[min_window_left,
-                                            min_window_right]))
-    if np.isnan(vmin):
-        vmin = hue_data.min()
-    else:
-        vmin = max(hue_data.min(), vmin)
-    if np.isnan(vmax):
-        vmax = hue_data.max()
-    else:
-        vmax = min(hue_data.max(), vmax)
-    return vmin, vmax
 
 
 def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
@@ -308,7 +288,7 @@ def continuous_scatter(data, ax, coord_base='tsne',
             _data['hue'] = hue
             hue = 'hue'
         # get the smallest range that include "hue_portion" of data
-        hue_norm = _tight_hue_range(_data[hue], hue_portion)
+        hue_norm = tight_hue_range(_data[hue], hue_portion)
         # from here, cmap become colormap object
         cmap = mpl.cm.get_cmap(cmap)
         # cnorm is the normalizer for color
@@ -326,7 +306,7 @@ def continuous_scatter(data, ax, coord_base='tsne',
             _data['size'] = size
             size = 'size'
         # get the smallest range that include "size_portion" of data
-        size_norm = _tight_hue_range(_data[hue], size_portion)
+        size_norm = tight_hue_range(_data[hue], size_portion)
         # snorm is the normalizer for size
         # for size, LogNorm is more suitable
         snorm = LogNorm(vmin=size_norm[0],
@@ -373,22 +353,11 @@ def continuous_scatter(data, ax, coord_base='tsne',
         # In matplotlib 3.0, ax.inset_axes() can access its own inset_axes, but it is experimental
         cax = inset_axes(ax, width="3%", height="25%",
                          loc='lower right', borderpad=0)
-        return_axes.append(cax)
 
-        colorbar = ColorbarBase(cax, cmap=cmap, norm=cnorm,
-                                orientation='vertical', extend='both')
-        colorbar.set_label('Normalized mCH%',
-                           labelpad=8,
-                           rotation=270,
-                           fontsize=label_fontsize)
-        colorbar_ticks = [hue_norm[0], sum(hue_norm) / 2, hue_norm[1]]
-        # TODO automatic ticklabel format, auto sci-format, float trim etc
-        colorbar_ticklabels = list(map(lambda i: f'{i:.2f}', colorbar_ticks))
-        colorbar.set_ticks(colorbar_ticks)
-        colorbar.set_ticklabels(colorbar_ticklabels)
-        colorbar.outline.set_linewidth(0.5)
-        colorbar.ax.tick_params(size=label_fontsize, labelsize=label_fontsize,
-                                pad=1, width=0.5)
+        cax = plot_colorbar(cax, cmap=cmap, cnorm=cnorm, hue_norm=hue_norm,
+                            label_kws=dict(label='Normalized mCH%', labelpad=8,
+                                           rotation=270, fontsize=label_fontsize))
+        return_axes.append(cax)
 
     if sizebar and (size is not None):
         # small ax for sizebar
