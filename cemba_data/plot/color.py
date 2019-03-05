@@ -1,4 +1,11 @@
 import seaborn as sns
+import matplotlib as mpl
+import numpy as np
+
+
+def tab_palette():
+    # TODO make manual tab palettes from 2 to 20
+    return
 
 
 def continuous_color_palette(color, n, skip_border=1):
@@ -20,7 +27,13 @@ def continuous_color_palette(color, n, skip_border=1):
     return colors
 
 
+def get_kv_dict(data_df, major, sub):
+    _dict = data_df.groupby(major)[sub].unique().to_dict()
+    return _dict
+
+
 def level_one_palette(name_list, order=None, palette='default'):
+    name_set = set(name_list)
     if palette == 'default':
         if len(set(name_list)) < 10:
             palette = 'tab10'
@@ -28,11 +41,11 @@ def level_one_palette(name_list, order=None, palette='default'):
             palette = 'tab20'
 
     if order is None:
-        order = set(name_list)
+        order = name_set
     else:
-        if set(order) != set(name_list):
+        if (set(order) != name_set) or (len(order) != len(name_set)):
             raise ValueError('Order is not equal to set(name_list).')
-    n = len(set(name_list))
+    n = len(order)
     colors = sns.color_palette(palette, n)
     color_palette = {}
     for name, color in zip(order, colors):
@@ -65,3 +78,13 @@ def level_two_palette(major_color, major_sub_dict,
         for sub, _color in zip(subs, colors):
             color_palette[sub] = _color
     return color_palette
+
+
+def palplot(pal, ax, transpose=True):
+    n = len(pal)
+    data = np.arange(n).reshape(1, n)
+    if transpose:
+        data = data.T
+    ax.imshow(data, interpolation="nearest", aspect="auto",
+              cmap=mpl.colors.ListedColormap(list(pal)))
+    return ax
