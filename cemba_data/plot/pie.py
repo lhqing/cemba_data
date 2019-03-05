@@ -6,7 +6,13 @@ from collections import OrderedDict
 def sunbrust(pie_data, ax, inner_radius=0.25, outer_radius=1,
              anno_col=None, text_anno='text', anno_layer_size=0.05,
              col_color_dict=None, startangle=0, anno_ang_min=5,
-             anno_border=1.2, text_expend=1.2):
+             anno_border=1.2, text_expend=1.2,
+             uniform_section=False):
+    if uniform_section:
+        dedup_groups = pie_data.reset_index().set_index(pie_data.columns.tolist()).index.drop_duplicates()
+        dedup_groups = pd.DataFrame(dedup_groups.tolist(), columns=pie_data.columns)
+        pie_data = dedup_groups
+
     _col_color_dict = {col: None for col in pie_data.columns}
     if col_color_dict is not None:
         _col_color_dict.update(col_color_dict)
@@ -21,7 +27,6 @@ def sunbrust(pie_data, ax, inner_radius=0.25, outer_radius=1,
     anno_wedges = []
     anno_names = []
     for col, col_name in enumerate(pie_data.columns):
-        print(col, col_name)
         cur_radius = inner_radius + (col + 1) * layer_size
         col_pie_data = pie_data[col_name].value_counts()
 

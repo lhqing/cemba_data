@@ -3,12 +3,12 @@ import matplotlib as mpl
 import numpy as np
 
 
-def tab_palette():
+def _tab_palette():
     # TODO make manual tab palettes from 2 to 20
     return
 
 
-def continuous_color_palette(color, n, skip_border=1):
+def _continuous_color_palette(color, n, skip_border=1):
     """
     This function concatenate the result of both sns.light_palette
     and sns.dark_palette to get a wider color range
@@ -74,7 +74,7 @@ def level_two_palette(major_color, major_sub_dict,
     for major, color in major_color_dict.items():
         subs = major_sub_dict[major]
         n = len(subs)
-        colors = continuous_color_palette(color, n, skip_border=skip_border_color)
+        colors = _continuous_color_palette(color, n, skip_border=skip_border_color)
         for sub, _color in zip(subs, colors):
             color_palette[sub] = _color
     return color_palette

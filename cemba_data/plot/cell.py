@@ -112,35 +112,6 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
     return
 
 
-def density_based_sample(data, coords, portion=None, size=None, seed=None):
-    clf = LocalOutlierFactor(n_neighbors=20, algorithm='auto',
-                             leaf_size=30, metric='minkowski',
-                             p=2, metric_params=None)
-    data_coords = data[coords]
-    clf.fit(data_coords)
-    # original score is negative, the larger the denser
-    density_score = clf.negative_outlier_factor_
-    delta = density_score.max() - density_score.min()
-    # density score to probability: the denser the less probability to be picked up
-    probability_score = 1 - (density_score - density_score.min()) / delta
-    probability_score = np.sqrt(probability_score)
-    probability_score = probability_score / probability_score.sum()
-
-    if size is not None:
-        pass
-    elif portion is not None:
-        size = int(data_coords.index.size * portion)
-    else:
-        raise ValueError('Either portion or size should be provided.')
-    if seed is not None:
-        np.random.seed(seed)
-    selected_cell_index = np.random.choice(data_coords.index,
-                                           size=size,
-                                           replace=False,
-                                           p=probability_score)
-    return data.reindex(selected_cell_index)
-
-
 def _tight_hue_range(hue_data, portion):
     """Automatic select a SMALLEST data range that covers [portion] of the data"""
     hue_quantiles = hue_data.quantile(q=np.arange(0, 1, 0.01))
@@ -179,6 +150,35 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
 
     ax.set(ylim=(0, 1), xlim=(-0.1, 1), xticks=[], yticks=[])
     return ax
+
+
+def density_based_sample(data, coords, portion=None, size=None, seed=None):
+    clf = LocalOutlierFactor(n_neighbors=20, algorithm='auto',
+                             leaf_size=30, metric='minkowski',
+                             p=2, metric_params=None)
+    data_coords = data[coords]
+    clf.fit(data_coords)
+    # original score is negative, the larger the denser
+    density_score = clf.negative_outlier_factor_
+    delta = density_score.max() - density_score.min()
+    # density score to probability: the denser the less probability to be picked up
+    probability_score = 1 - (density_score - density_score.min()) / delta
+    probability_score = np.sqrt(probability_score)
+    probability_score = probability_score / probability_score.sum()
+
+    if size is not None:
+        pass
+    elif portion is not None:
+        size = int(data_coords.index.size * portion)
+    else:
+        raise ValueError('Either portion or size should be provided.')
+    if seed is not None:
+        np.random.seed(seed)
+    selected_cell_index = np.random.choice(data_coords.index,
+                                           size=size,
+                                           replace=False,
+                                           p=probability_score)
+    return data.reindex(selected_cell_index)
 
 
 def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
@@ -409,35 +409,3 @@ def continuous_scatter(data, ax, coord_base='tsne',
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
         # TODO adjust label color, turn white when background is dark
     return tuple(return_axes)
-
-
-def generate_tree_dict(data):
-    """
-    Helper function for echarts tree structures
-
-    Parameters
-    ----------
-    data
-
-    Returns
-    -------
-
-    """
-    childrens = []
-    if data.shape[1] == 1:
-        cell_counts = data.iloc[:, 0].value_counts()
-        for children, count in cell_counts.items():
-            childrens.append({
-                'name': children,
-                'value': count
-            })
-    else:
-        for children, sub_df in data.groupby(data.columns[0]):
-            count = sub_df.shape[0]
-            childrens.append({
-                'name': children,
-                'value': count,
-                'children': generate_tree_dict(sub_df.iloc[:, 1:])
-            })
-    return childrens
-

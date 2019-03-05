@@ -318,6 +318,3 @@ def print_allen_url(df):
         text = f'Go to Brain Explorer for {gene} 3D expressions (id={section_data_set_id}).'
         display(HTML(f'<a href="{url}">{text}</a>'))
     return
-
-
-
