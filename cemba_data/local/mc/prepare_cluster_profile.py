@@ -121,7 +121,7 @@ def _batch_merge_allc(cluster_table, cell_path_series,
         memory_gbs = 5
         cmd_dict = {
             'command': cmd,
-            'pe smp': int(cpu * 1.1),
+            'pe smp': int(cpu),
             'l h_vmem': f'{memory_gbs}G'
         }
         records.append(cmd_dict)
@@ -247,7 +247,7 @@ def _batch_extract_mc(out_dir, mc_contexts, merge_strand):
     return
 
 
-def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
+def cluster_merge_pipeline(cluster_table_path, allc_path_file, out_dir,
                            chrom_size_path, bin_length=1000000,
                            bigwig_contexts=('CGN', 'CHN'),
                            extract_contexts=('CGN',), merge_strand=True,
@@ -260,13 +260,13 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     cluster_table_path
         Path to the cluster table. The first column must be cell id. The other columns
         are different levels of cluster assignments. From left to right, sub to major.
-    cell_path_file
+    allc_path_file
         Path to the ALLC path table. The first column must be cell id. The second column
         is the ALLC file path for each cell.
     out_dir
         Output directory, must not exist.
     chrom_size_path
-        Path to UCSC chrom size file, used for guide merge and bigwig generation
+        Path to UCSC chrom size file, used for guide merge and bigwig generation.
     bin_length
         Length of the chrom bin size when do parallel merging. The larger the more MEM usage.
         The default value is usually fine.
@@ -284,7 +284,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
         Total CPU used in qsub queue
     Returns
     -------
-    
+
     """
 
     cluster_table = pd.read_table(cluster_table_path, index_col=0, header=0)
@@ -293,7 +293,7 @@ def cluster_merge_pipeline(cluster_table_path, cell_path_file, out_dir,
     if cluster_table.columns.duplicated().sum() != 0:
         raise ValueError('Cluster table have duplicated cell_ids')
 
-    cell_path_series = pd.read_table(cell_path_file, index_col=0, header=None, squeeze=True)
+    cell_path_series = pd.read_table(allc_path_file, index_col=0, header=None, squeeze=True)
 
     out_dir = pathlib.Path(out_dir).absolute()
     _batch_merge_allc(cluster_table, cell_path_series=cell_path_series,

@@ -38,6 +38,7 @@ STAGE 3
     allc-profile - Generate summary statistics for a ALLC file.
     allc-to-bigwig - ALLC to BIGWIG.
     allc-extract - Extract ALLC file information. 
+    cluster-merge - Wrapper for above stage 3 functions that run with "yap qsub"
     
 Qsub
     qsub - Qsubmitter for SGE QSUB.
@@ -781,18 +782,133 @@ def standardize_allc_register_subparser(subparser):
     )
 
 
+def cluster_merge_register_subparser(subparser):
+    parser = subparser.add_parser('cluster-merge',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Stage 3 pipeline for merge allc and generate bigwig "
+                                       "files for hierarchical cluster assignments. "
+                                       "This pipeline in clude 5 steps: "
+                                       "1. merge allc files by minimum groups "
+                                       "(merge cells assign to same cluster in all level); "
+                                       "2. merge (or simply copy) group-allc into "
+                                       "cluster allc of different levels; "
+                                       "3. generate cluster allc profile; "
+                                       "4. generate cluster allc bigwig files, if needed; "
+                                       "5. generate mC context extracted cluster allc, if needed.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--genome_size_path",
+        type=str,
+        required=True,
+        help="Path of UCSC genome size file, used for check chromosome names. "
+             "You should use the same file as the genome you used for mapping "
+             "and never change chromosome name by no means."
+    )
+
+    parser_opt.add_argument(
+        "--process",
+        type=int,
+        required=False,
+        default=10,
+        help="Number of processes to use in parallel."
+    )
+
+
 def mapping_summary_register_subparser(subparser):
     parser = subparser.add_parser('mapping-summary',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Summary mapping output. Just a convenient function after mapping.")
 
     parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    """
+    merge_strand=True,
+    min_group=10, merge_allc_cpu=20, total_cpu=80
+    """
+
+    parser_req.add_argument(
+        "--cluster_table_path",
+        type=str,
+        required=True,
+        help="Path to the cluster table. The first column must be cell id. The other columns "
+             "are different levels of cluster assignments. From left to right, sub to major."
+    )
+
+    parser_req.add_argument(
+        "--allc_path_file",
+        type=str,
+        required=True,
+        help="Path to the ALLC path table. The first column must be cell id. The second column "
+             "is the ALLC file path for each cell."
+    )
 
     parser_req.add_argument(
         "--out_dir",
         type=str,
         required=True,
-        help="Output directory after mapping."
+        help="Output directory, must not exist."
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="Path to UCSC chrom size file, used for guide merge and bigwig generation."
+    )
+
+    parser_opt.add_argument(
+        "--bin_length",
+        type=int,
+        required=False,
+        default=1000000,
+        help="Length of the chrom bin size when do parallel merging. The larger the more MEM usage. "
+             "The default value is usually fine."
+    )
+
+    parser_opt.add_argument(
+        "--bigwig_contexts",
+        type=str,
+        required=False,
+        nargs='+',
+        default=['CGN', 'CHN'],
+        help="mC contexts used for generate bigwig."
+    )
+
+    parser_opt.add_argument(
+        "--extract_contexts",
+        type=str,
+        required=False,
+        nargs='+',
+        default=['CGN'],
+        help="mC contexts used for extract sub ALLC."
+    )
+
+    parser_opt.add_argument(
+        "--merge_strand",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to merge adjacent CG site methylation info."
+    )
+
+    parser_opt.add_argument(
+        "--min_group",
+        type=int,
+        required=False,
+        default=10,
+        help="Minimum number of cells for a cell group to be considered."
+    )
+
+    parser_opt.add_argument(
+        "--merge_allc_cpu",
+        type=int,
+        required=False,
+        default=20,
+        help="CPU used in each merge allc job."
     )
 
 
@@ -867,6 +983,8 @@ def main():
         from .tools.allc import batch_standardize_allc as func
     elif cur_command == 'mapping-summary':
         from .mapping.pipeline import summary_pipeline_stat as func
+    elif cur_command == 'cluster-merge':
+        from .local.mc.prepare_cluster_profile import cluster_merge_pipeline as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
