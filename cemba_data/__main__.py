@@ -782,53 +782,28 @@ def standardize_allc_register_subparser(subparser):
     )
 
 
-def cluster_merge_register_subparser(subparser):
-    parser = subparser.add_parser('cluster-merge',
-                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Stage 3 pipeline for merge allc and generate bigwig "
-                                       "files for hierarchical cluster assignments. "
-                                       "This pipeline in clude 5 steps: "
-                                       "1. merge allc files by minimum groups "
-                                       "(merge cells assign to same cluster in all level); "
-                                       "2. merge (or simply copy) group-allc into "
-                                       "cluster allc of different levels; "
-                                       "3. generate cluster allc profile; "
-                                       "4. generate cluster allc bigwig files, if needed; "
-                                       "5. generate mC context extracted cluster allc, if needed.")
-
-    parser_req = parser.add_argument_group("Required inputs")
-    parser_opt = parser.add_argument_group("Optional inputs")
-
-    parser_req.add_argument(
-        "--genome_size_path",
-        type=str,
-        required=True,
-        help="Path of UCSC genome size file, used for check chromosome names. "
-             "You should use the same file as the genome you used for mapping "
-             "and never change chromosome name by no means."
-    )
-
-    parser_opt.add_argument(
-        "--process",
-        type=int,
-        required=False,
-        default=10,
-        help="Number of processes to use in parallel."
-    )
-
-
 def mapping_summary_register_subparser(subparser):
     parser = subparser.add_parser('mapping-summary',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Aggregate mapping summaries.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--out_dir",
+        type=str,
+        required=True,
+        help="Path of mapping output dir."
+    )
+
+
+def cluster_merge_register_subparser(subparser):
+    parser = subparser.add_parser('cluster-merge',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Summary mapping output. Just a convenient function after mapping.")
 
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
-
-    """
-    merge_strand=True,
-    min_group=10, merge_allc_cpu=20, total_cpu=80
-    """
 
     parser_req.add_argument(
         "--cluster_table_path",
