@@ -171,7 +171,7 @@ def summary_pipeline_stat(out_dir):
         .sum()[['CA', 'CC', 'CG', 'CT']] \
         .rename(columns={c: c + '_Cov' for c in ['CA', 'CC', 'CG', 'CT']})
     cov_df['CH_Cov'] = cov_df[['CA_Cov', 'CC_Cov', 'CT_Cov']].sum(axis=1)
-    mc_df = result_dfs['allc_total_result'] \
+    mc_df = result_dfs['stat_allc_total_result'] \
         .set_index(['uid', 'index_name', 'index'])['mc'] \
         .unstack('index').fillna(0).astype(int)
     ccc_mc = mc_df['CCC']
