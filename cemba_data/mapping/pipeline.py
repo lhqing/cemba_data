@@ -162,7 +162,7 @@ def summary_pipeline_stat(out_dir):
     bam_result['DeduppedRatio'] = bam_result['DeduppedReads'] / bam_result.sum(axis=1)
 
     # ALLC stat
-    cov_df = result_dfs['allc_total_result'] \
+    cov_df = result_dfs['stat_allc_total_result'] \
         .set_index(['uid', 'index_name', 'index'])['cov'] \
         .unstack('index') \
         .fillna(0).astype(int)
