@@ -289,6 +289,9 @@ def calc_jaccard(x1, x2=None):
     rows1 = np.repeat(b1[:, None], a.shape[1], axis=1)
     rows2 = np.repeat(b2[:, None], a.shape[0], axis=1)
     jaccard_m = a / (rows1 + rows2.T - a)
+
+    # cell's jaccard to its self is 1, which is far more larger than normal jaccard
+    # set to mean of whole matrix
     jaccard_m[jaccard_m == 1] = jaccard_m.mean()
     return jaccard_m
 
