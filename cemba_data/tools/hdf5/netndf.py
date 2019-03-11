@@ -7,8 +7,8 @@ from anndata import AnnData
 def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
                                  normalize_per_cell=True, clip_norm_value=10):
     raw_rate = mc_da / cov_da
-    cell_rate_mean = raw_rate.mean(dim=var_dim)
-    cell_rate_var = raw_rate.var(dim=var_dim)
+    cell_rate_mean = raw_rate.mean(dim=var_dim)  # this skip na
+    cell_rate_var = raw_rate.var(dim=var_dim)  # this skip na
 
     # based on beta distribution mean, var
     # a / (a + b) = cell_rate_mean
@@ -21,8 +21,15 @@ def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
     post_rate = (mc_da + cell_a) / (cov_da + cell_a + cell_b)
 
     if normalize_per_cell:
-        # this is normalize by post_rate per cell, just a mean center
-        post_rate = post_rate / post_rate.mean(dim=var_dim)
+        # there are two ways of normalizing per cell, by posterior or prior mean:
+        # prior_mean = cell_a / (cell_a + cell_b)
+        # posterior_mean = post_rate.mean(dim=var_dim)
+
+        # Here I choose to use prior_mean to normalize cell,
+        # therefore all cov == 0 features will have normalized rate == 1 in all cells.
+        # i.e. 0 cov feature will provide no info
+        prior_mean = cell_a / (cell_a + cell_b)
+        post_rate = post_rate / prior_mean
         if clip_norm_value is not None:
             post_rate.values[np.where(post_rate.values > clip_norm_value)] = clip_norm_value
     return post_rate

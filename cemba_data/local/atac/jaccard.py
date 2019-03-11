@@ -256,6 +256,7 @@ def norm_jaccard(jaccard_m, x1, x2=None):
     m1 = x1.mean(axis=1)
     m2 = x2.mean(axis=1)
     expect = _norm_ove(m1, m2)
+
     clf = LinearRegression()
     x = expect.ravel().reshape(-1, 1)
     y = jaccard_m.ravel().reshape(-1, 1)
@@ -273,15 +274,13 @@ def calc_jaccard(x1, x2=None, ove_norm=True):
     x1
         Cell * Feature matrix
     x2
-        Cell * Feature matrix, if None, will only calculate
-        self pairwise jaccard for x1
+        Cell * Feature matrix, if None, will only calculate self pairwise jaccard for x1
     ove_norm
         Whether do OVE normalization or not
 
     Returns
     -------
     (raw or normalized) Jaccard matrix
-
     """
     if x2 is None:
         # if x2 is None, set to x1 to calculate self pairwise jaccard
