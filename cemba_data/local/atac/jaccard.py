@@ -258,10 +258,10 @@ def norm_jaccard(jaccard_m, x1, x2=None):
     expect = _norm_ove(m1, m2)
 
     clf = LinearRegression()
-    x = expect.ravel().reshape(-1, 1)
-    y = jaccard_m.ravel().reshape(-1, 1)
+    x = expect.reshape(-1, 1)
+    y = jaccard_m.reshape(-1, 1)
     clf.fit(X=x, y=y)
-    residual = (y - clf.predict(x)).reshape(expect.shape)
+    residual = (y - clf.predict(X=x)).reshape(expect.shape)
     return residual
 
 
@@ -349,10 +349,10 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
         # non-parallel
         for i, row_chunk in enumerate(row_chunks):
             for j, col_chunk in enumerate(col_chunks):
-                print(f'Calculate {i}/{len(row_chunks)} row, {j}/{len(col_chunks)} col')
+                print(f'Calculate {i+1}/{len(row_chunks)} row, {j+1}/{len(col_chunks)} col')
                 row_x = csr_matrix[slice(*row_chunk), :].todense()
                 col_x = csr_matrix[ref_ids[slice(*col_chunk)], :].todense()
                 chunk_jaccard = calc_jaccard(x1=row_x, x2=col_x, ove_norm=norm)
                 final_jaccard[slice(*row_chunk), slice(*col_chunk)] += chunk_jaccard
 
-    return final_jaccard
+    return final_jaccard, ref_ids
