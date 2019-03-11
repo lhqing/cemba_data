@@ -349,7 +349,7 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
         # non-parallel
         for i, row_chunk in enumerate(row_chunks):
             for j, col_chunk in enumerate(col_chunks):
-                print(f'Calculate {i}/{row_chunks} row, {j}/{len(col_chunks)} col')
+                print(f'Calculate {i}/{len(row_chunks)} row, {j}/{len(col_chunks)} col')
                 row_x = csr_matrix[slice(*row_chunk), :].todense()
                 col_x = csr_matrix[ref_ids[slice(*col_chunk)], :].todense()
                 chunk_jaccard = calc_jaccard(x1=row_x, x2=col_x, ove_norm=norm)
