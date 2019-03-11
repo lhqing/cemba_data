@@ -289,6 +289,7 @@ def calc_jaccard(x1, x2=None):
     rows1 = np.repeat(b1[:, None], a.shape[1], axis=1)
     rows2 = np.repeat(b2[:, None], a.shape[0], axis=1)
     jaccard_m = a / (rows1 + rows2.T - a)
+    jaccard_m[jaccard_m == 1] = jaccard_m.mean()
     return jaccard_m
 
 
@@ -348,9 +349,10 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
                 chunk_jaccard = calc_jaccard(x1=row_x, x2=col_x)
                 final_jaccard[slice(*row_chunk), slice(*col_chunk)] += chunk_jaccard
 
+    print('Normalizing Jaccard Matrix')
     if norm:
         m1 = csr_matrix.mean(axis=1)
         m2 = csr_matrix[ref_ids, :].mean(axis=1)
         final_jaccard = norm_jaccard(final_jaccard, m1, m2)
-    
+
     return final_jaccard, ref_ids
