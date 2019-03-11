@@ -248,13 +248,11 @@ def _norm_ove(m1, m2):
     return expect
 
 
-def norm_jaccard(jaccard_m, x1, x2=None):
-    if x2 is None:
+def norm_jaccard(jaccard_m, m1, m2=None):
+    if m2 is None:
         # if x2 is None, set to x1 to calculate self pairwise jaccard
-        x2 = x1
+        m2 = m1
 
-    m1 = x1.mean(axis=1)
-    m2 = x2.mean(axis=1)
     expect = _norm_ove(m1, m2)
 
     clf = LinearRegression()
@@ -265,7 +263,7 @@ def norm_jaccard(jaccard_m, x1, x2=None):
     return residual
 
 
-def calc_jaccard(x1, x2=None, ove_norm=True):
+def calc_jaccard(x1, x2=None):
     """
     Return Jaccard matrix of 1 (self) or 2 Cell * Feature matrices.
 
@@ -291,12 +289,7 @@ def calc_jaccard(x1, x2=None, ove_norm=True):
     rows1 = np.repeat(b1[:, None], a.shape[1], axis=1)
     rows2 = np.repeat(b2[:, None], a.shape[0], axis=1)
     jaccard_m = a / (rows1 + rows2.T - a)
-
-    if not ove_norm:
-        return jaccard_m
-    else:
-        norm_jaccard_m = norm_jaccard(jaccard_m, x1, x2)
-        return norm_jaccard_m
+    return jaccard_m
 
 
 def _flexible_chunk(nrow, chunk_size):
@@ -333,7 +326,7 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
                 for col_id, col_chunk in enumerate(col_chunks):
                     row_x = csr_matrix[slice(*row_chunk), :].todense()
                     col_x = csr_matrix[ref_ids[slice(*col_chunk)], :].todense()
-                    k = executor.submit(calc_jaccard, x1=row_x, x2=col_x, ove_norm=norm)
+                    k = executor.submit(calc_jaccard, x1=row_x, x2=col_x)
                     v = (row_id, col_id)
                     future_result[k] = v
 
@@ -352,7 +345,12 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
                 print(f'Calculate {i+1}/{len(row_chunks)} row, {j+1}/{len(col_chunks)} col')
                 row_x = csr_matrix[slice(*row_chunk), :].todense()
                 col_x = csr_matrix[ref_ids[slice(*col_chunk)], :].todense()
-                chunk_jaccard = calc_jaccard(x1=row_x, x2=col_x, ove_norm=norm)
+                chunk_jaccard = calc_jaccard(x1=row_x, x2=col_x)
                 final_jaccard[slice(*row_chunk), slice(*col_chunk)] += chunk_jaccard
 
+    if norm:
+        m1 = csr_matrix.mean(axis=1)
+        m2 = csr_matrix[ref_ids, :].mean(axis=1)
+        final_jaccard = norm_jaccard(final_jaccard, m1, m2)
+    
     return final_jaccard, ref_ids
