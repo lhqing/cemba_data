@@ -315,8 +315,8 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
     # here the col means ref cells, which is also from rows in csr_matrix
     if ref_cov_weight:
         cell_sum = np.log10(csr_matrix.sum(axis=1) + 1)
-        cell_sum = (cell_sum - cell_sum.mean()) / cell_sum.std()
         p = cell_sum / cell_sum.sum()
+        p = np.array(p).reshape(p.size)
     else:
         p = None
 
