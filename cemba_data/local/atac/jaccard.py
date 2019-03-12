@@ -273,8 +273,6 @@ def calc_jaccard(x1, x2=None):
         Cell * Feature matrix
     x2
         Cell * Feature matrix, if None, will only calculate self pairwise jaccard for x1
-    ove_norm
-        Whether do OVE normalization or not
 
     Returns
     -------
@@ -304,7 +302,7 @@ def _flexible_chunk(nrow, chunk_size):
 
 
 def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
-                       max_var=5000, seed=0, norm=True, cpu=1):
+                       max_var=5000, seed=0, norm=True, cpu=1, ref_cov_weight=True):
     nrow, ncol = csr_matrix.shape
     row_chunk_size, col_chunk_size = chunk_size
     row_chunk_size = min(row_chunk_size, nrow)
@@ -315,9 +313,16 @@ def batch_calc_jaccard(csr_matrix, chunk_size=(5000, 5000),
 
     # col_chunks (list of tuple, but is used to slice ref_ids first)
     # here the col means ref cells, which is also from rows in csr_matrix
+    if ref_cov_weight:
+        cell_sum = np.log10(csr_matrix.sum(axis=1) + 1)
+        cell_sum = (cell_sum - cell_sum.mean()) / cell_sum.std()
+        p = cell_sum / cell_sum.sum()
+    else:
+        p = None
+
     max_var = min(max_var, nrow)
     np.random.seed(seed)
-    ref_ids = np.random.choice(range(nrow), size=max_var, replace=False)
+    ref_ids = np.random.choice(range(nrow), size=max_var, replace=False, p=p)
     ref_ids.sort()
     col_chunks = _flexible_chunk(nrow=max_var, chunk_size=col_chunk_size)
 
