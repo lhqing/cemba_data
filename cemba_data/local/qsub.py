@@ -196,6 +196,10 @@ class _Qsubmitter:
                     future_mem = self.running_mem + command_mem
                     if (future_cpu <= self.total_cpu) and (future_mem <= self.total_mem):
                         break
+            if not self.alive:
+                print(f'Stop submitting jobs because CORE SIGNAL "alive" is not true. '
+                      f'CORE SIGNAL dict path {self.core_signal_path}')
+                break
             command_obj.submit()
             # gather submitted id and obj
             if command_obj.submission_fail:
@@ -206,10 +210,6 @@ class _Qsubmitter:
             self.running_cpu += command_cpu
             self.running_mem += command_mem
             time.sleep(self.submission_gap)
-            if not self.alive:
-                print(f'Stop submitting jobs because CORE SIGNAL "alive" is not true. '
-                      f'CORE SIGNAL dict path {self.core_signal_path}')
-                break
 
         # final job check:
         temp_gap = self.qstat_gap
