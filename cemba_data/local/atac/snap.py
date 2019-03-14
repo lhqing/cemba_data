@@ -98,11 +98,13 @@ def reshape_matrix(adata, bed_path, chrom_size_path, slop=5000, force_run=False)
     return result_adata
 
 
+# this is wrong, SNAP matrix feature is not full, bins without any signal in all cell are dropped.
+"""
 def reshape_matrix_fix_step(adata, window, step):
-    """
+    \"""
     Reshape adata.X columns based on fix window size and steps.
     Window and step refer to matrix columns, not any genome region size.
-    """
+    \"""
     batch = 3000
 
     # prepare chrom_slices to separate chromosome columns
@@ -157,6 +159,7 @@ def reshape_matrix_fix_step(adata, window, step):
                            obs=adata.obs.copy(),
                            var=pd.DataFrame([], index=total_chrom_index))
     return result_adata
+"""
 
 
 def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir=None,
