@@ -162,6 +162,16 @@ class _Qsubmitter:
     def _parse_command_file(self):
         with open(self.command_file_path) as command:
             command_dict_list = json.load(command)
+            # validate command file
+            if not isinstance(command_dict_list, list):
+                raise ValueError(f'json.load(open(command_file)) does not return a list, '
+                                 f'but got {type(command_dict_list)}. '
+                                 f'Command file path: {self.command_file_path}')
+            if len(command_dict_list) < 1:
+                raise ValueError(f'Command file seems empty...'
+                                 f'Command file path: {self.command_file_path}')
+
+
             obj_list = []
             for n, command_dict in enumerate(command_dict_list):
                 obj_list.append(_Command(command_dict=command_dict,
