@@ -203,6 +203,10 @@ class Strip:
         return
 
     def plot_strip(self, ax, curve_value=50, **fill_kws):
+        """
+        This function taken from here:
+        https://github.com/anazalea/pySankey
+        """
         if curve_value < 40:
             curve_value = 40
             print(f'Curve value >= 40, got {curve_value}, set to 40 instead.')
