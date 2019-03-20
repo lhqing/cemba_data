@@ -99,19 +99,13 @@ class Sankey:
 
         # draw strips
         for strip in self.strips:
-            if isinstance(strip_color, dict):
-                facecolor = strip_color[(strip.left_label.name, strip.right_label.name)]
-            elif isinstance(strip_color, str):
-                if strip_color == 'left':
-                    facecolor = strip.left_label.color
-                elif strip_color == 'right':
-                    facecolor = strip.right_label.color
-                else:
-                    raise ValueError(f'strip_color can only be "left" or "right", '
-                                     f'got {strip_color}')
+            if strip_color == 'left':
+                facecolor = strip.left_label.color
+            elif strip_color == 'right':
+                facecolor = strip.right_label.color
             else:
-                raise ValueError(f'strip_color can only be dict or str, '
-                                 f'got {type(strip_color)}')
+                # assume this is a color that can be understood in ax.fill_between
+                facecolor = strip_color
             _fill_kws = {'facecolor': facecolor}
             if fill_kws is not None:
                 _fill_kws.update(fill_kws)
