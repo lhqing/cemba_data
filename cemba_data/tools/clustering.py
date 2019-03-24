@@ -170,6 +170,27 @@ def _multi_kmode_clustering(multi_leiden_result, k='auto', cpu=1):
     return result_dict
 
 
+def get_kl_overall_df(adata):
+    if 'leiden_kmode_results' not in adata.uns:
+        raise KeyError('leiden_kmode_results not found in adata.uns, '
+                       'make sure you run leiden_kmode_clustering first.')
+
+    records = []
+    for resolution, kmode_results in adata.uns['leiden_kmode_results'].items():
+        overall_dict = {'pureness': {},
+                        'completeness': {},
+                        'n_cluster': {}}
+        for k, result_dict in kmode_results.items():
+            overall_dict['pureness'][k] = result_dict['overall_pureness']
+            overall_dict['completeness'][k] = result_dict['overall_completeness']
+            overall_dict['n_cluster'][k] = result_dict['cluster'].unique().size
+        overall_df = pd.DataFrame(overall_dict).reset_index().rename(columns={'index': 'k'})
+        overall_df['resolution'] = resolution
+        records.append(overall_df)
+    total_df = pd.concat(records, sort=True)
+    return total_df
+
+
 def _select_optimal_k(kmode_results, pureness_cutoff=0.99, completeness_cutoff=0.95):
     overall_dict = {'pureness': {},
                     'completeness': {},
@@ -190,6 +211,8 @@ def _select_optimal_k(kmode_results, pureness_cutoff=0.99, completeness_cutoff=0
             # break when see the first max n_cluster, additional row is useless
             break
     pass_cutoff = pd.DataFrame(rows)
+    if pass_cutoff.shape[0] == 0:
+        return None
     optimal_k = int(pass_cutoff['k'].max())
     return optimal_k
 
@@ -208,8 +231,8 @@ def _filter_cell_and_cluster(result_dict, cell_ambiguity_cutoff=0.01, cluster_po
 
     cluster_pureness = result_dict['cluster_pureness']
     cluster_completeness = result_dict['cluster_completeness']
-    cell_data['LK_cluster_pureness'] = cell_data['cluster'].map(cluster_pureness)
-    cell_data['LK_cluster_completeness'] = cell_data['cluster'].map(cluster_completeness)
+    cell_data['LK_cluster_pureness'] = cell_data['LK_cluster'].map(cluster_pureness)
+    cell_data['LK_cluster_completeness'] = cell_data['LK_cluster'].map(cluster_completeness)
 
     # ambiguity judge
     ambiguity_judge = cell_data['LK_cell_ambiguity'] <= cell_ambiguity_cutoff
@@ -224,8 +247,8 @@ def _filter_cell_and_cluster(result_dict, cell_ambiguity_cutoff=0.01, cluster_po
     cell_data['LK_final_judge'] = cluster_judge & ambiguity_judge
 
     # mask cell's cluster
-    cell_data['LK_masked_cluster'] = cell_data.apply(lambda i: str(i['cluster']) if i['final_judge'] else np.nan,
-                                                     axis=1)
+    cell_data['LK_masked_cluster'] = cell_data.apply(
+        lambda i: str(i['LK_cluster']) if i['LK_final_judge'] else np.nan, axis=1)
     return cell_data
 
 
@@ -239,7 +262,7 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
     total_results = {}
     for _resolution in resolutions:
         print(f'Running {leiden_repeats} clustering with resolution {_resolution}')
-        results = _multi_leiden_clustering(adata, cpu=cpu, n=300, resolution=_resolution)
+        results = _multi_leiden_clustering(adata, cpu=cpu, n=leiden_repeats, resolution=_resolution)
         mode_k = int(results.apply(lambda i: i.cat.categories.size, axis=0).mode())
         if kmode_ks == 'auto':
             # generate a list based on mode k
@@ -277,6 +300,7 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
 # this function filter the leiden_kmode_clustering result to automatically
 # determine optimal resolution and k, and annotate cells about their cluster and ambiguity info.
 def judge_leiden_kmode_results(adata,
+                               select_k=None, select_resolution=None,
                                pureness_cutoff=0.99,
                                completeness_cutoff=0.95,
                                cell_ambiguity_cutoff=0.01,
@@ -288,20 +312,26 @@ def judge_leiden_kmode_results(adata,
     parameters = adata.uns['leiden_kmode_parameter']
     resolutions = parameters['resolutions']
 
-    best_resolution = None
+    best_resolution = -1
     max_opt_k = -1
-    for resolution in resolutions:
-        kmode_results = total_results[resolution]
-        opt_k = _select_optimal_k(kmode_results,
-                                  pureness_cutoff=pureness_cutoff,
-                                  completeness_cutoff=completeness_cutoff)
-        print(resolution, opt_k)
-        if opt_k is not None:
-            if opt_k > max_opt_k:
+    if select_k is None or select_resolution is None:
+        for resolution in sorted(resolutions):
+            kmode_results = total_results[resolution]
+            opt_k = _select_optimal_k(kmode_results,
+                                      pureness_cutoff=pureness_cutoff,
+                                      completeness_cutoff=completeness_cutoff)
+            if opt_k is not None:
                 best_resolution = resolution
                 max_opt_k = opt_k
+            else:
+                break
+    else:
+        best_resolution = select_resolution
+        max_opt_k = select_k
 
-    if best_resolution is not None:
+    if best_resolution != -1:
+        print(f'Optimal Resolution {best_resolution}.')
+        print(f'Optimal K for KMode {max_opt_k}. Note: this is not final cluster number.')
         best_k_result = total_results[best_resolution][max_opt_k]
         cell_data = _filter_cell_and_cluster(best_k_result,
                                              cell_ambiguity_cutoff=cell_ambiguity_cutoff,
@@ -316,3 +346,8 @@ def judge_leiden_kmode_results(adata,
         print('None of the resolution and K value combination fulfill both the pureness and completeness cutoff. '
               'Try loosen the cutoff or change the resolution and K ranges '
               'in leiden_kmode_clustering and calculate again.')
+
+
+def determine_resolution():
+    # automatically determine resolution and cluster range using ARI
+    return

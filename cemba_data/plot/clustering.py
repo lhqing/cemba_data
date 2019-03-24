@@ -1,21 +1,30 @@
-def plot_kmode_overall(overall_df):
-    fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
+import seaborn as sns
+from .cell import categorical_scatter
+
+
+def _plot_kmode_overall_single_r(ax, overall_df):
     sns.lineplot(data=overall_df, color='orange',
-                 x='k', y='pureness', ax=ax1, label='Pureness',
+                 x='k', y='pureness', ax=ax, label='Pureness',
                  markers=True, dashes=True, legend=None)
     sns.scatterplot(data=overall_df, color='orange',
-                 x='k', y='pureness', ax=ax1, legend=None)
-    ax1_twin = ax1.twinx()
+                 x='k', y='pureness', ax=ax, legend=None)
+    ax_twin = ax.twinx()
     sns.lineplot(data=overall_df, color='steelblue',
-                 x='k', y='completeness', ax=ax1_twin, label='Completeness',
+                 x='k', y='completeness', ax=ax_twin, label='Completeness',
                  markers=True, dashes=True, legend=None, )
     sns.scatterplot(data=overall_df, color='steelblue',
-                 x='k', y='completeness', ax=ax1_twin, legend=None)
-    ax1.grid()
-    ax1.set(ylim=(0.98, 1))
-    ax1_twin.set(ylim=(0.8, 1))
-    fig.tight_layout()
-    return fig, (ax1)
+                 x='k', y='completeness', ax=ax_twin, legend=None)
+    ax.grid()
+    ax.set(ylim=(0.98, 1))
+    ax_twin.set(ylim=(0.8, 1))
+    return ax
+
+
+def plot_kmode_overall(axes, overall_df):
+    for ax, (resolution, sub_df) in zip(axes.flat, overall_df.groupby('resolution')):
+        _plot_kmode_overall_single_r(ax, sub_df)
+        ax.set_title(f'Resolution = {resolution}')
+    return axes
 
 
 def plot_kmode_stats(axes, coord_data, result_dict, coord_base='umap'):
