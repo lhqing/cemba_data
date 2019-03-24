@@ -5,7 +5,7 @@ from anndata import AnnData
 import pybedtools
 import h5py
 import subprocess
-import pathlib
+import collections
 
 
 def read_snap(file_path, bin_size=5000):
@@ -162,89 +162,6 @@ def reshape_matrix_fix_step(adata, window, step):
 """
 
 
-def split_bam(bam_path, out_prefix, cell_to_cluster, out_dir=None,
-              keep_unknown=False, cpu=10, mapq_cutoff=10):
-    """
-
-    Parameters
-    ----------
-    bam_path
-
-    out_prefix
-
-    cell_to_cluster
-        A dict where the key is cell barcode, value is cluster assignment
-    out_dir
-
-    keep_unknown
-
-    cpu
-
-    mapq_cutoff
-
-    Returns
-    -------
-
-    """
-    bam_path = pathlib.Path(bam_path).absolute()
-    # get bam header text
-    headers = subprocess.run(['samtools', 'view', '-H', str(bam_path)],
-                             stderr=subprocess.PIPE, stdout=subprocess.PIPE, encoding='utf8').stdout
-
-    # set up out dir
-    if out_dir is None:
-        out_dir = bam_path.parent
-    else:
-        out_dir = pathlib.Path(out_dir).absolute()
-    # set up output handle for each cluster
-    unique_clusters = set(cell_to_cluster.values())
-    if keep_unknown:
-        unique_clusters.add('unknown')
-    cluster_handle_dict = {}
-    for cluster in unique_clusters:
-        out_handle = open(out_dir / f'{out_prefix}.{cluster}.sam', 'w')
-        out_handle.write(headers)
-        cluster_handle_dict[cluster] = out_handle
-
-    # read and split bam file
-    read_popen = subprocess.Popen(['samtools', 'view', str(bam_path)],
-                                  stdout=subprocess.PIPE, encoding='utf8')
-    for line in read_popen.stdout:
-        cell_id = line.split(':')[0]
-        try:
-            cluster_handle_dict[cell_to_cluster[cell_id]].write(line)
-        except KeyError:
-            if keep_unknown:
-                cluster_handle_dict['unknown'].write(line)
-            else:
-                continue
-    for k, v in cluster_handle_dict.items():
-        v.close()
-
-    # transfer all split sam into bam
-    for cluster in unique_clusters:
-        out_sam = str(out_dir / f'{out_prefix}.{cluster}.sam')
-        out_bam = str(out_dir / f'{out_prefix}.{cluster}.bam')
-        sort_bam = str(out_dir / f'{out_prefix}.{cluster}.sort.bam')
-        dedup_bam = str(out_dir / f'{out_prefix}.{cluster}.dedup.bam')
-        dedup_matrix = dedup_bam + '.matrix'
-        cmd = f'samtools view -q {mapq_cutoff} -f 2 {out_sam} -o {out_bam}'
-        subprocess.run(cmd.split(' '), check=True)
-        cmd = f'samtools sort -@ {cpu} {out_bam} -o {sort_bam}'
-        subprocess.run(cmd.split(' '), check=True)
-        subprocess.run(['rm', '-f', out_sam])
-        dedup_cmd = f'picard MarkDuplicates I={sort_bam} O={dedup_bam} ' \
-                    f'M={dedup_matrix} REMOVE_DUPLICATES=true'
-        subprocess.run(dedup_cmd.split(' '), check=True)
-        cmd = ['samtools', 'index', str(dedup_bam)]
-        subprocess.run(cmd, stderr=subprocess.PIPE)
-        cmd = ['bamCoverage', '-b', str(dedup_bam), '-o',
-               str(dedup_bam)[:-3] + 'bigwig', '--binSize', '50',
-               '-p', '1', '--normalizeUsing', 'CPM']
-        subprocess.run(cmd, stderr=subprocess.PIPE)
-    return
-
-
 def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3, chunksize=500, seed=0):
     from sklearn.neighbors import LocalOutlierFactor
 
@@ -291,3 +208,74 @@ def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3,
                                           index=pd.Index(cell_id)),
                          var=adata.var.copy())
     return meta_adata
+
+
+def _get_barcode_dict(f):
+    barcode_dict = collections.OrderedDict()
+    i = 0
+    for item in f["BD/name"]:
+        item = item.decode()
+        barcode_dict[item] = i
+        i = i + 1
+    return barcode_dict
+
+
+def _get_frags_iter(f, barcodes, barcode_dict, barcode_chunk=50):
+    frag_list = []
+    count = 0
+    for barcode in barcodes:
+        try:
+            barcode_id = barcode_dict[barcode]
+        except KeyError:
+            print(f'barcode {barcode} not found in snap file')
+            continue
+        barcodePos = f["FM"]["barcodePos"][barcode_id] - 1
+        barcodeLen = f["FM"]["barcodeLen"][barcode_id]
+        _chroms = [item.decode() for item in f["FM"]["fragChrom"][barcodePos:(barcodePos + barcodeLen)]]
+        _start = f["FM"]["fragStart"][barcodePos:(barcodePos + barcodeLen)]
+        _len = f["FM"]["fragLen"][barcodePos:(barcodePos + barcodeLen)]
+        frag_list = frag_list + list(zip(_chroms, _start, _start + _len, [1] * len(_chroms)))
+
+        count += 1
+        if count % barcode_chunk == 0:
+            yield frag_list
+            frag_list = []
+    yield frag_list
+
+
+def _dump_frags_single_snap(snap_path, out_f, barcodes):
+    total_frags = 0
+    with h5py.File(snap_path, 'r') as f:
+        barcode_dict = _get_barcode_dict(f)
+        for frag_chunk in _get_frags_iter(f, barcodes, barcode_dict, barcode_chunk=50):
+            total_frags += len(frag_chunk)
+            for frag in frag_chunk:
+                out_f.write("\t".join(map(str, frag)) + "\n")
+    return total_frags
+
+
+def dump_frags(snap_path_dict, barcode_dict, out_prefix, chrom_size_path, scale=1,
+               sort_mem='10%', sort_cpu=1, path_to_bedgraphtobigwig=''):
+    with open(out_prefix + '.frags', 'w') as out_f:
+        for snap, barcodes in barcode_dict.items():
+            print(f'extract fragments from {snap}...')
+            snap_path = snap_path_dict[snap]
+            _dump_frags_single_snap(snap_path, out_f, barcodes)
+    scale = f'{scale:.5f}'
+    print(f'Calculate genome coverage, scale {scale}')
+    with open(out_prefix + '.genome_cov', 'w') as out_f:
+        sort_p = subprocess.Popen(['sort', '-k1,1', '-k2,2n',
+                                   '-S', sort_mem, '--parallel', str(sort_cpu), out_prefix + '.frags'],
+                                  stdout=subprocess.PIPE)
+        genome_cov_p = subprocess.Popen(['bedtools', 'genomecov', '-bg', '-i', '-',
+                                         '-g', chrom_size_path, '-scale', scale],
+                                        stdin=sort_p.stdout,
+                                        stdout=out_f)
+        genome_cov_p.wait()
+    print('bedGraph to BigWig')
+    subprocess.run([path_to_bedgraphtobigwig + 'bedGraphToBigWig',
+                    out_prefix + '.genome_cov', chrom_size_path, out_prefix + '.bg'], check=True)
+
+    print('Clean up')
+    subprocess.run(['rm', '-f', out_prefix + '.frags', out_prefix + '.genome_cov'], check=True)
+    return
