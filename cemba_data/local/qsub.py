@@ -437,9 +437,9 @@ class _Command:
                     else:
                         continue
         if (self.return_code == -99) or (self.start_time is None) or (self.end_time is None):
-            print('Job {self.qsub_id} return code: {self.return_code} (default init is -99)')
-            print('Job {self.qsub_id} start time: {self.start_time} (default is None)')
-            print('Job {self.qsub_id} end time: {self.end_time} (default is None)')
+            print(f'Job {self.qsub_id} return code: {self.return_code} (default init is -99)')
+            print(f'Job {self.qsub_id} start time: {self.start_time} (default is None)')
+            print(f'Job {self.qsub_id} end time: {self.end_time} (default is None)')
             raise ValueError(f'Output log for job {self.qsub_id} {self.unique_id} is not complete')
         self.duration_second = (self.end_time - self.start_time).total_seconds()
         return
