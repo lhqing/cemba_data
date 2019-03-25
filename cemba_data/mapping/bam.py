@@ -114,6 +114,6 @@ def bam_qc(bismark_result, out_dir, config):
         # only keep filtered bam and bismark report
         remove_file_list = [str(p) for p in pathlib.Path(out_dir).glob(f'{uid}_{index_name}_R*.*bismark*')]
         remove_file_str = ' '.join(remove_file_list)
-        rm_cmd = f'rm -f {remove_file_str}'
+        rm_cmd = f'ionice -c 2 -n 0 rm -f {remove_file_str}'
         subprocess.run(shlex.split(rm_cmd), encoding='utf8')
     return bam_result_df

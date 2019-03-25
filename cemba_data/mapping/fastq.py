@@ -239,12 +239,12 @@ def fastq_qc(demultiplex_result, out_dir, config):
     # clean up
     for (uid, index_name), sub_df in demultiplex_result.groupby(['uid', 'index_name']):
         r_path_pattern = f'{out_dir}/{uid}_L*_{index_name}_R*.fq.gz'
-        r_rm_cmd = f'rm -f {r_path_pattern}'
+        r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
     for uid in demultiplex_result['uid'].unique():
         # remove unknown reads
         r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq.gz'
-        r_rm_cmd = f'rm -f {r_path_pattern}'
+        r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
 
     return fastq_final_result

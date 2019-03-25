@@ -868,9 +868,9 @@ def _index_allc_file_batch(allc_files, cpu=1):
     return 0
 
 
-def _index_allc_file(allc_file):
+def _index_allc_file(allc_file, reindex=False):
     index_file = str(allc_file) + '.idx'
-    if os.path.exists(index_file):
+    if os.path.exists(index_file) and not reindex:
         # backward compatibility
         with open(index_file) as f:
             last_line = f.readlines()[-1]
