@@ -151,7 +151,7 @@ class MCDS(xr.Dataset):
             raise KeyError(f'{dim} is not a dimension of {da}')
         da_mc = self[da].sel(count_type='mc')
         da_cov = self[da].sel(count_type='cov')
-        
+
         if method == 'bayes':
             rate = _calculate_posterior_mc_rate(mc_da=da_mc,
                                                 cov_da=da_cov,
@@ -173,12 +173,35 @@ class MCDS(xr.Dataset):
         self[da + "_" + rate_da_suffix] = rate
         return
 
-    def to_ann(self, da, var_dim, mc_type, obs_dim='cell'):
+    def to_ann(self, da, var_dim, obs_dim='cell', **sel_kwargs):
+        if len(self[da].dims) < 2:
+            raise ValueError(f'to_ann only apply to dataarray with >= 2 dims, '
+                             f'{da} have only {len(self[da].dims)} dim')
+
+        _data = self[da].sel(**sel_kwargs).squeeze().values
+
+        if len(_data.shape) != 2:
+            if ('mc_type' in self[da].dims) and ('mc_type' not in sel_kwargs):
+                raise ValueError(f'The {da} dataarray have mc_type dimension, '
+                                 f'you must provide mc_type for AnnData')
+            else:
+                raise ValueError(f'The {da} dataarray is not 2D after selection, '
+                                 f'you must provide sel_kwargs to select additional dims, '
+                                 f'AnnData can only be 2D.')
+
         index_dict = self[da].indexes
-        # TODO: turn all var_dim and obs_dim coords into obs and var df of AnnData
-        return AnnData(X=self[da].sel(mc_type=mc_type).squeeze().values.copy(),
-                       obs=pd.DataFrame(index=index_dict[obs_dim]),
-                       var=pd.DataFrame(index=index_dict[var_dim]))
+        obs_df = pd.DataFrame({k: pd.Series(v)
+                               for k, v in index_dict.items()
+                               if v.name == obs_dim},
+                              index=index_dict[obs_dim])
+        var_df = pd.DataFrame({k: pd.Series(v)
+                               for k, v in index_dict.items()
+                               if v.name == var_dim},
+                              index=index_dict[var_dim])
+
+        return AnnData(X=_data.copy(),
+                       obs=obs_df,
+                       var=var_df)
 
     def add_ann_results(self, adata, var_dim, obs_dim='cell'):
         # columns from AnnData.obs and AnnData.var go to da.coords
@@ -287,7 +310,7 @@ class MCDS(xr.Dataset):
                 gene_cov_df = self['gene_da'].sel(mc_type=gene_mc_type,
                                                   count_type='cov',
                                                   gene=select_genes).to_pandas()
-                gene_cov_df.columns = gene_cov_df.columns.map(lambda i: i+'_cov')
+                gene_cov_df.columns = gene_cov_df.columns.map(lambda i: i + '_cov')
                 all_dfs.append(gene_cov_df)
 
         total_df = pd.concat(all_dfs, axis=1, sort=True)
