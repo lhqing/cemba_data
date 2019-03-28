@@ -190,11 +190,11 @@ class MCDS(xr.Dataset):
                                  f'AnnData can only be 2D.')
 
         index_dict = self[da].indexes
-        obs_df = pd.DataFrame({k: pd.Series(v)
+        obs_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
                                if v.name == obs_dim},
                               index=index_dict[obs_dim])
-        var_df = pd.DataFrame({k: pd.Series(v)
+        var_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
                                if v.name == var_dim},
                               index=index_dict[var_dim])
