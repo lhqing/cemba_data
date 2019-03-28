@@ -41,7 +41,7 @@ def level_one_palette(name_list, order=None, palette='default'):
             palette = 'tab20'
 
     if order is None:
-        order = name_set
+        order = list(sorted(name_set))
     else:
         if (set(order) != name_set) or (len(order) != len(name_set)):
             raise ValueError('Order is not equal to set(name_list).')

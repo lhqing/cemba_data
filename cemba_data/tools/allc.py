@@ -100,6 +100,7 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     return path_dict
 
 
+# TODO: change map to region using tabix, prevent output temp file and include parallel
 def map_to_region(allc_path, out_path_prefix,
                   region_bed_path, region_name, genome_size_path,
                   context_pattern, max_cov_cutoff, remove_tmp):
