@@ -320,8 +320,8 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
             _data['size'] = size.astype(float)
             size = 'size'
         # make sure size >= 1
-        _data['size'] = _data['size'] - _data['size'].min() + 1
-            
+        _data[size] = _data[size] - _data[size].min() + 1
+
         if size_norm is None:
             print(f'Use size_portion {size_portion} to determine size_norm')
             # get the smallest range that include "size_portion" of data
