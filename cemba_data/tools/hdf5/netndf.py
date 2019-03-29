@@ -203,7 +203,7 @@ class MCDS(xr.Dataset):
                        obs=obs_df,
                        var=var_df)
 
-    def add_ann_results(self, adata, var_dim, obs_dim='cell'):
+    def add_ann_results(self, adata, var_dim=None, obs_dim='cell'):
         # columns from AnnData.obs and AnnData.var go to da.coords
         # obsm goes to new da with corresponding new dimension
         obs_df = adata.obs
@@ -211,10 +211,11 @@ class MCDS(xr.Dataset):
         for col, data in obs_df.iteritems():
             self.coords[col] = data
 
-        var_df = adata.var
-        var_df.index.name = var_dim  # make sure coords added with var index
-        for col, data in var_df.iteritems():
-            self.coords[col] = data
+        if var_dim is not None:
+            var_df = adata.var
+            var_df.index.name = var_dim  # make sure coords added with var index
+            for col, data in var_df.iteritems():
+                self.coords[col] = data
 
         for obsm_key in adata.obsm_keys():
             coord_name = obsm_key[2:]  # remove 'X_'

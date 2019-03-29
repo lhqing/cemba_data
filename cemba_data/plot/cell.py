@@ -46,6 +46,8 @@ def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=5):
 
 
 def _dodge(point_array, max_movement=0.05):
+    # TODO change this to using adjusttext package
+    print('deprecated, will use adjusttext package')
     """dodge point to prevent overlap (very naive)"""
     # add some noise to prevent exact same points
     noise = (np.random.random(size=point_array.shape) - 0.5) / 10000
@@ -78,7 +80,8 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
     if dodge is None:
         # text annotation
         for text, sub_df in data.groupby(anno_col):
-            if (not isinstance(text, str)) or (text == ''):
+            text = str(text)
+            if text in ['', 'nan']:
                 continue
             x, y, *_ = sub_df.median()
             ax.text(x, y, text,
@@ -127,7 +130,6 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
     sns.despine(ax=ax, bottom=True, left=True, right=True)
     ax.yaxis.tick_right()
     ax.yaxis.set_label_position('right')
-
     ax.set(ylim=(0, 1), xlim=(-0.1, 1), xticks=[], yticks=[])
     return ax
 
@@ -161,20 +163,7 @@ def density_based_sample(data, coords, portion=None, size=None, seed=None):
     return data.reindex(selected_cell_index)
 
 
-def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
-                        expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
-                        scatter_kws=None, text_anno_kws=None, axis_format='tiny',
-                        show_legend=False, legend_kws=None, max_points=None):
-    # down sample plot data if needed.
-    if max_points is not None:
-        if data.shape[0] > max_points:
-            data = density_based_sample(data, seed=1, size=max_points,
-                                        coords=[f'{coord_base}_0',
-                                                f'{coord_base}_1'])
-    _scatter_kws = dict(linewidth=0, s=7, legend=None, palette=palette)
-    if scatter_kws is not None:
-        _scatter_kws.update(scatter_kws)
-
+def _translate_coord_base(coord_base):
     _coord_base = coord_base
     coord_base = coord_base.lower()
     if coord_base == 'tsne':
@@ -185,18 +174,37 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
         real_coord_name = 'PC'
     else:
         real_coord_name = _coord_base
+    return real_coord_name
+
+
+def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about basic scatter
+                        expand_border_scale=0.1, border_quantile=0.01,  # about xlim and ylim
+                        hue=None, palette='tab10',  # about hue
+                        text_anno=None, dodge=None, text_anno_kws=None,  # about text anno
+                        show_legend=False, legend_kws=None,  # about legend
+                        axis_format='tiny', max_points=5000):  # other adjustment
+    # down sample plot data if needed.
+    if max_points is not None:
+        if data.shape[0] > max_points:
+            data = density_based_sample(data, seed=1, size=max_points,
+                                        coords=[f'{coord_base}_0',
+                                                f'{coord_base}_1'])
+    _scatter_kws = dict(linewidth=0, s=7, legend=None, palette=palette)
+    if scatter_kws is not None:
+        _scatter_kws.update(scatter_kws)
+    real_coord_name = _translate_coord_base(coord_base)
 
     scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale, border_quantile)
     scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale, border_quantile)
     _data = pd.DataFrame({'x': scaled_x,
                           'y': scaled_y})
+
     if hue is not None:
         if isinstance(hue, str):
-            _data[hue] = data[hue]
+            _data[hue] = data[hue].astype('category')
         else:
-            _data['hue'] = hue
+            _data['hue'] = hue.astype('category')
             hue = 'hue'
-
         # deal with color palette
         palette = _scatter_kws['palette']
         if isinstance(palette, str) or isinstance(palette, list):
@@ -236,7 +244,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
 
     if show_legend:
-        hue_length = len(_data[hue])
+        hue_length = len(_data[hue].cat.ca)
         _legend_kws = dict(ncol=(1 if hue_length <= 14 else 2 if hue_length <= 30 else 3))
         if legend_kws is not None:
             _legend_kws.update(legend_kws)
@@ -244,7 +252,7 @@ def categorical_scatter(data, ax, coord_base='tsne', hue=None, palette='tab10',
     return ax
 
 
-def continuous_scatter(data, ax, coord_base='tsne',
+def continuous_scatter(data, ax, coord_base='umap',
                        sample_portion=None, sample_size=None, seed=0,
                        expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
                        hue=None, hue_portion=0.8, cmap='viridis', colorbar=True,
