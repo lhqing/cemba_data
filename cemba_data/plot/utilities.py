@@ -2,8 +2,13 @@ import numpy as np
 from matplotlib.colorbar import ColorbarBase
 
 
-def tight_hue_range(hue_data, portion):
+def tight_hue_range(hue_data, portion, force_positive=False):
     """Automatic select a SMALLEST data range that covers [portion] of the data"""
+    hue_data = hue_data[np.isfinite(hue_data)]
+
+    if force_positive and (hue_data.min() < 0):
+        hue_data = hue_data - hue_data.min() + 1
+
     hue_quantiles = hue_data.quantile(q=np.arange(0, 1, 0.01))
     min_window_right = hue_quantiles.rolling(window=int(portion * 100)) \
         .apply(lambda i: i.max() - i.min(), raw=True) \
@@ -11,14 +16,14 @@ def tight_hue_range(hue_data, portion):
     min_window_left = max(0, min_window_right - portion)
     vmin, vmax = tuple(hue_data.quantile(q=[min_window_left,
                                             min_window_right]))
-    if np.isnan(vmin):
-        vmin = hue_data.min()
-    else:
+    if np.isfinite(vmin):
         vmin = max(hue_data.min(), vmin)
-    if np.isnan(vmax):
-        vmax = hue_data.max()
     else:
+        vmin = hue_data.min()
+    if np.isfinite(vmax):
         vmax = min(hue_data.max(), vmax)
+    else:
+        vmax = hue_data.max()
     return vmin, vmax
 
 
