@@ -6,6 +6,7 @@ from sklearn.neighbors import LocalOutlierFactor
 from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize, LogNorm
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from matplotlib.lines import Line2D
 from .color import level_one_palette
 from .utilities import tight_hue_range, plot_colorbar
 
@@ -22,7 +23,7 @@ def _robust_scale_0_1(coord, expand_border_scale=0.1, border_quantile=0.01):
     return true_coord
 
 
-def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=5):
+def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=6):
     """this function assume coord is [0, 1]"""
     # clean ax axises
     ax.set(xticks=[], yticks=[], xlabel=None, ylabel=None)
@@ -69,8 +70,9 @@ def _dodge(point_array, max_movement=0.05):
 
 
 def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None):
+    # TODO adjust label color, turn white when background is dark
     """Add text annotation to a scatter plot"""
-    _text_anno_kws = dict(fontsize=6,
+    _text_anno_kws = dict(fontsize=10,
                           fontweight='black',
                           horizontalalignment='center',
                           verticalalignment='center')
@@ -137,7 +139,7 @@ def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
 def density_based_sample(data, coords, portion=None, size=None, seed=None):
     clf = LocalOutlierFactor(n_neighbors=20, algorithm='auto',
                              leaf_size=30, metric='minkowski',
-                             p=2, metric_params=None)
+                             p=2, metric_params=None, contamination=0.1)
     data_coords = data[coords]
     clf.fit(data_coords)
     # original score is negative, the larger the denser
@@ -199,6 +201,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
     _data = pd.DataFrame({'x': scaled_x,
                           'y': scaled_y})
 
+    palette_dict = None
     if hue is not None:
         if isinstance(hue, str):
             _data[hue] = data[hue].astype('category')
@@ -243,21 +246,33 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
         _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
 
-    if show_legend:
-        hue_length = _data[hue].unique().size
-        _legend_kws = dict(ncol=(1 if hue_length <= 14 else 2 if hue_length <= 30 else 3))
+    if show_legend and (hue is not None):
+        n_hue = len(palette_dict)
+        _legend_kws = dict(ncol=(1 if n_hue <= 14 else 2 if n_hue <= 30 else 3), fontsize=10)
         if legend_kws is not None:
             _legend_kws.update(legend_kws)
+
+        handles = []
+        labels = []
+        for hue_name, color in palette_dict.items():
+            handle = Line2D([0], [0], marker='o', color='w',
+                            markerfacecolor=color, markersize=_legend_kws['fontsize'])
+            handles.append(handle)
+            labels.append(hue_name)
+        _legend_kws['handles'] = handles
+        _legend_kws['labels'] = labels
         ax.legend(**_legend_kws)
     return ax
 
 
-def continuous_scatter(data, ax, coord_base='umap',
-                       sample_portion=None, sample_size=None, seed=0,
-                       expand_border_scale=0.1, border_quantile=0.01, text_anno=None, dodge=None,
-                       hue=None, hue_portion=0.8, cmap='viridis', colorbar=True,
-                       size=None, size_portion=0.8, label_fontsize=5, sizebar=True,
-                       scatter_kws=None, text_anno_kws=None, axis_format='tiny', max_points=None):
+def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
+                       expand_border_scale=0.1, border_quantile=0.01,
+                       hue=None, hue_norm=None, hue_portion=0.8, cmap='viridis',
+                       colorbar=True, colorbar_label_kws=None,
+                       size=None, size_norm=None, size_portion=0.8, sizes=None,
+                       sizebar=True, sizebar_label_kws=None,
+                       text_anno=None, dodge=None, text_anno_kws=None,
+                       axis_format='tiny', max_points=5000):
     # down sample plot data if needed.
     if max_points is not None:
         if data.shape[0] > max_points:
@@ -265,25 +280,10 @@ def continuous_scatter(data, ax, coord_base='umap',
                                         coords=[f'{coord_base}_0',
                                                 f'{coord_base}_1'])
 
-    if (sample_portion is not None) or (sample_size is not None):
-        data = density_based_sample(data.copy(),
-                                    coords=[f'{coord_base}_0', f'{coord_base}_1'],
-                                    portion=sample_portion, size=sample_size, seed=seed)
-
-    _coord_base = coord_base
-    coord_base = coord_base.lower()
-    if coord_base == 'tsne':
-        real_coord_name = 'tSNE'
-    elif coord_base == 'umap':
-        real_coord_name = 'UMAP'
-    elif coord_base in ['pca', 'pc']:
-        real_coord_name = 'PC'
-    else:
-        real_coord_name = _coord_base
-
     _scatter_kws = dict(linewidth=0, s=7, legend=None)
     if scatter_kws is not None:
         _scatter_kws.update(scatter_kws)
+    real_coord_name = _translate_coord_base(coord_base)
 
     scaled_x = _robust_scale_0_1(data[f'{coord_base}_0'], expand_border_scale, border_quantile)
     scaled_y = _robust_scale_0_1(data[f'{coord_base}_1'], expand_border_scale, border_quantile)
@@ -295,33 +295,43 @@ def continuous_scatter(data, ax, coord_base='umap',
         else:
             _data['hue'] = hue
             hue = 'hue'
-        # get the smallest range that include "hue_portion" of data
-        hue_norm = tight_hue_range(_data[hue], hue_portion)
-        # from here, cmap become colormap object
-        cmap = mpl.cm.get_cmap(cmap)
+        if hue_norm is None:
+            print(f'Use hue_portion {hue_portion} to determine hue_norm')
+            # get the smallest range that include "hue_portion" of data
+            hue_norm = tight_hue_range(_data[hue], hue_portion)
+        if isinstance(cmap, str):
+            # from here, cmap become colormap object
+            cmap = mpl.cm.get_cmap(cmap)
+            cmap.set_bad(color=(0.5, 0.5, 0.5, 0.5))
+        else:
+            if not isinstance(cmap, mpl.cm.ScalarMappable):
+                raise TypeError(f'cmap can only be str or ScalarMappable, got {type(cmap)}')
         # cnorm is the normalizer for color
         cnorm = mpl.colors.Normalize(vmin=hue_norm[0],
                                      vmax=hue_norm[1])
-        cmap.set_bad(color=(0.5, 0.5, 0.5, 0.5))
     else:
         hue_norm = None
         cnorm = None
 
     if size is not None:
         if isinstance(size, str):
-            _data[size] = data[size]
+            _data[size] = data[size].astype(float)
         else:
-            _data['size'] = size
+            _data['size'] = size.astype(float)
             size = 'size'
-        # get the smallest range that include "size_portion" of data
-        size_norm = tight_hue_range(_data[hue], size_portion)
+        if size_norm is None:
+            print(f'Use size_portion {size_portion} to determine size_norm')
+            # get the smallest range that include "size_portion" of data
+            size_norm = tight_hue_range(_data[size], size_portion, force_positive=True)
+
         # snorm is the normalizer for size
         # for size, LogNorm is more suitable
         snorm = LogNorm(vmin=size_norm[0],
                         vmax=size_norm[1])
         # replace s with sizes
         s = _scatter_kws.pop('s')
-        sizes = (1, s)
+        if sizes is None:
+            sizes = (1, s)
     else:
         size_norm = None
         sizes = None
@@ -355,19 +365,25 @@ def continuous_scatter(data, ax, coord_base='umap',
     return_axes = [ax]
 
     if colorbar and (hue is not None):
+        _colorbar_label_kws = dict(fontsize=10, label=hue, labelpad=6, rotation=270)
+        if colorbar_label_kws is not None:
+            _colorbar_label_kws.update(colorbar_label_kws)
+
         # small ax for colorbar
         # inset_axes add a special ax in figure level: mpl_toolkits.axes_grid1.parasite_axes.AxesHostAxes
         # so there is not way to access cax within ax, we should return cax as well
         # In matplotlib 3.0, ax.inset_axes() can access its own inset_axes, but it is experimental
         cax = inset_axes(ax, width="3%", height="25%",
                          loc='lower right', borderpad=0)
-
         cax = plot_colorbar(cax, cmap=cmap, cnorm=cnorm, hue_norm=hue_norm,
-                            label_kws=dict(label='Normalized mCH%', labelpad=8,
-                                           rotation=270, fontsize=label_fontsize))
+                            label_kws=_colorbar_label_kws)
         return_axes.append(cax)
 
     if sizebar and (size is not None):
+        _sizebar_label_kws = dict(fontsize=10, label=size, labelpad=6, rotation=270)
+        if sizebar_label_kws is not None:
+            _sizebar_label_kws.update(sizebar_label_kws)
+
         # small ax for sizebar
         sax = inset_axes(ax, width="3%", height="25%",
                          loc='upper right', borderpad=0)
@@ -375,14 +391,13 @@ def continuous_scatter(data, ax, coord_base='umap',
         return_axes.append(sax)
 
         sax = _sizebar(sax)
-        sax.set_yticks([0, 0.5, 1])  # the y axis for sizebar is fixed
-        ticklabels = list(map(lambda i: f'{i:.0f}', [size_norm[0], sum(size_norm) / 2, size_norm[1]]))
-        sax.set_yticklabels(ticklabels)
-        sax.set_ylabel('cov', labelpad=10, rotation=270, fontsize=label_fontsize)
-        sax.yaxis.set_tick_params(labelsize=label_fontsize, width=0.5, pad=1)
+        # do not set the ticks, let the user do custom works
+        # ticklabels = list(map(lambda i: f'{i:.0f}', [size_norm[0], sum(size_norm) / 2, size_norm[1]]))
+        # sax.set(yticks=[0, 0.5, 1], yticklabels=ticklabels)
+        # sax.yaxis.set_tick_params(labelsize=label_fontsize, width=0.5, pad=1)
+        sax.set_ylabel(**_sizebar_label_kws)
 
     if text_anno is not None:
         _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
-        # TODO adjust label color, turn white when background is dark
     return tuple(return_axes)
