@@ -258,7 +258,7 @@ class MCDS(xr.Dataset):
 
     def get_cell_tidy_data(self, tsne=True, umap=True, pca=True, pc_components=4,  # Select coordinates
                            select_genes=None, gene_mc_type='CHN', add_gene_cov=True,
-                           add_gene_rna=True, rna_count_type='gene'):
+                           add_gene_rna=True, rna_count_type='gene', norm_rna_by_cell=True):
         # A cell tidy dataframe need:
         # - tsne, umap and pca coordinates
         # - gene rate and gene cov
@@ -320,8 +320,13 @@ class MCDS(xr.Dataset):
 
             # add gene RNA info, only when rna_da exist (e.g. snmCT-seq)
             if add_gene_rna and 'rna_da' in self.data_vars:
-                rna_df = self['rna_da'].sel(count_type=rna_count_type,
+                rna_df = self['rna_da'].sel(rna_count_type=rna_count_type,
                                             gene=select_genes).to_pandas()
+                if norm_rna_by_cell:
+                    # RPM, but not RPKM or TPM
+                    rna_total = self['rna_da'].sel(rna_count_type=rna_count_type).sum(dim='gene')
+                    rna_df = rna_df.divide(rna_total, axis=0) * 1000000
+
                 rna_df.columns = rna_df.columns.map(lambda i: i + '_rna')
                 all_dfs.append(rna_df)
 
