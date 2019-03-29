@@ -244,7 +244,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
 
     if show_legend:
-        hue_length = len(_data[hue].cat.ca)
+        hue_length = _data[hue].unique().size
         _legend_kws = dict(ncol=(1 if hue_length <= 14 else 2 if hue_length <= 30 else 3))
         if legend_kws is not None:
             _legend_kws.update(legend_kws)
