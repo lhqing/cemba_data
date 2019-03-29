@@ -324,10 +324,10 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
             # get the smallest range that include "size_portion" of data
             size_norm = tight_hue_range(_data[size], size_portion, force_positive=True)
 
-        # snorm is the normalizer for size
-        # for size, LogNorm is more suitable
-        snorm = LogNorm(vmin=size_norm[0],
-                        vmax=size_norm[1])
+            # snorm is the normalizer for size
+            # for size, LogNorm is more suitable
+            size_norm = LogNorm(vmin=size_norm[0],
+                                vmax=size_norm[1])
         # replace s with sizes
         s = _scatter_kws.pop('s')
         if sizes is None:
@@ -346,7 +346,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
 
     sns.scatterplot(x='x', y='y', data=_data,
                     hue=hue, palette=cmap, hue_norm=cnorm,
-                    size=size, sizes=sizes, size_norm=snorm,
+                    size=size, sizes=sizes, size_norm=size_norm,
                     ax=ax, **_scatter_kws)
 
     # clean axis
@@ -365,7 +365,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
     return_axes = [ax]
 
     if colorbar and (hue is not None):
-        _colorbar_label_kws = dict(fontsize=10, label=hue, labelpad=6, rotation=270)
+        _colorbar_label_kws = dict(fontsize=10, label=hue, labelpad=10, rotation=270)
         if colorbar_label_kws is not None:
             _colorbar_label_kws.update(colorbar_label_kws)
 
@@ -380,7 +380,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         return_axes.append(cax)
 
     if sizebar and (size is not None):
-        _sizebar_label_kws = dict(fontsize=10, label=size, labelpad=6, rotation=270)
+        _sizebar_label_kws = dict(fontsize=10, ylabel=size, labelpad=20, rotation=270)
         if sizebar_label_kws is not None:
             _sizebar_label_kws.update(sizebar_label_kws)
 
