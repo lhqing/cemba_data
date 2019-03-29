@@ -212,7 +212,7 @@ class MCDS(xr.Dataset):
             self.coords[col] = data
 
         var_df = adata.var
-        var_df.index.name = var_dim  # make sure coords added with "cell" index
+        var_df.index.name = var_dim  # make sure coords added with var index
         for col, data in var_df.iteritems():
             self.coords[col] = data
 
@@ -256,7 +256,8 @@ class MCDS(xr.Dataset):
         return
 
     def get_cell_tidy_data(self, tsne=True, umap=True, pca=True, pc_components=4,  # Select coordinates
-                           select_genes=None, gene_mc_type='CHN', add_gene_cov=True):
+                           select_genes=None, gene_mc_type='CHN', add_gene_cov=True,
+                           add_gene_rna=True, rna_count_type='gene'):
         # A cell tidy dataframe need:
         # - tsne, umap and pca coordinates
         # - gene rate and gene cov
@@ -299,19 +300,29 @@ class MCDS(xr.Dataset):
                 if len(unknown_genes) != 0:
                     unknown_genes = ' '.join(unknown_genes)
                     raise KeyError(f'{unknown_genes} not exist in gene coords')
+
+            # add gene mC info
             if 'gene_da_rate' not in self.data_vars:
                 print('Gene rate dataarray do not exist, skip adding gene info')
-            if gene_mc_type not in self['gene_da_rate'].coords['mc_type']:
-                raise ValueError(f'Gene rate dataarray do not contain mC type {gene_mc_type}')
+            else:
+                if gene_mc_type not in self['gene_da_rate'].coords['mc_type']:
+                    raise ValueError(f'Gene rate dataarray do not contain mC type {gene_mc_type}')
 
-            gene_df = self['gene_da_rate'].sel(mc_type=gene_mc_type, gene=select_genes).to_pandas()
-            all_dfs.append(gene_df)
-            if add_gene_cov:
-                gene_cov_df = self['gene_da'].sel(mc_type=gene_mc_type,
-                                                  count_type='cov',
-                                                  gene=select_genes).to_pandas()
-                gene_cov_df.columns = gene_cov_df.columns.map(lambda i: i + '_cov')
-                all_dfs.append(gene_cov_df)
+                gene_df = self['gene_da_rate'].sel(mc_type=gene_mc_type, gene=select_genes).to_pandas()
+                all_dfs.append(gene_df)
+                if add_gene_cov:
+                    gene_cov_df = self['gene_da'].sel(mc_type=gene_mc_type,
+                                                      count_type='cov',
+                                                      gene=select_genes).to_pandas()
+                    gene_cov_df.columns = gene_cov_df.columns.map(lambda i: i + '_cov')
+                    all_dfs.append(gene_cov_df)
+
+            # add gene RNA info, only when rna_da exist (e.g. snmCT-seq)
+            if add_gene_rna and 'rna_da' in self.data_vars:
+                rna_df = self['rna_da'].sel(count_type=rna_count_type,
+                                            gene=select_genes).to_pandas()
+                rna_df.columns = rna_df.columns.map(lambda i: i + '_rna')
+                all_dfs.append(rna_df)
 
         total_df = pd.concat(all_dfs, axis=1, sort=True)
         return total_df
