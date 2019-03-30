@@ -126,7 +126,7 @@ class MCDS(xr.Dataset):
     def add_mc_rate(self, dim, da,
                     normalize_per_cell=True,
                     clip_norm_value=10,
-                    rate_da_suffix='rate'):
+                    rate_da_suffix='rate', inplace=True):
         if da not in self.data_vars:
             raise KeyError(f'{da} is not in this dataset')
         if dim not in self[da].dims:
@@ -139,12 +139,15 @@ class MCDS(xr.Dataset):
                                             var_dim=dim,
                                             normalize_per_cell=normalize_per_cell,
                                             clip_norm_value=clip_norm_value)
-        self[da + "_" + rate_da_suffix] = rate
-        return
+        if inplace:
+            self[da + "_" + rate_da_suffix] = rate
+            return
+        else:
+            return rate
 
     def add_gene_rate(self, dim='gene', da='gene_da', method='bayes',
                       normalize_per_cell=True, clip_norm_value=10,
-                      rate_da_suffix='rate'):
+                      rate_da_suffix='rate', inplace=True):
         if da not in self.data_vars:
             raise KeyError(f'{da} is not in this dataset')
         if dim not in self[da].dims:
@@ -170,8 +173,11 @@ class MCDS(xr.Dataset):
         else:
             raise ValueError('Method can only be "bayes" or "naive"')
 
-        self[da + "_" + rate_da_suffix] = rate
-        return
+        if inplace:
+            self[da + "_" + rate_da_suffix] = rate
+            return
+        else:
+            return rate
 
     def to_ann(self, da, var_dim, obs_dim='cell', **sel_kwargs):
         if len(self[da].dims) < 2:
