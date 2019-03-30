@@ -185,6 +185,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
                         text_anno=None, dodge=None, text_anno_kws=None,  # about text anno
                         show_legend=False, legend_kws=None,  # about legend
                         axis_format='tiny', max_points=5000):  # other adjustment
+    data = data.copy()
     # down sample plot data if needed.
     if max_points is not None:
         if data.shape[0] > max_points:
@@ -273,6 +274,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                        sizebar=True, sizebar_label_kws=None,
                        text_anno=None, dodge=None, text_anno_kws=None,
                        axis_format='tiny', max_points=5000):
+    data = data.copy()
     # down sample plot data if needed.
     if max_points is not None:
         if data.shape[0] > max_points:
@@ -291,9 +293,9 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                           'y': scaled_y})
     if hue is not None:
         if isinstance(hue, str):
-            _data[hue] = data[hue]
+            _data[hue] = data[hue].astype(float)
         else:
-            _data['hue'] = hue
+            _data['hue'] = hue.astype(float)
             hue = 'hue'
         if hue_norm is None:
             print(f'Use hue_portion {hue_portion} to determine hue_norm')
@@ -396,7 +398,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         sax = _sizebar(sax)
         # set simple tick label, let the user do custom works
         ticklabels = ['low', 'high']
-        sax.set(yticks=[0, 1], yticklabels=ticklabels, fontsize=_sizebar_label_kws['fontsize'])
+        sax.yaxis.set(yticks=[0, 1], yticklabels=ticklabels)
         sax.set_ylabel(**_sizebar_label_kws)
 
     if text_anno is not None:
