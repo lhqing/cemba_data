@@ -6,6 +6,9 @@ from anndata import AnnData
 
 def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
                                  normalize_per_cell=True, clip_norm_value=10):
+    # TODO calculate cell_a, cell_b separately
+    # so we can do post_rate only in a very small set of gene to prevent memory issue
+    
     raw_rate = mc_da / cov_da
     cell_rate_mean = raw_rate.mean(dim=var_dim)  # this skip na
     cell_rate_var = raw_rate.var(dim=var_dim)  # this skip na
