@@ -1,7 +1,5 @@
 """
 SGE qsub system auto-submitter
-# TODO add runtime parameter change, e.g. submitted using 100 CPU, change to 200 at runtime
-# TODO add safe_terminate, e.g. terminate after all current running job have been finished, but not submit new job
 # TODO deal with failed and incomplete json in resubmit
 # TODO add option to profile (qacct) several jobs as reference for next submission
 # TODO add test_run parameter to run N command and profile each and give report
@@ -58,7 +56,7 @@ def _get_running_job_id_qstat(user_name, id_set):
                                       stdout=PIPE, encoding='utf8', check=True).stdout
             break
         except CalledProcessError as e:
-            # TODO: there seems to be a bug for qstat occasionally happen in mapping,
+            # TODO: there seems to be a bug for qstat occasionally happen in mapping
             # qstat return through an unknown error about
             # ERROR: failed receiving gdi request response for mid=1 (got syncron message receive timeout error)
             tried += 1
@@ -88,7 +86,7 @@ def _get_running_job_id_qstat(user_name, id_set):
 
 
 class _Qsubmitter:
-    def __init__(self, command_file_path, working_dir, project_name, force_redo=False,
+    def __init__(self, command_file_path, working_dir, project_name, force_redo=False, global_parm_dict=None,
                  total_cpu=60, total_mem=500, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
         # prepare working_dir
         self.working_dir = working_dir
@@ -121,6 +119,7 @@ class _Qsubmitter:
 
         # prepare project dir
         self.command_file_path = command_file_path
+        self.global_parm_dict = global_parm_dict if global_parm_dict is not None else {}
         if not os.path.exists(self.project_dir):
             os.mkdir(self.project_dir)
 
@@ -171,9 +170,9 @@ class _Qsubmitter:
                 raise ValueError(f'Command file seems empty...'
                                  f'Command file path: {self.command_file_path}')
 
-
             obj_list = []
             for n, command_dict in enumerate(command_dict_list):
+                command_dict = command_dict.update(self.global_parm_dict)
                 obj_list.append(_Command(command_dict=command_dict,
                                          unique_id=f'{self.project_name}_{n}',
                                          working_dir=self.working_dir,
@@ -446,8 +445,21 @@ class _Command:
 
 
 def qsub(command_file_path, working_dir, project_name, wait_until=None,
-         total_cpu=60, total_mem=500, force_redo=False,
+         total_cpu=60, total_mem=500, force_redo=False, qsub_global_parms='',
          submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
+    # deal with qsub_global_parms:
+    global_parm_dict = {}
+    for parm_pair in qsub_global_parms.split(';'):
+        parm_pair = parm_pair.strip().lstrip('-')
+        if parm_pair != '':
+            if parm_pair.count('=') == 0:
+                global_parm_dict[parm_pair] = ''
+            elif parm_pair.count('=') == 1:
+                k, v = parm_pair.split('=')
+                global_parm_dict[k] = v
+            else:
+                raise ValueError(f'Can not parse global parm part: "{parm_pair}"')
+
     if isinstance(command_file_path, str):
         command_file_path = [command_file_path]
 
@@ -481,6 +493,7 @@ def qsub(command_file_path, working_dir, project_name, wait_until=None,
         if len(command_file_path) != 1:
             _project_name += f'_{i}'
         submitter = _Qsubmitter(command_file_path=command_file,
+                                global_parm_dict=global_parm_dict,
                                 working_dir=working_dir,
                                 project_name=_project_name,
                                 total_cpu=total_cpu,

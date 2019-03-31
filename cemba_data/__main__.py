@@ -155,6 +155,17 @@ def qsub_register_subparser(subparser):
         help="By default, the finished job (which has an accompanying .json file with the command.sh file) "
              "will not be submitted again, but if you want to force resubmit all jobs, set this to true. "
     )
+
+    parser_opt.add_argument(
+        "--qsub_global_parms",
+        type=str,
+        required=False,
+        default='',
+        help="Other global qsub parameters you want to pass to each job's qsub script. "
+             "This will cover command.json if set repeatedly."
+             "These additional parameters should form in one ';' separated string like this: "
+             "'-q=queue_name;-cwd;-wd=/path/to/working/dir;-pe smp=20;-l h_vmem=5G'"
+    )
     return
 
 
