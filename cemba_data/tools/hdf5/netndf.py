@@ -38,7 +38,7 @@ def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
 class MCDS(xr.Dataset):
     def __init__(self, dataset):
         super().__init__(data_vars=dataset.data_vars, coords=dataset.coords,
-                         attrs=dataset.attrs, compat='broadcast_equals')
+                         attrs=dataset.attrs)
         return
 
     @classmethod
@@ -198,11 +198,11 @@ class MCDS(xr.Dataset):
         index_dict = self[da].indexes
         obs_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
-                               if v.name == obs_dim},
+                               if v.name == obs_dim and k != obs_dim},
                               index=index_dict[obs_dim])
         var_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
-                               if v.name == var_dim},
+                               if v.name == var_dim and k != var_dim},
                               index=index_dict[var_dim])
 
         return AnnData(X=_data.copy(),
