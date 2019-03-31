@@ -227,7 +227,7 @@ def _read_faidx(faidx_path):
     Read fadix of reference fasta file
     samtools fadix ref.fa
     """
-    return pd.read_table(faidx_path, index_col=0, header=None,
+    return pd.read_csv(faidx_path, index_col=0, header=None, sep='\t',
                          names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
 
 

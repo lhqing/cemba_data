@@ -49,7 +49,7 @@ def validate_fastq_dataframe(fastq_dataframe):
     2. uid is unique
     """
     if isinstance(fastq_dataframe, str):
-        fastq_dataframe = pd.read_table(fastq_dataframe, index_col=None)
+        fastq_dataframe = pd.read_csv(fastq_dataframe, index_col=None, sep='\t')
 
     for required in ['uid', 'lane', 'read_type', 'fastq_path']:
         if required not in fastq_dataframe.columns:
@@ -90,7 +90,7 @@ def summary_pipeline_stat(out_dir):
     # merge all stats dataframe
     stat_dict = collections.defaultdict(list)
     for f in out_dir.glob('**/stats/*tsv.gz'):
-        df = pd.read_table(f)
+        df = pd.read_csv(f, sep='\t')
         stat_dict[f.name.split('.')[0]].append(df)
     # result df is a dict contain 5 concat dfs for raw metadata
     result_dfs = {}
