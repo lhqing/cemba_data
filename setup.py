@@ -11,7 +11,7 @@ setup(
     description='A package for processing and analyzing single cell sequencing data.',
     long_description=open('README.md').read(),
     include_package_data=True,
-    install_requires=['pandas=0.24', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
+    install_requires=['pandas>=0.24', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
                       'matplotlib', 'seaborn', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
                       'six', 'xarray', 'statsmodels', 'leidenalg', 'natsort', 'netcdf4'],
     entry_points={

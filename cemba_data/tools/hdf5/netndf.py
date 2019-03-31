@@ -111,7 +111,7 @@ class MCDS(xr.Dataset):
             regions to remove no matter how
 
         Returns
-        ------- 
+        -------
 
         """
         if dim not in self[da].dims:
