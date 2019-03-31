@@ -338,3 +338,22 @@ class MCDS(xr.Dataset):
 
         total_df = pd.concat(all_dfs, axis=1, sort=True)
         return total_df
+
+
+def calculate_gch_rate(mcds, var_dim='chrom100k'):
+    rate_da = mcds.sel(mc_type=['GCHN', 'HCHN']).add_mc_rate(dim=var_dim, da=f'{var_dim}_da',
+                                                             normalize_per_cell=False, inplace=False)
+    # (PCG - PCH) / (1 - PCH)
+    real_gc_rate = (rate_da.sel(mc_type='GCHN') - rate_da.sel(mc_type='HCHN')) / (
+            1 - rate_da.sel(mc_type='HCHN'))
+    real_gc_rate = real_gc_rate.transpose('cell', var_dim).values
+    real_gc_rate[real_gc_rate < 0] = 0
+
+    # norm per cell
+    cell_overall_count = mcds[f'{var_dim}_da'].sel(mc_type=['GCHN', 'HCHN']).sum(dim=var_dim)
+    cell_overall_rate = cell_overall_count.sel(count_type='mc') / cell_overall_count.sel(count_type='cov')
+    gchn = cell_overall_rate.sel(mc_type='GCHN')
+    hchn = cell_overall_rate.sel(mc_type='HCHN')
+    overall_gchn = (gchn - hchn) / (1 - hchn)
+    real_gc_rate = real_gc_rate / overall_gchn.values[:, None]
+    return real_gc_rate
