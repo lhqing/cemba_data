@@ -10,6 +10,11 @@ import subprocess
 import multiprocessing
 import shlex
 import glob
+import logging
+
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _process_bam(cmd_list):
@@ -73,7 +78,13 @@ def bam_qc(bismark_result, out_dir, config):
     for result in results:
         # get every result to make sure it finished properly with return code 0
         # if not do this, check=True in subprocess.run will not work
-        result.get()
+        try:
+            result.get()
+        except subprocess.CalledProcessError as e:
+            log.error("Pipeline break, BAM process ERROR!")
+            log.error(e.stdout)
+            log.error(e.stderr)
+            raise e
 
     # get qc stats
     qc_result = []
@@ -108,8 +119,15 @@ def bam_qc(bismark_result, out_dir, config):
         merge_bam = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
         bam_list = ' '.join(glob.glob(f'{out_dir}/{uid}_{index_name}_R*filter.bam'))
         merge_cmd = f'samtools merge -f {merge_bam} {bam_list}'
-        subprocess.run(shlex.split(merge_cmd),
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8')
+        try:
+            subprocess.run(shlex.split(merge_cmd),
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8', check=True)
+        except subprocess.CalledProcessError as e:
+            log.error("Pipeline break, BAM merge ERROR!")
+            log.error(e.stdout)
+            log.error(e.stderr)
+            raise e
+
         # clean up
         # only keep filtered bam and bismark report
         remove_file_list = [str(p) for p in pathlib.Path(out_dir).glob(f'{uid}_{index_name}_R*.*bismark*')]

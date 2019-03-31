@@ -130,7 +130,14 @@ def demultiplex(fastq_dataframe, out_dir, config):
         pool.join()
 
         for result, lane in zip(results, single_uid_df['lane']):
-            result_df = _read_cutadapt_result(result.get())
+            try:
+                result_df = _read_cutadapt_result(result.get())
+            except subprocess.CalledProcessError as e:
+                log.error("Pipeline break, FASTQ demultiplex ERROR!")
+                log.error(e.stdout)
+                log.error(e.stderr)
+                raise e
+
             result_df['lane'] = lane
             result_df['uid'] = uid
             result_df['index_name'] = result_df['Sequence'].apply(lambda ind: multiplex_index_map[ind])
@@ -190,8 +197,14 @@ def fastq_qc(demultiplex_result, out_dir, config):
                  f'-q {quality_threshold} -u {r1_left_cut} ' \
                  f'-u -{r1_right_cut} -m {length_threshold} ' \
                  f'-a {r1_adapter} -o {r1_out} -'
-        r1_result = subprocess.run(r1_cmd, stdout=subprocess.PIPE,
-                                   encoding='utf8', shell=True, check=True)
+        try:
+            r1_result = subprocess.run(r1_cmd, stdout=subprocess.PIPE,
+                                       encoding='utf8', shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            log.error("Pipeline break, FASTQ R1 trim ERROR!")
+            log.error(e.stdout)
+            log.error(e.stderr)
+            raise e
 
         # get R1 result stat
         lines = []
@@ -213,8 +226,15 @@ def fastq_qc(demultiplex_result, out_dir, config):
                  f'-q {quality_threshold} -u {r2_left_cut} ' \
                  f'-u -{r2_right_cut} -m {length_threshold} ' \
                  f'-a {r2_adapter} -o {r2_out} -'
-        r2_result = subprocess.run(r2_cmd, stdout=subprocess.PIPE,
-                                   encoding='utf8', shell=True, check=True)
+        try:
+            r2_result = subprocess.run(r2_cmd, stdout=subprocess.PIPE,
+                                       encoding='utf8', shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            log.error("Pipeline break, FASTQ R2 trim ERROR!")
+            log.error(e.stdout)
+            log.error(e.stderr)
+            raise e
+
         # get R2 result stat
         lines = []
         for line in r2_result.stdout.split('\n'):

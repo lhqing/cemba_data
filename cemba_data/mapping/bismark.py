@@ -132,7 +132,13 @@ def bismark(fastq_final_result, out_dir, config):
     for result in (r1_results + r2_results):
         # get every result to make sure it finished properly with return code 0
         # if not do this, check=True in subprocess.run will not work
-        result.get()
+        try:
+            result.get()
+        except subprocess.CalledProcessError as e:
+            log.error("Pipeline break, Bismark ERROR!")
+            log.error(e.stdout)
+            log.error(e.stderr)
+            raise e
 
     if len(ran_samples) != 0:
         report_path_dict = {}
