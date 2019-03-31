@@ -8,7 +8,7 @@ def _calculate_posterior_mc_rate(mc_da, cov_da, var_dim,
                                  normalize_per_cell=True, clip_norm_value=10):
     # TODO calculate cell_a, cell_b separately
     # so we can do post_rate only in a very small set of gene to prevent memory issue
-    
+
     raw_rate = mc_da / cov_da
     cell_rate_mean = raw_rate.mean(dim=var_dim)  # this skip na
     cell_rate_var = raw_rate.var(dim=var_dim)  # this skip na
@@ -87,7 +87,8 @@ class MCDS(xr.Dataset):
         return self.loc[dict(cell=select_index)]
 
     def filter_region_cov(self, dim, da, mc_type,
-                          min_cov=None, max_cov=None):
+                          min_cov=None, max_cov=None,
+                          white_list=None, black_list=None):
         """
         Filter cell by total cov for certain mc_type along certain dimension in certain dataarray.
 
@@ -104,6 +105,10 @@ class MCDS(xr.Dataset):
             minimum cov mean, suggest to plot distribution first.
         max_cov
             maximum cov mean, suggest ot plot distribution first.
+        white_list
+            regions to keep no matter how
+        black_list
+            regions to remove no matter how
 
         Returns
         -------
@@ -119,9 +124,23 @@ class MCDS(xr.Dataset):
             max_cov = np.inf
         region_max = region_mean < max_cov
         region_min = region_mean > min_cov
+
+        # deal with white black list
+        black_list = [] if black_list is None else black_list
+        white_list = [] if white_list is None else white_list
+        black_set = set(black_list)
+        white_set = set(white_list)
+        black_and_white = black_set & white_set
+        if len(black_and_white) != 0:
+            raise ValueError(f'{len(black_and_white)} items in both black and white list. Check your input.')
+        black_judge = self.get_index(dim).map(lambda i: i not in black_set).values
+        white_judge = self.get_index(dim).map(lambda i: i in white_set).values
         region_mask = np.all(np.vstack([region_max.values,
-                                        region_min.values]),
-                             axis=0)
+                                        region_min.values,
+                                        black_judge]), axis=0)
+        region_mask = np.any(np.vstack([region_mask,
+                                        white_judge]), axis=0)
+
         select_index = self.get_index(dim)[region_mask]
         filtered_ds = self.loc[{dim: select_index}]
         return MCDS(filtered_ds)
