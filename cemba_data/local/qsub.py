@@ -3,6 +3,8 @@ SGE qsub system auto-submitter
 # TODO deal with failed and incomplete json in resubmit
 # TODO add option to profile (qacct) several jobs as reference for next submission
 # TODO add test_run parameter to run N command and profile each and give report
+# TODO support other qsub command system
+# TODO qsub parameter validation
 """
 
 from subprocess import run, PIPE, CalledProcessError
@@ -172,7 +174,7 @@ class _Qsubmitter:
 
             obj_list = []
             for n, command_dict in enumerate(command_dict_list):
-                command_dict = command_dict.update(self.global_parm_dict)
+                command_dict.update(self.global_parm_dict)
                 obj_list.append(_Command(command_dict=command_dict,
                                          unique_id=f'{self.project_name}_{n}',
                                          working_dir=self.working_dir,
@@ -450,7 +452,7 @@ def qsub(command_file_path, working_dir, project_name, wait_until=None,
     # deal with qsub_global_parms:
     global_parm_dict = {}
     for parm_pair in qsub_global_parms.split(';'):
-        parm_pair = parm_pair.strip().lstrip('-')
+        parm_pair = parm_pair.strip().strip("'").strip('"').lstrip('-')
         if parm_pair != '':
             if parm_pair.count('=') == 0:
                 global_parm_dict[parm_pair] = ''
