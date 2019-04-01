@@ -274,6 +274,10 @@ class MCDS(xr.Dataset):
             else:
                 df.index.name = index_dim
         for col, data in df.iteritems():
+            if col == index_dim:
+                print(f'Found index_dim "{index_dim}" in the col, skip to prevent mess up. '
+                      'If you want to add that column, rename it.')
+                continue
             self.coords[col] = data
         return
 
