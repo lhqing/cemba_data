@@ -1074,6 +1074,8 @@ def main():
         from .mapping.pipeline import summary_pipeline_stat as func
     elif cur_command == 'cluster-merge':
         from .local.mc.prepare_cluster_profile import cluster_merge_pipeline as func
+    elif cur_command == 'bam-to-allc':
+        from .mapping.allc import call_methylated_sites as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
