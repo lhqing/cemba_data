@@ -313,6 +313,9 @@ def call_methylated_sites(bam_path, reference_fasta,
     if output_path is None:
         allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
         output_path = str(file_dir / allc_name)
+    else:
+        if not output_path.endswith('.gz'):
+            output_path += '.gz'
 
     output_file_handler = open_allc(output_path, mode='w',
                                     compresslevel=compress_level)
