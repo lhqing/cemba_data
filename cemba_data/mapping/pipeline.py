@@ -14,6 +14,9 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
+# TODO: Check every thing (software, path etc) before actual run!
+
+
 def get_configuration(config_path=None):
     """
     Read .ini config file from given path
