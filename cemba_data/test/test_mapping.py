@@ -8,7 +8,7 @@ Testing related files should exist in ./_data/mapping
 from cemba_data.mapping.fastq import demultiplex, fastq_qc
 from cemba_data.mapping.bam import bam_qc
 from cemba_data.mapping.bismark import bismark
-from cemba_data.mapping.allc import call_methylated_sites
+from cemba_data.mapping.allc import batch_call_methylated_sites
 from cemba_data.mapping.pipeline import pipeline, validate_fastq_dataframe, summary_pipeline_stat
 
 

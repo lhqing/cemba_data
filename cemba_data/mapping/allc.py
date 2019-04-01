@@ -228,7 +228,7 @@ def _read_faidx(faidx_path):
     samtools fadix ref.fa
     """
     return pd.read_csv(faidx_path, index_col=0, header=None, sep='\t',
-                         names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
+                       names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
 
 
 def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
@@ -250,10 +250,10 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
         return seq
 
 
-def _call_methylated_sites_worker(bam_path, reference_fasta,
-                                  num_upstr_bases, num_downstr_bases,
-                                  buffer_line_number, min_mapq, min_base_quality,
-                                  compress_level=5, idx=True, tabix=True):
+def call_methylated_sites(bam_path, reference_fasta,
+                          num_upstr_bases=0, num_downstr_bases=2,
+                          buffer_line_number=500000, min_mapq=0, min_base_quality=1,
+                          compress_level=5, idx=True, tabix=True, output_path=None, save_count_df=False):
     """
     Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
     and pipe to this function to generate mC and cov count. Only for single cell, not base level statistics.
@@ -262,6 +262,8 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     ----------
     bam_path
         path of input bam file
+    output_path
+        path of output ALLC file, if None, use the default name pattern
     reference_fasta
         path of reference fasta, no assumption, should be the same as mapping
     num_upstr_bases
@@ -271,13 +273,22 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     buffer_line_number
         number of buffer line
     min_mapq
-        minimum MAPQ for a read being considered, samtools mpileup parameter
+        minimum MAPQ for a read being considered, samtools mpileup parameter, see samtools documentation.
     min_base_quality
-        minimum base quality for a base being considered, samtools mpileup parameter
+        minimum base quality for a base being considered, samtools mpileup parameter, see samtools documentation.
+    compress_level
+        Compress level for the output ALLC file, pass to gzip or bgzip
+    idx
+        Whether to generate old methylpy chromosome index
+    tabix
+        Whether to generate tabix index, bgzip and tabix must be installed for this
+    save_count_df
+        If true, an ALLC context count table will be saved next to ALLC file.
     Returns
     -------
-    count_df
-        A dataframe contain all mC context summary counts.
+    count_df or None
+        If save_count_df = False, return a dataframe contain all mC context summary counts.
+        If save_count_df = True, return None
     """
     # Check fasta index
     if not pathlib.Path(reference_fasta + ".fai").exists():
@@ -299,8 +310,9 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
     # Output handel
     input_path = pathlib.Path(bam_path)
     file_dir = input_path.parent
-    allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
-    output_path = str(file_dir / allc_name)
+    if output_path is None:
+        allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
+        output_path = str(file_dir / allc_name)
 
     output_file_handler = open_allc(output_path, mode='w',
                                     compresslevel=compress_level)
@@ -437,10 +449,15 @@ def _call_methylated_sites_worker(bam_path, reference_fasta,
 
     count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
     count_df['mc_rate'] = count_df['mc'] / count_df['cov']
-    return count_df
+
+    if save_count_df:
+        count_df.to_csv(output_path+'.count.csv')
+        return None
+    else:
+        return count_df
 
 
-def call_methylated_sites(bam_result_df, out_dir, config):
+def batch_call_methylated_sites(bam_result_df, out_dir, config):
     """
     Parallel function for ALLC calling.
 
@@ -476,10 +493,14 @@ def call_methylated_sites(bam_result_df, out_dir, config):
     results = {}
     for (uid, index_name), _ in bam_result_df.groupby(['uid', 'index_name']):
         final_bam_path = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
-        result = pool.apply_async(_call_methylated_sites_worker,
-                                  (str(final_bam_path), reference_fasta,
-                                   num_upstr_bases, num_downstr_bases,
-                                   buffer_line_number, min_mapq, min_base_quality))
+        result = pool.apply_async(call_methylated_sites,
+                                  kwds=dict(bam_path=str(final_bam_path),
+                                            reference_fasta=reference_fasta,
+                                            num_upstr_bases=num_upstr_bases,
+                                            num_downstr_bases=num_downstr_bases,
+                                            buffer_line_number=buffer_line_number,
+                                            min_mapq=min_mapq,
+                                            min_base_quality=min_base_quality))
         results[(uid, index_name)] = result
     pool.close()
     pool.join()

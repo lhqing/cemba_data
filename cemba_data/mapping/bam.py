@@ -23,7 +23,7 @@ def _process_bam(cmd_list):
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE,
                            encoding='utf8',
-                           check=True)
+                           check=False)
             for cmd in cmd_list]
 
 
@@ -78,13 +78,12 @@ def bam_qc(bismark_result, out_dir, config):
     for result in results:
         # get every result to make sure it finished properly with return code 0
         # if not do this, check=True in subprocess.run will not work
-        try:
-            result.get()
-        except subprocess.CalledProcessError as e:
-            log.error("Pipeline break, BAM process ERROR!")
-            log.error(e.stdout)
-            log.error(e.stderr)
-            raise e
+        run_return = result.get()
+        if run_return.returncode != 0:
+            print("Pipeline break, BAM process ERROR! return code {run_return.returncode}")
+            print(run_return.stdout)
+            print(run_return.stderr)
+            raise OSError
 
     # get qc stats
     qc_result = []

@@ -23,10 +23,14 @@ This toolkit contain functions for 3-stage analysis:
     Other functions: qsub submitter for SGE QSUB; simulation functions
 
 STAGE 1
+    - Mapping pipeline:
     mapping - Actual mapping function
     default-mapping-config - Print the default mapping config
     mapping-qsub - Qsub wrapper for mapping that run with "yap qsub" 
     mapping-summary - Summary mapping output directory after mapping
+    
+    - Stand alone STAGE 1 functions:
+    bam-to-allc - Take 1 after QC and position sorted BAM file, generate and index 1 ALLC file.
 
 STAGE 2
     map-to-region - Map ALLC file into a region BED file
@@ -895,6 +899,105 @@ def cluster_merge_register_subparser(subparser):
         required=False,
         default=20,
         help="CPU used in each merge allc job."
+    )
+
+
+def bam_to_allc_register_subparser(subparser):
+    parser = subparser.add_parser('bam-to-allc',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Take 1 after QC and position sorted BAM file, generate and index 1 ALLC file.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--bam_path",
+        type=str,
+        required=True,
+        help="Path to input position sorted BAM file"
+    )
+
+    parser_req.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="Path to output ALLC file"
+    )
+
+    parser_req.add_argument(
+        "--reference_fasta",
+        type=str,
+        required=True,
+        help="Path to 1 genome reference FASTA file (the one used for mapping), "
+             "use samtools fadix to build .fai index first. Do not compress that file."
+    )
+
+    parser_opt.add_argument(
+        "--num_upstr_bases",
+        type=int,
+        required=False,
+        default=0,
+        help="Number of upstream base(s) of the C base to include in ALLC context column, "
+             "usually use 0 for normal BS-seq, 1 if doing NOMe-seq."
+    )
+
+    parser_opt.add_argument(
+        "--num_downstr_bases",
+        type=int,
+        required=False,
+        default=0,
+        help="Number of downstream base(s) of the C base to include in ALLC context column, "
+             "usually use 2 for both BS-seq and NOMe-seq."
+    )
+
+    parser_opt.add_argument(
+        "--min_mapq",
+        type=int,
+        required=False,
+        default=0,
+        help="Minimum MAPQ for a read being considered, samtools mpileup parameter, see samtools documentation. "
+             "Redundant if you did that in BAM QC."
+    )
+
+    parser_opt.add_argument(
+        "--min_base_quality",
+        type=int,
+        required=False,
+        default=1,
+        help="Minimum base quality for a base being considered, samtools mpileup parameter, "
+             "see samtools documentation. Redundant if you did that in BAM QC."
+    )
+
+    parser_opt.add_argument(
+        "--compress_level",
+        type=int,
+        required=False,
+        default=5,
+        help="Compress level for the output ALLC file, pass to gzip or bgzip"
+    )
+
+    parser_opt.add_argument(
+        "--idx",
+        type=bool,
+        required=False,
+        default=False,
+        help="Whether to generate old methylpy chromosome index, for back compatibility."
+    )
+
+    parser_opt.add_argument(
+        "--tabix",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to generate tabix index, bgzip and tabix must be installed for this."
+    )
+
+    parser_opt.add_argument(
+        "--save_count_df",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to generate  ALLC context count table."
     )
 
 

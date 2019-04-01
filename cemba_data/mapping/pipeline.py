@@ -5,7 +5,7 @@ import os
 import collections
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
-from .allc import call_methylated_sites
+from .allc import batch_call_methylated_sites
 from .bam import bam_qc
 import logging
 
@@ -276,7 +276,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
 
     # allc
     log.info('Calculate mC sites.')
-    allc_df = call_methylated_sites(bam_df, out_dir, config)
+    allc_df = batch_call_methylated_sites(bam_df, out_dir, config)
     allc_df.to_csv(stat_dir / 'stat_allc_total_result.tsv.gz',
                    sep='\t', compression='gzip', index=None)
     log.info('Mapping finished.')
