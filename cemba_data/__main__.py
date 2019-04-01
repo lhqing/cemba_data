@@ -945,7 +945,7 @@ def bam_to_allc_register_subparser(subparser):
         "--num_downstr_bases",
         type=int,
         required=False,
-        default=0,
+        default=2,
         help="Number of downstream base(s) of the C base to include in ALLC context column, "
              "usually use 2 for both BS-seq and NOMe-seq."
     )
