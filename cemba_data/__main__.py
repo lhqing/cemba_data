@@ -58,6 +58,8 @@ SIMULATION (exp)
 
 EPILOG = """
 Author: Hanqing Liu, hanliu@salk.edu
+
+If this looks good, send coffee to...
 """
 
 
