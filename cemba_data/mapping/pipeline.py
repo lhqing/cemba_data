@@ -14,9 +14,6 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-# TODO: Check every thing (software, path etc) before actual run!
-
-
 def get_configuration(config_path=None):
     """
     Read .ini config file from given path
@@ -56,16 +53,20 @@ def validate_fastq_dataframe(fastq_dataframe):
 
     for required in ['uid', 'lane', 'read_type', 'fastq_path']:
         if required not in fastq_dataframe.columns:
-            raise ValueError(required, 'not in fastq dataframe columns')
+            raise ValueError(f'column {required} not in fastq dataframe columns, '
+                             f'remember that the 4 required columns of fastq dataframe are: '
+                             f'uid, lane, read_type, fastq_path. '
+                             f'The orders do not matter, but the names need to be exact.')
 
     for _, df in fastq_dataframe.groupby(['lane', 'read_type']):
         if df['uid'].unique().size != df['uid'].size:
-            raise ValueError(f'uid column are not unique for each lane and read-type combination.')
+            raise ValueError('uid column are not unique for each lane and read-type combination.')
 
     # modify fastq dataframe column names
     fastq_dataframe.columns = [column.replace('-', '_') for column in fastq_dataframe.columns]
 
     # modify fastq columns, because '_' is used in file name and we split by '_'
+    # I know this is stupid...
     fastq_dataframe['uid'] = fastq_dataframe['uid'].apply(lambda i: i.replace('_', '-'))
     fastq_dataframe['lane'] = fastq_dataframe['lane'].apply(lambda i: i.replace('_', '-'))
     fastq_dataframe['read_type'] = fastq_dataframe['read_type'].apply(lambda i: i.replace('_', '-'))
@@ -215,6 +216,11 @@ def summary_pipeline_stat(out_dir):
     return total_meta
 
 
+def valid_environments(config):
+    # TODO Write a full environment validation func, check all path
+    return
+
+
 def pipeline(fastq_dataframe, out_dir, config_path=None):
     """
     Run full pipeline: demultiplex, fastq QC, bismark mapping, bam QC, ALLC calling
@@ -234,6 +240,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     """
     # get config
     config = get_configuration(config_path)
+    valid_environments(config)
 
     # get and validate fastq dataframe
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
