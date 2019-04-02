@@ -48,5 +48,5 @@ def make_animation(fig, ax, out_path, frames=360, interval=10):
         ax.view_init(10, i)
     ani = animation.FuncAnimation(
         fig, func=update, frames=frames, interval=interval, blit=False)
-    ani.save(out_path, writer='imagemagic')
+    ani.save(out_path, writer='imagemagick')
     return ani
