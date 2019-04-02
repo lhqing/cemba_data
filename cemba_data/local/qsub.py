@@ -165,13 +165,13 @@ class _Qsubmitter:
             if self.command_file_path.endswith('json'):
                 command_dict_list = json.load(command)
             else:
-                print('command file name does not end with "json", '
+                print('\ncommand file name does not end with "json", '
                       'will read each line in the file as a single command.')
                 print('In this case, you can not specify qsub parameters in the command file '
                       'for each job separately, you can only pass qsub parameter through '
                       '--qsub_global_parms, this will apply to every job equally.')
                 print('If you want to specify qsub parameters for each job separately, '
-                      'use JSON format command file.')
+                      'use JSON format command file.\n')
                 command_dict_list = []
                 for line in command:
                     command_dict_list.append({'command': line})
