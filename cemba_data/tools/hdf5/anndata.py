@@ -438,3 +438,94 @@ def batch_correct_pc(adata, batch_series, correct=False,
 
     # TODO fill up other PC related parts same as sc.tl.pca
     return adata
+
+
+def scanpy_umap(adata,
+                min_dist=0.5,
+                spread=1.0,
+                n_components=2,
+                maxiter=None,
+                alpha=1.0,
+                gamma=1.0,
+                negative_sample_rate=5,
+                init_pos='spectral',
+                random_state=0,
+                a=None,
+                b=None):
+    """Scanpy's umap function, take out here for getting umap but not adding to adata"""
+    from scanpy.neighbors.umap.umap_ import find_ab_params, simplicial_set_embedding
+    from scanpy.tools._utils import get_init_pos_from_paga
+    if a is None or b is None:
+        a, b = find_ab_params(spread, min_dist)
+    else:
+        a = a
+        b = b
+    if init_pos in adata.obsm.keys():
+        init_coords = adata.obsm[init_pos]
+    elif init_pos == 'paga':
+        init_coords = get_init_pos_from_paga(adata, random_state=random_state)
+    else:
+        init_coords = init_pos
+    from sklearn.utils import check_random_state
+    random_state = check_random_state(random_state)
+    n_epochs = maxiter
+    _umap = simplicial_set_embedding(
+        graph=adata.uns['neighbors']['connectivities'].tocoo(),
+        n_components=n_components,
+        initial_alpha=alpha,
+        a=a,
+        b=b,
+        gamma=gamma,
+        negative_sample_rate=negative_sample_rate,
+        n_epochs=n_epochs,
+        init=init_coords,
+        random_state=random_state,
+        verbose=False)
+    return _umap
+
+
+def run_embedding(adata, components=None, method='umap', method_kws=None):
+    ALLOW_METHOD = {'umap', 'tsne'}
+
+    if method_kws is None:
+        method_kws = {}
+
+    if components is None:
+        components = [2]
+    elif isinstance(components, int):
+        components = [components]
+    else:
+        components = components
+
+    method = method.lower()
+    method_kws.pop('n_components', None)
+    records = {}
+    if method not in ALLOW_METHOD:
+        raise ValueError(f'Method {method} not allowed in this function. Currently support {ALLOW_METHOD}.')
+    else:
+        _coord = None
+        for component in components:
+            if method == 'tsne':
+                params_sklearn = dict(
+                    perplexity=30,
+                    random_state=0,
+                    early_exaggeration=12,
+                    learning_rate=1000,
+                )
+                params_sklearn.update(method_kws)
+
+                from MulticoreTSNE import MulticoreTSNE as TSNE
+                tsne = TSNE(n_components=component, **params_sklearn)
+                # need to transform to float64 for MulticoreTSNE...
+                _coord = tsne.fit_transform(adata.X.astype('float64'))
+            elif method == 'umap':
+                if component != 2:
+                    method_kws['init_pos'] = 'spectral'
+                _coord = scanpy_umap(adata, n_components=component, **method_kws)
+            for dim in range(component):
+                records[f'{method}_{component}_{dim}'] = _coord[:, dim]
+        # put the last X_coord into adata
+        if _coord is not None:
+            adata.obsm[f'X_{method}'] = _coord
+    total_df = pd.DataFrame(records, index=adata.obs_names)
+    return total_df
