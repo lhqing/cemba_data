@@ -125,7 +125,11 @@ def qsub_register_subparser(subparser):
         type=str,
         required=True,
         nargs='+',
-        help="One or space-separated paths of the command.json file."
+        help="One or space-separated paths of the command file. Accept 2 different command file format: "
+             "1. each line in the file is a full command, will be submitted as a single job. "
+             "Qsub parameters can only be specified by qsub_global_parms in this way."
+             "2. JSON format, a list of dict, where each dict is a command (required key \"command\") "
+             "and other optional key specify qsub parameters per job."
     )
 
     parser_opt.add_argument(
