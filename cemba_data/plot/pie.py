@@ -145,7 +145,8 @@ def sunbrust(pie_data, ax,
                 ang = ang - 360
             ax.text(x * text_expend, y * text_expend, anno_names[i],
                     fontdict=None, withdash=False,
-                    rotation=ang, va='center', ha='center')
+                    rotation=ang, va='center', ha='left',
+                    rotation_mode='anchor')
         elif text_anno is None:
             pass
         else:

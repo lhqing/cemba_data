@@ -255,7 +255,11 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
 
         handles = []
         labels = []
+        exist_hues = _data[hue].unique()
         for hue_name, color in palette_dict.items():
+            if hue_name not in exist_hues:
+                # skip hue_name that do not appear in the plot
+                continue
             handle = Line2D([0], [0], marker='o', color='w',
                             markerfacecolor=color, markersize=_legend_kws['fontsize'])
             handles.append(handle)
