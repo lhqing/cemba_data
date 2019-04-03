@@ -15,7 +15,7 @@ def sunbrust(pie_data, ax,
              inner_radius=0.25, outer_radius=1,
              anno_col=None, text_anno='text', anno_layer_size=0.05,
              col_color_dict=None, startangle=0, anno_ang_min=5,
-             anno_border=1.2, text_expend=1.2,
+             anno_border=1.2, text_expend=1.05,
              uniform_section=False):
     return_axes = [ax]
 
@@ -139,13 +139,17 @@ def sunbrust(pie_data, ax,
             ax.annotate(anno_names[i], xy=(x, y), xytext=(anno_border * np.sign(x), y_niche),
                         horizontalalignment=horizontalalignment, **kw)
         elif text_anno == 'text':
+            ha = 'left'
             if x < 0:
+                # left side label
                 ang += 180
+                ha = 'right'
             if ang > 180:
+                # so label will not be up-side-down
                 ang = ang - 360
             ax.text(x * text_expend, y * text_expend, anno_names[i],
                     fontdict=None, withdash=False,
-                    rotation=ang, va='center', ha='left',
+                    rotation=ang, va='center', ha=ha,
                     rotation_mode='anchor')
         elif text_anno is None:
             pass
