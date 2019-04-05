@@ -252,7 +252,7 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
 
 def call_methylated_sites(bam_path, reference_fasta,
                           num_upstr_bases=0, num_downstr_bases=2,
-                          buffer_line_number=500000, min_mapq=0, min_base_quality=1,
+                          buffer_line_number=100000, min_mapq=0, min_base_quality=1,
                           compress_level=5, idx=True, tabix=True, output_path=None, save_count_df=False):
     """
     Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
