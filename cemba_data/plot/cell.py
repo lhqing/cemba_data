@@ -402,7 +402,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         sax = _sizebar(sax)
         # set simple tick label, let the user do custom works
         ticklabels = ['low', 'high']
-        sax.yaxis.set(yticks=[0, 1], yticklabels=ticklabels)
+        sax.yaxis.set(ticks=[0, 1], ticklabels=ticklabels)
         sax.set_ylabel(**_sizebar_label_kws)
 
     if text_anno is not None:
