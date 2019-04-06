@@ -29,4 +29,5 @@ from .pie import \
 
 # cluster tree
 from .tree import \
-    generate_tree_dict
+    generate_tree_dict, \
+    dendrogram

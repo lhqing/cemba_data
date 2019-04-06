@@ -15,23 +15,23 @@ def generate_tree_dict(data):
     -------
 
     """
-    childrens = []
+    children = []
     if data.shape[1] == 1:
         cell_counts = data.iloc[:, 0].value_counts()
-        for children, count in cell_counts.items():
-            childrens.append({
-                'name': children,
+        for child, count in cell_counts.items():
+            children.append({
+                'name': child,
                 'value': count
             })
     else:
-        for children, sub_df in data.groupby(data.columns[0]):
+        for child, sub_df in data.groupby(data.columns[0]):
             count = sub_df.shape[0]
-            childrens.append({
-                'name': children,
+            children.append({
+                'name': child,
                 'value': count,
                 'children': generate_tree_dict(sub_df.iloc[:, 1:])
             })
-    return childrens
+    return children
 
 
 def dendrogram(data_df, groupby,
