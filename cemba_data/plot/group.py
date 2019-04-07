@@ -19,6 +19,7 @@ Appendix:
 """
 from .tree import dendrogram
 import seaborn as sns
+import numpy as np
 
 
 def fancy_heatmap(ax, tidy_data, row_col, col_col,
@@ -55,7 +56,7 @@ def fancy_heatmap(ax, tidy_data, row_col, col_col,
     sns.scatterplot(x='row_i', y='col_i',
                     data=data[data['sig_marker']], **_sig_scatter_kws, ax=ax)
 
-    ax.set(xlim=(-0.5, 6.5),
+    ax.set(xlim=(-0.5, data[row_col].unique().size - 0.5),
            yticks=range(data[col_col].unique().size),
            yticklabels=col_order,
            xticks=range(data[row_col].unique().size),
@@ -63,5 +64,32 @@ def fancy_heatmap(ax, tidy_data, row_col, col_col,
     for label in ax.xaxis.get_ticklabels():
         label.set(rotation=45, rotation_mode='anchor', ha='right')
     sns.despine(ax=ax, left=True, bottom=True)
+    ax.set(xlabel=col_col, ylabel=row_col)
     return ax
 
+
+def stack_bar_plot(ax, tidy_data, group, group_order, palette, hue, hue_order=None):
+    count_data = tidy_data.groupby([group, hue]) \
+        .apply(lambda i: i.shape[0]) \
+        .unstack() \
+        .fillna(0)
+    rate_table = count_data / count_data.sum(axis=1).values[:, None]
+    if hue_order is None:
+        hue_order = sorted(tidy_data[hue].unique())
+    plot_data = rate_table[hue_order].apply(np.cumsum, axis=1) \
+        .stack() \
+        .reset_index()
+
+    for element in hue_order[::-1]:
+        sub_df = plot_data[plot_data[hue] == element]
+        sns.barplot(
+            x=group,
+            y=0,
+            label=element,
+            data=sub_df,
+            color=palette[element],
+            ax=ax,
+            order=group_order)
+    sns.despine(ax=ax, offset=20)
+    ax.set(ylim=(0, 1))
+    return ax

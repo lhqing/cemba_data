@@ -23,9 +23,10 @@ def tight_hue_range(hue_data, portion):
     return vmin, vmax
 
 
-def plot_colorbar(cax, cmap, cnorm, hue_norm, label_kws):
+def plot_colorbar(cax, cmap, cnorm, hue_norm, label_kws=None):
     _label_kws = {'fontsize': 3, 'label': ''}
-    _label_kws.update(label_kws)
+    if label_kws is not None:
+        _label_kws.update(label_kws)
 
     colorbar = ColorbarBase(cax, cmap=cmap, norm=cnorm,
                             orientation='vertical', extend='both')
