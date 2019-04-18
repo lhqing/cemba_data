@@ -294,6 +294,7 @@ def call_methylated_sites(bam_path, reference_fasta,
     if not pathlib.Path(reference_fasta + ".fai").exists():
         raise FileNotFoundError("Reference fasta not indexed. Use samtools faidx to index it and run again.")
     fai_df = _read_faidx(pathlib.Path(reference_fasta + ".fai"))
+    total_genome_length = fai_df['LENGTH'].sum()
 
     if not pathlib.Path(bam_path + ".bai").exists():
         subprocess.check_call(shlex.split("samtools index " + bam_path))
@@ -330,6 +331,7 @@ def call_methylated_sites(bam_path, reference_fasta,
     context_len = num_upstr_bases + 1 + num_downstr_bases
     cur_chrom = ""
     line_counts = 0
+    total_line = 0
     out = ""
     seq = None  # whole cur_chrom seq
     chr_out_pos_list = []
@@ -339,6 +341,7 @@ def call_methylated_sites(bam_path, reference_fasta,
 
     # process mpileup result
     for line in result_handle:
+        total_line += 1
         fields = line.split("\t")
         fields[2] = fields[2].upper()
         # if chrom changed, read whole chrom seq from fasta
@@ -452,6 +455,7 @@ def call_methylated_sites(bam_path, reference_fasta,
 
     count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
     count_df['mc_rate'] = count_df['mc'] / count_df['cov']
+    count_df['genome_cov'] = total_line / total_genome_length
 
     if save_count_df:
         count_df.to_csv(output_path+'.count.csv')
