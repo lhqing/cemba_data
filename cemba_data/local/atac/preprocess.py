@@ -22,18 +22,6 @@ def filter_atac_cell(adata,
     return adata
 
 
-def filter_bins(adata, zscore_cutoff=2):
-    x = adata.X
-    bin_sum = x.sum(axis=0)
-    lg1p_bin_sum = np.log1p(bin_sum)
-    _mean = lg1p_bin_sum[lg1p_bin_sum > 0].mean()
-    _sd = lg1p_bin_sum[lg1p_bin_sum > 0].std()
-    norm_lg1p_bin_sum = (lg1p_bin_sum - _mean) / _sd
-    bool_index = (norm_lg1p_bin_sum > -abs(zscore_cutoff)) & (norm_lg1p_bin_sum < abs(zscore_cutoff))
-    _adata = adata[:, np.array(bool_index).reshape(bool_index.size)]
-    return _adata
-
-
 def scale_jaccard(jaccard_matrix,
                   with_row_mean=True, with_row_std=True, clip_value=5,
                   with_col_mean=True, with_col_std=False):

@@ -302,7 +302,6 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
             _data['hue'] = hue.astype(float)
             hue = 'hue'
         if hue_norm is None:
-            print(f'Use hue_portion {hue_portion} to determine hue_norm')
             # get the smallest range that include "hue_portion" of data
             hue_norm = tight_hue_range(_data[hue], hue_portion)
         if isinstance(cmap, str):
@@ -329,7 +328,6 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         _data[size] = _data[size] - _data[size].min() + 1
 
         if size_norm is None:
-            print(f'Use size_portion {size_portion} to determine size_norm')
             # get the smallest range that include "size_portion" of data
             size_norm = tight_hue_range(_data[size], size_portion)
 

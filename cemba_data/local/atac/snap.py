@@ -256,6 +256,7 @@ def _dump_frags_single_snap(snap_path, out_f, barcodes):
 
 def dump_frags(snap_path_dict, barcode_dict, out_prefix, chrom_size_path, scale=1,
                sort_mem='10%', sort_cpu=1, path_to_bedgraphtobigwig=''):
+    """Extract cluster bigwig from SNAP file"""
     with open(out_prefix + '.frags', 'w') as out_f:
         for snap, barcodes in barcode_dict.items():
             print(f'extract fragments from {snap}...')
