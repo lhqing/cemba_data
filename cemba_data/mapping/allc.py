@@ -231,23 +231,20 @@ def _read_faidx(faidx_path):
                        names=['NAME', 'LENGTH', 'OFFSET', 'LINEBASES', 'LINEWIDTH'])
 
 
-def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
+def _get_chromosome_sequence_upper(fasta_path, fai_df, query_chrom):
     """
     read a whole chromosome sequence into memory
     """
-    if query_chrom not in fai_df.index:
-        return None
-    else:
-        chrom_pointer = fai_df.loc[query_chrom, 'OFFSET']
-        tail = fai_df.loc[query_chrom, 'LINEBASES'] - fai_df.loc[query_chrom, 'LINEWIDTH']
-        seq = ""
-        with open(fasta_path, 'r') as f:
-            f.seek(chrom_pointer)
-            for line in f:
-                if line[0] == '>':
-                    break
-                seq += line[:tail]  # trim \n
-        return seq
+    chrom_pointer = fai_df.loc[query_chrom, 'OFFSET']
+    tail = fai_df.loc[query_chrom, 'LINEBASES'] - fai_df.loc[query_chrom, 'LINEWIDTH']
+    seq = ""
+    with open(fasta_path, 'r') as f:
+        f.seek(chrom_pointer)
+        for line in f:
+            if line[0] == '>':
+                break
+            seq += line[:tail]  # trim \n
+    return seq.upper()
 
 
 def _get_bam_chrom_index(bam_path):
@@ -370,12 +367,8 @@ def call_methylated_sites(bam_path, reference_fasta,
             cur_chrom = fields[0]
             chr_out_pos_list.append((cur_chrom, str(cur_out_pos)))
             # get seq for cur_chrom
-            seq = _get_chromosome_sequence(reference_fasta, fai_df, cur_chrom)
-            if seq is not None:
-                seq = seq.upper()
+            seq = _get_chromosome_sequence_upper(reference_fasta, fai_df, cur_chrom)
 
-        if seq is None:
-            continue
         if fields[2] not in mc_sites:
             continue
 
