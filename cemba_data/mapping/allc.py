@@ -250,6 +250,18 @@ def _get_chromosome_sequence(fasta_path, fai_df, query_chrom):
         return seq
 
 
+def _get_bam_chrom_index(bam_path):
+    result = subprocess.run(['samtools', 'idxstats', bam_path],
+                            stdout=subprocess.PIPE, encoding='utf8').stdout
+
+    chrom_set = set()
+    for line in result.split('\n'):
+        chrom = line.split('\t')[0]
+        if chrom not in ['', '*']:
+            chrom_set.add(chrom)
+    return pd.Index(chrom_set)
+
+
 def call_methylated_sites(bam_path, reference_fasta,
                           num_upstr_bases=0, num_downstr_bases=2,
                           buffer_line_number=100000, min_mapq=0, min_base_quality=1,
@@ -298,6 +310,15 @@ def call_methylated_sites(bam_path, reference_fasta,
 
     if not pathlib.Path(bam_path + ".bai").exists():
         subprocess.check_call(shlex.split("samtools index " + bam_path))
+
+    # check chromosome between BAM and FASTA
+    # samtools have a bug when chromosome not match...
+    bam_chroms_index = _get_bam_chrom_index(bam_path)
+    unknown_chroms = [i for i in bam_chroms_index if i not in fai_df.index]
+    if len(unknown_chroms) != 0:
+        unknown_chroms = ' '.join(unknown_chroms)
+        raise IndexError(f'BAM file contain unknown chromosomes: {unknown_chroms}\n'
+                         'bam-to-allc MUST use the same fasta file that used for mapping.')
 
     # mpileup
     mpileup_cmd = f"samtools mpileup -Q {min_base_quality} " \
@@ -458,7 +479,7 @@ def call_methylated_sites(bam_path, reference_fasta,
     count_df['genome_cov'] = total_line / total_genome_length
 
     if save_count_df:
-        count_df.to_csv(output_path+'.count.csv')
+        count_df.to_csv(output_path + '.count.csv')
         return None
     else:
         return count_df
