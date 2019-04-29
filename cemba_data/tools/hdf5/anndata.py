@@ -425,8 +425,10 @@ def batch_correct_pc(adata, batch_series, correct=False,
 
     adata.obs['batch'] = batch_series
     adata_list = []
+    indexes = []
     for _, sub_df in adata.obs.groupby('batch'):
         adata_list.append(adata[sub_df.index, :])
+        indexes.extend(sub_df.index.tolist())
 
     if correct:
         integrated, corrected = scanorama.correct_scanpy(adata_list, return_dimred=True,
@@ -434,8 +436,10 @@ def batch_correct_pc(adata, batch_series, correct=False,
         adata.X = np.vstack([ann.X.toarray() for ann in corrected])
     else:
         integrated = scanorama.integrate_scanpy(adata_list, **scanorama_kws)
-    adata.obsm['X_pca'] = np.vstack(integrated)
 
+    pca_df = pd.DataFrame(np.vstack(integrated), index=indexes).reindex(adata.obs_names)
+
+    adata.obsm['X_pca'] = pca_df.values
     # TODO fill up other PC related parts same as sc.tl.pca
     return adata
 
