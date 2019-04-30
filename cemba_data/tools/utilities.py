@@ -60,7 +60,7 @@ def parse_chrom_size(path, remove_chr_list=None):
     return chrom_dict
 
 
-def genome_region_chunks(chrom_size_file, bin_length=10000000):
+def genome_region_chunks(chrom_size_file, bin_length=10000000, combine_small=True):
     """
     Split the whole genome into bins, where each bin is {bin_length} bp. Used for tabix region query
 
@@ -70,6 +70,8 @@ def genome_region_chunks(chrom_size_file, bin_length=10000000):
         Path of UCSC genome size file
     bin_length
         length of each bin
+    combine_small
+        whether combine small regions into one record
 
     Returns
     -------
@@ -93,17 +95,21 @@ def genome_region_chunks(chrom_size_file, bin_length=10000000):
 
     # merge small records (when bin larger then chrom length)
     final_records = []
-    temp_records = []
-    cum_length = 0
-    for record, record_length in zip(records, record_lengths):
-        temp_records.append(record)
-        cum_length += record_length
-        if cum_length >= bin_length:
+    if combine_small:
+        temp_records = []
+        cum_length = 0
+        for record, record_length in zip(records, record_lengths):
+            temp_records.append(record)
+            cum_length += record_length
+            if cum_length >= bin_length:
+                final_records.append(' '.join(temp_records))
+                temp_records = []
+                cum_length = 0
+        if len(temp_records) != 0:
             final_records.append(' '.join(temp_records))
-            temp_records = []
-            cum_length = 0
-    if len(temp_records) != 0:
-        final_records.append(' '.join(temp_records))
+    else:
+        for record in records:
+            final_records.append(record)
     return final_records
 
 

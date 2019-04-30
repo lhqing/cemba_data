@@ -267,7 +267,7 @@ class PipedBamReader(Closing):
                                  encoding=encoding)
 
         self.name = path
-        self._file = self.process.stdout
+        self.file = self.process.stdout
         self._stderr = self.process.stderr
         self.closed = False
         # Give gzip a little bit of time to report any errors
@@ -284,13 +284,13 @@ class PipedBamReader(Closing):
         self._raise_if_error()
 
     def __iter__(self):
-        for line in self._file:
+        for line in self.file:
             yield line
         self.process.wait()
         self._raise_if_error()
 
     def readline(self):
-        return self._file.readline()
+        return self.file.readline()
 
     def _raise_if_error(self):
         """
@@ -303,7 +303,7 @@ class PipedBamReader(Closing):
             raise IOError(message)
 
     def read(self, *args):
-        data = self._file.read(*args)
+        data = self.file.read(*args)
         if len(args) == 0 or args[0] <= 0:
             # wait for process to terminate until we check the exit code
             self.process.wait()

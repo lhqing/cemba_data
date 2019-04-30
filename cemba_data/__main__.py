@@ -1006,6 +1006,15 @@ def bam_to_allc_register_subparser(subparser):
         help="Whether to generate  ALLC context count table."
     )
 
+    parser_opt.add_argument(
+        "--cpu",
+        type=int,
+        required=False,
+        default=1,
+        help="Number of cores to parallel, NEVER use this if you "
+             "run bam-to-allc for things like single cell (generate thousands of ALLCs together)."
+    )
+
 
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,

@@ -631,7 +631,7 @@ def _merge_allc_files_idx(allc_files,
                                         mini_batch=mini_batch,
                                         compress_output=compress_output,
                                         skip_snp_info=skip_snp_info)
-        _index_allc_file(output_file)
+        index_allc_file(output_file)
         return 0
 
     # parallel merging
@@ -683,7 +683,7 @@ def _merge_allc_files_idx(allc_files,
             tmp_file = tmp_file[0]
             subprocess.run(["rm", tmp_file])
     # index output allc file
-    _index_allc_file(output_file)
+    index_allc_file(output_file)
     return 0
 
 
@@ -727,7 +727,7 @@ def _merge_allc_files_idx_minibatch(allc_files,
                                      compress_output=compress_output,
                                      skip_snp_info=skip_snp_info)
         subprocess.check_call(["mv", output_tmp_file, output_file])
-        _index_allc_file(output_file)
+        index_allc_file(output_file)
     return 0
 
 
@@ -858,17 +858,17 @@ def _index_allc_file_batch(allc_files, cpu=1):
 
     if cpu == 1:
         for allc_file in allc_files:
-            _index_allc_file(allc_file)
+            index_allc_file(allc_file)
     else:
         pool = multiprocessing.Pool(min(cpu, len(allc_files), 48))
         for allc_file in allc_files:
-            pool.apply_async(_index_allc_file, (allc_file,))
+            pool.apply_async(index_allc_file, (allc_file,))
         pool.close()
         pool.join()
     return 0
 
 
-def _index_allc_file(allc_file, reindex=False):
+def index_allc_file(allc_file, reindex=False):
     index_file = str(allc_file) + '.idx'
     if os.path.exists(index_file) and not reindex:
         # backward compatibility
@@ -919,7 +919,7 @@ def _index_allc_file(allc_file, reindex=False):
 
 def _read_allc_index(allc_file):
     index_file = str(allc_file) + ".idx"
-    _index_allc_file(allc_file)
+    index_allc_file(allc_file)
     with open(index_file, 'r') as f:
         chrom_pointer = {}
         for line in f:

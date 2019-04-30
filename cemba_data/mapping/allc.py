@@ -219,7 +219,14 @@ import pathlib
 import pandas as pd
 import multiprocessing
 import collections
-from ..tools.open import open_allc
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from ..tools.utilities import genome_region_chunks
+from ..tools.open import open_allc, open_bam
+import logging
+
+# logger
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 
 def _read_faidx(faidx_path):
@@ -259,10 +266,10 @@ def _get_bam_chrom_index(bam_path):
     return pd.Index(chrom_set)
 
 
-def call_methylated_sites(bam_path, reference_fasta,
-                          num_upstr_bases=0, num_downstr_bases=2,
-                          buffer_line_number=100000, min_mapq=0, min_base_quality=1,
-                          compress_level=5, idx=True, tabix=True, output_path=None, save_count_df=False):
+def _call_methylated_sites_worker(bam_path, reference_fasta, fai_df, output_path, region=None,
+                                  num_upstr_bases=0, num_downstr_bases=2,
+                                  buffer_line_number=100000, min_mapq=0, min_base_quality=1,
+                                  compress_level=5, idx=True, tabix=True, save_count_df=False):
     """
     Main ALLC calling function. Take one bam file, use samtools mpileup to call variants
     and pipe to this function to generate mC and cov count. Only for single cell, not base level statistics.
@@ -299,42 +306,26 @@ def call_methylated_sites(bam_path, reference_fasta,
         If save_count_df = False, return a dataframe contain all mC context summary counts.
         If save_count_df = True, return None
     """
-    # Check fasta index
-    if not pathlib.Path(reference_fasta + ".fai").exists():
-        raise FileNotFoundError("Reference fasta not indexed. Use samtools faidx to index it and run again.")
-    fai_df = _read_faidx(pathlib.Path(reference_fasta + ".fai"))
-    total_genome_length = fai_df['LENGTH'].sum()
-
-    if not pathlib.Path(bam_path + ".bai").exists():
-        subprocess.check_call(shlex.split("samtools index " + bam_path))
-
-    # check chromosome between BAM and FASTA
-    # samtools have a bug when chromosome not match...
-    bam_chroms_index = _get_bam_chrom_index(bam_path)
-    unknown_chroms = [i for i in bam_chroms_index if i not in fai_df.index]
-    if len(unknown_chroms) != 0:
-        unknown_chroms = ' '.join(unknown_chroms)
-        raise IndexError(f'BAM file contain unknown chromosomes: {unknown_chroms}\n'
-                         'bam-to-allc MUST use the same fasta file that used for mapping.')
-
     # mpileup
-    mpileup_cmd = f"samtools mpileup -Q {min_base_quality} " \
-                  f"-q {min_mapq} -B -f {reference_fasta} {bam_path}"
-    pipes = subprocess.Popen(shlex.split(mpileup_cmd),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True)
-    result_handle = pipes.stdout
-
-    # Output handel
-    input_path = pathlib.Path(bam_path)
-    file_dir = input_path.parent
-    if output_path is None:
-        allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
-        output_path = str(file_dir / allc_name)
+    if region is None:
+        mpileup_cmd = f"samtools mpileup -Q {min_base_quality} " \
+                      f"-q {min_mapq} -B -f {reference_fasta} {bam_path}"
+        pipes = subprocess.Popen(shlex.split(mpileup_cmd),
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 universal_newlines=True)
     else:
-        if not output_path.endswith('.gz'):
-            output_path += '.gz'
+        bam_handle = open_bam(bam_path, region=region, mode='r',
+                              include_header=True, samtools_parms_str=None)
+        mpileup_cmd = f"samtools mpileup -Q {min_base_quality} " \
+                      f"-q {min_mapq} -B -f {reference_fasta} -"
+        pipes = subprocess.Popen(shlex.split(mpileup_cmd),
+                                 stdin=bam_handle.file,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 universal_newlines=True)
+
+    result_handle = pipes.stdout
 
     output_file_handler = open_allc(output_path, mode='w',
                                     compresslevel=compress_level)
@@ -469,6 +460,8 @@ def call_methylated_sites(bam_path, reference_fasta,
 
     count_df = pd.DataFrame({'mc': mc_dict, 'cov': cov_dict})
     count_df['mc_rate'] = count_df['mc'] / count_df['cov']
+
+    total_genome_length = fai_df['LENGTH'].sum()
     count_df['genome_cov'] = total_line / total_genome_length
 
     if save_count_df:
@@ -476,6 +469,124 @@ def call_methylated_sites(bam_path, reference_fasta,
         return None
     else:
         return count_df
+
+
+def _aggregate_count_df(count_dfs):
+    total_df = pd.concat(count_dfs)
+    total_df = total_df.groupby(total_df.index).sum()
+    total_df['mc_rate'] = total_df['mc'] / total_df['cov']
+    total_df['mc'] = total_df['mc'].astype(int)
+    total_df['cov'] = total_df['cov'].astype(int)
+    return total_df
+
+
+def call_methylated_sites(bam_path, reference_fasta, cpu=1,
+                          num_upstr_bases=0, num_downstr_bases=2,
+                          buffer_line_number=100000, min_mapq=0, min_base_quality=1,
+                          compress_level=5, idx=True, tabix=True, output_path=None, save_count_df=False):
+    # Check fasta index
+    if not pathlib.Path(reference_fasta + ".fai").exists():
+        raise FileNotFoundError("Reference fasta not indexed. Use samtools faidx to index it and run again.")
+    fai_df = _read_faidx(pathlib.Path(reference_fasta + ".fai"))
+
+    if not pathlib.Path(bam_path + ".bai").exists():
+        subprocess.check_call(shlex.split("samtools index " + bam_path))
+
+    # check chromosome between BAM and FASTA
+    # samtools have a bug when chromosome not match...
+    bam_chroms_index = _get_bam_chrom_index(bam_path)
+    unknown_chroms = [i for i in bam_chroms_index if i not in fai_df.index]
+    if len(unknown_chroms) != 0:
+        unknown_chroms = ' '.join(unknown_chroms)
+        raise IndexError(f'BAM file contain unknown chromosomes: {unknown_chroms}\n'
+                         'Make sure you use the same genome FASTA file for mapping and bam-to-allc.')
+
+    # if parallel, chunk genome
+    if cpu > 1:
+        regions = genome_region_chunks(reference_fasta + ".fai",
+                                       bin_length=50000000,
+                                       combine_small=False)
+    else:
+        regions = None
+
+    # Output path
+    input_path = pathlib.Path(bam_path)
+    file_dir = input_path.parent
+    if output_path is None:
+        allc_name = 'allc_' + input_path.name.split('.')[0] + '.tsv.gz'
+        output_path = str(file_dir / allc_name)
+    else:
+        if not output_path.endswith('.gz'):
+            output_path += '.gz'
+
+    if cpu > 1:
+        temp_out_paths = []
+        for batch_id, region in enumerate(regions):
+            temp_out_paths.append(output_path + f'.batch_{batch_id}.tmp.tsv.gz')
+
+        with ProcessPoolExecutor(max_workers=cpu) as executor:
+            future_dict = {}
+            for batch_id, (region, out_temp_path) in enumerate(zip(regions, temp_out_paths)):
+                _kwargs = dict(bam_path=bam_path,
+                               reference_fasta=reference_fasta,
+                               fai_df=fai_df,
+                               output_path=out_temp_path,
+                               region=region,
+                               num_upstr_bases=num_upstr_bases,
+                               num_downstr_bases=num_downstr_bases,
+                               buffer_line_number=buffer_line_number,
+                               min_mapq=min_mapq,
+                               min_base_quality=min_base_quality,
+                               compress_level=compress_level,
+                               idx=False,
+                               tabix=False,
+                               save_count_df=False)
+                future_dict[executor.submit(_call_methylated_sites_worker, **_kwargs)] = batch_id
+
+            count_dfs = []
+            for future in as_completed(future_dict):
+                batch_id = future_dict[future]
+                try:
+                    count_dfs.append(future.result())
+                except Exception as exc:
+                    log.info('%r generated an exception: %s' % (batch_id, exc))
+
+            # aggregate ALLC
+            with open_allc(output_path, mode='w', compresslevel=compress_level,
+                           threads=1, region=None) as out_f:
+                for out_temp_path in temp_out_paths:
+                    with open_allc(out_temp_path) as f:
+                        for line in f:
+                            out_f.write(line)
+                    subprocess.check_call(['rm', '-f', out_temp_path])
+
+            # index
+            if idx:
+                from ..tools.allc_utilities import index_allc_file
+                index_allc_file(output_path)
+
+            # tabix
+            if tabix:
+                subprocess.run(shlex.split(f'tabix -b 2 -e 2 -s 1 {output_path}'),
+                               check=True)
+
+            # aggregate count_df
+            count_df = _aggregate_count_df(count_dfs)
+            if save_count_df:
+                count_df.to_csv(output_path + '.count.csv')
+                return None
+            else:
+                return count_df
+    else:
+        return _call_methylated_sites_worker(bam_path, reference_fasta, fai_df, output_path,
+                                             region=None,
+                                             num_upstr_bases=num_upstr_bases,
+                                             num_downstr_bases=num_downstr_bases,
+                                             buffer_line_number=buffer_line_number,
+                                             min_mapq=min_mapq,
+                                             min_base_quality=min_base_quality,
+                                             compress_level=compress_level,
+                                             idx=idx, tabix=tabix, save_count_df=save_count_df)
 
 
 def batch_call_methylated_sites(bam_result_df, out_dir, config):
@@ -515,8 +626,11 @@ def batch_call_methylated_sites(bam_result_df, out_dir, config):
     for (uid, index_name), _ in bam_result_df.groupby(['uid', 'index_name']):
         final_bam_path = pathlib.Path(out_dir) / f'{uid}_{index_name}.final.bam'
         result = pool.apply_async(call_methylated_sites,
+                                  # the batch function is for multiple ALLC generation,
+                                  # each ALLC is run on single core
                                   kwds=dict(bam_path=str(final_bam_path),
                                             reference_fasta=reference_fasta,
+                                            cpu=1,
                                             num_upstr_bases=num_upstr_bases,
                                             num_downstr_bases=num_downstr_bases,
                                             buffer_line_number=buffer_line_number,
