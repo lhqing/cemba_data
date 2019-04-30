@@ -221,6 +221,108 @@ class PipedGzipReader(Closing):
         return data
 
 
+"""
+
+
+def open_bam(bam_path, region_str=None, include_header=True):
+    command_list = ['samtools', 'view']
+    if include_header:
+        command_list.append('-h')
+    command_list.append(bam_path)
+    if region_str is not None:
+        command_list.extend(region_str.split(' '))
+
+    p = subprocess.Popen(command_list,
+                     stdout=subprocess.PIPE,
+                     encoding='utf8')
+    return p.stdout
+    """
+
+
+class PipedBamReader(Closing):
+    # decompression can't be parallel even in pigz, so there is not thread/cpu parameter
+    def __init__(self, path, region=None, mode='r', include_header=True, samtools_parms_str=None):
+        if mode not in ('r', 'rt', 'rb'):
+            raise ValueError(f"Mode is {mode}, but it must be 'r', 'rt' or 'rb'")
+        if 'b' not in mode:
+            encoding = 'utf8'
+        else:
+            encoding = None
+
+        command_list = ['samtools', 'view']
+        if include_header:
+            command_list.append('-h')
+        if samtools_parms_str is not None:
+            command_list.extend(samtools_parms_str.split(' '))
+
+        if region is None:
+            self.process = Popen(command_list + [path],
+                                 stdout=PIPE,
+                                 stderr=PIPE,
+                                 encoding=encoding)
+        else:
+            self.process = Popen(command_list + [path, region],
+                                 stdout=PIPE,
+                                 stderr=PIPE,
+                                 encoding=encoding)
+
+        self.name = path
+        self._file = self.process.stdout
+        self._stderr = self.process.stderr
+        self.closed = False
+        # Give gzip a little bit of time to report any errors
+        # (such as a non-existing file)
+        time.sleep(0.01)
+        self._raise_if_error()
+
+    def close(self):
+        self.closed = True
+        return_code = self.process.poll()
+        if return_code is None:
+            # still running
+            self.process.terminate()
+        self._raise_if_error()
+
+    def __iter__(self):
+        for line in self._file:
+            yield line
+        self.process.wait()
+        self._raise_if_error()
+
+    def readline(self):
+        return self._file.readline()
+
+    def _raise_if_error(self):
+        """
+        Raise IOError if process is not running anymore and the
+        exit code is nonzero.
+        """
+        return_code = self.process.poll()
+        if return_code is not None and return_code != 0:
+            message = self._stderr.read().strip()
+            raise IOError(message)
+
+    def read(self, *args):
+        data = self._file.read(*args)
+        if len(args) == 0 or args[0] <= 0:
+            # wait for process to terminate until we check the exit code
+            self.process.wait()
+        self._raise_if_error()
+        return data
+
+
+def open_bam(filename, mode='r', region=None, include_header=True, samtools_parms_str=None):
+    if 'r' in mode:
+        try:
+            return PipedBamReader(filename, region=region, mode=mode,
+                                  include_header=include_header,
+                                  samtools_parms_str=samtools_parms_str)
+        except OSError as e:
+            raise e
+    else:
+        raise NotImplementedError('BAM writer not implemented yet... I am lazy')
+
+
 def open_gz(filename, mode='r', compresslevel=3, threads=1, region=None):
     if 'r' in mode:
         try:
@@ -329,6 +431,14 @@ def is_bgzip(filename):
 def has_tabix(filename):
     tabix_path = filename + '.tbi'
     if os.path.exists(tabix_path):
+        return True
+    else:
+        return False
+
+
+def has_bai(filename):
+    index_path = filename + '.bai'
+    if os.path.exists(index_path):
         return True
     else:
         return False
