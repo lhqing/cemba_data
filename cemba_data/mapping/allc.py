@@ -504,7 +504,7 @@ def call_methylated_sites(bam_path, reference_fasta, cpu=1,
     # if parallel, chunk genome
     if cpu > 1:
         regions = genome_region_chunks(reference_fasta + ".fai",
-                                       bin_length=50000000,
+                                       bin_length=100000000,
                                        combine_small=False)
     else:
         regions = None
