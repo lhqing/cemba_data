@@ -42,14 +42,18 @@ def parse_mc_pattern(pattern):
 @functools.lru_cache(maxsize=10)
 def parse_chrom_size(path, remove_chr_list=None):
     """
+    support simple UCSC chrom size file, or .fai format (1st and 2nd columns same as chrom size file)
+
     return chrom:length dict
     """
     if remove_chr_list is None:
         remove_chr_list = []
+
     with open(path) as f:
         chrom_dict = collections.OrderedDict()
         for line in f:
-            chrom, length = line.strip('\n').split('\t')
+            # *_ for other format like fadix file
+            chrom, length, *_ = line.strip('\n').split('\t')
             if chrom in remove_chr_list:
                 continue
             chrom_dict[chrom] = int(length)
