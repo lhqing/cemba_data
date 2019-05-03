@@ -170,7 +170,7 @@ def _multi_kmode_clustering(multi_leiden_result, k='auto', cpu=1):
     return result_dict
 
 
-def get_kl_overall_df(adata):
+def get_kl_overall_df(adata, delta_pureness_cutoff=0.001):
     if 'leiden_kmode_results' not in adata.uns:
         raise KeyError('leiden_kmode_results not found in adata.uns, '
                        'make sure you run leiden_kmode_clustering first.')
@@ -188,73 +188,54 @@ def get_kl_overall_df(adata):
         overall_df['resolution'] = resolution
         records.append(overall_df)
     total_df = pd.concat(records, sort=True)
+
+    # selected the optimal K for each resolution
+    # judge delta pureness, and select the first TRUE row follow after the last FALSE row
+    # which means: the last K increase accompany with delta_pureness > threshold
+    # which means: the last K that split chimera clusters instead of only ambiguous cells
+    total_df['delta_pureness'] = total_df['pureness'].rolling(2) \
+        .apply(lambda i: i[1] - i[0], raw=True) \
+        .fillna(1)
+    n_row_selected = total_df.groupby('resolution') \
+        .apply(lambda i: i['delta_pureness'] < delta_pureness_cutoff) \
+        .apply(lambda i: np.where(~i)[0][-1] + 1, axis=1)
+    records = []
+    for resolution, sub_df in total_df.groupby('resolution'):
+        _sub_df = sub_df.copy()
+        nrow = n_row_selected.loc[resolution]
+        judges = [True if i == nrow else False for i in range(sub_df.shape[0])]
+        _sub_df['selected_one'] = judges
+        records.append(_sub_df)
+    total_df = pd.concat(records)
+
     return total_df
 
 
-def _select_optimal_k(kmode_results, pureness_cutoff=0.99, completeness_cutoff=0.95):
-    overall_dict = {'pureness': {},
-                    'completeness': {},
-                    'n_cluster': {}}
-    for k, result_dict in kmode_results.items():
-        overall_dict['pureness'][k] = result_dict['overall_pureness']
-        overall_dict['completeness'][k] = result_dict['overall_completeness']
-        overall_dict['n_cluster'][k] = result_dict['cluster'].unique().size
-    overall_df = pd.DataFrame(overall_dict).reset_index().rename(columns={'index': 'k'})
-    n_cluster_max = overall_df['n_cluster'].max()
+def get_selected_cluster_profile(adata, resolution, k,
+                                 cluster_completeness_cutoff=0.1,
+                                 cluster_cell_portion_cutoff=0.01,
+                                 cell_ambiguity_cutoff=0.1):
+    cluster_profile = pd.DataFrame({_key: adata.uns['leiden_kmode_results'][resolution][k][_key]
+                                    for _key in ['cluster_pureness',
+                                                 'cluster_completeness',
+                                                 'weighted_cluster_pureness',
+                                                 'weighted_cluster_completeness']})
+    cluster_profile['cell_count'] = adata.uns['leiden_kmode_results'][resolution][k]['cluster'].value_counts()
+    cluster_profile['judge'] = (cluster_profile['cluster_completeness'] > cluster_completeness_cutoff) | \
+                               (cluster_profile['cell_count'] > (adata.shape[0] * cluster_cell_portion_cutoff))
 
-    pass_cutoff = overall_df[(overall_df['pureness'] > pureness_cutoff) &
-                             (overall_df['completeness'] > completeness_cutoff)]
-    rows = []
-    for i, row in pass_cutoff.iterrows():
-        rows.append(row)
-        if row['n_cluster'] == n_cluster_max:
-            # break when see the first max n_cluster, additional row is useless
-            break
-    pass_cutoff = pd.DataFrame(rows)
-    if pass_cutoff.shape[0] == 0:
-        return None
-    optimal_k = int(pass_cutoff['k'].max())
-    return optimal_k
-
-
-def _filter_cell_and_cluster(result_dict, cell_ambiguity_cutoff=0.01, cluster_portion_cutoff=0.005):
-    """
-    After determine the resolution and K,
-    trimming the final cluster and cells based on ambiguity and cluster size.
-    Small size cluster are not able to obtain supervised model.
-    """
-    cell_data = {
-        'LK_cell_ambiguity': result_dict['cell_ambiguity'],
-        'LK_cluster': result_dict['cluster']
-    }
-    cell_data = pd.DataFrame(cell_data)
-
-    cluster_pureness = result_dict['cluster_pureness']
-    cluster_completeness = result_dict['cluster_completeness']
-    cell_data['LK_cluster_pureness'] = cell_data['LK_cluster'].map(cluster_pureness)
-    cell_data['LK_cluster_completeness'] = cell_data['LK_cluster'].map(cluster_completeness)
-
-    # ambiguity judge
-    ambiguity_judge = cell_data['LK_cell_ambiguity'] <= cell_ambiguity_cutoff
-    # cluster size judge, after ambiguity
-    _pass_cell_data = cell_data[ambiguity_judge]
-    cluster_size_judge = _pass_cell_data['LK_cluster'].value_counts() > \
-                         _pass_cell_data.shape[0] * cluster_portion_cutoff
-    pass_clusters = cluster_size_judge[cluster_size_judge].index
-    cluster_judge = cell_data['LK_cluster'].apply(lambda i: i in pass_clusters)
-
-    # combine judges
-    cell_data['LK_final_judge'] = cluster_judge & ambiguity_judge
-
-    # mask cell's cluster
-    cell_data['LK_masked_cluster'] = cell_data.apply(
-        lambda i: str(i['LK_cluster']) if i['LK_final_judge'] else np.nan, axis=1)
-    return cell_data
+    cell_profile = pd.DataFrame({'cluster': adata.uns['leiden_kmode_results'][resolution][k]['cluster'],
+                                 'cell_ambiguity': adata.uns['leiden_kmode_results'][resolution][k]['cell_ambiguity']})
+    cell_profile['cluster'] = cell_profile['cluster'].apply(lambda i: i if cluster_profile.loc[i, 'judge'] else -1)
+    cell_ambiguity_judge = cell_profile['cell_ambiguity'] < cell_ambiguity_cutoff
+    cell_profile['cluster'] = [cluster if cell_ambiguity_judge[cell_id] else -1
+                               for cell_id, cluster in cell_profile['cluster'].iteritems()]
+    return cluster_profile, cell_profile
 
 
 # this function deal with real clustering, it save kmode results for different resolution and k
 def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
-                            leiden_repeats=300):
+                            leiden_repeats=300, kmode_k_step=2):
     n_cells = adata.X.shape[0]
     hard_k_min = 5
     hard_k_max = int(n_cells / 50)  # at maximum, ave cluster cell number should >= 50
@@ -266,7 +247,9 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
         mode_k = int(results.apply(lambda i: i.cat.categories.size, axis=0).mode())
         if kmode_ks == 'auto':
             # generate a list based on mode k
-            _kmode_ks = list(range(max(mode_k - 10, hard_k_min), min(int(mode_k * 2), hard_k_max), 2))
+            _kmode_ks = list(range(max(mode_k - 10, hard_k_min),
+                                   min(int(mode_k * 3), hard_k_max),
+                                   kmode_k_step))
             if len(_kmode_ks) == 0:
                 # mode_k is too extreme
                 print(f'Resolution {_resolution} have {mode_k} clusters, '
@@ -295,6 +278,42 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
         'leiden_repeats': leiden_repeats
     }
     return
+
+
+"""
+def _filter_cell_and_cluster(result_dict, cell_ambiguity_cutoff=0.01, cluster_portion_cutoff=0.005):
+    \"""
+    After determine the resolution and K,
+    trimming the final cluster and cells based on ambiguity and cluster size.
+    Small size cluster are not able to obtain supervised model.
+    \"""
+    cell_data = {
+        'LK_cell_ambiguity': result_dict['cell_ambiguity'],
+        'LK_cluster': result_dict['cluster']
+    }
+    cell_data = pd.DataFrame(cell_data)
+
+    cluster_pureness = result_dict['cluster_pureness']
+    cluster_completeness = result_dict['cluster_completeness']
+    cell_data['LK_cluster_pureness'] = cell_data['LK_cluster'].map(cluster_pureness)
+    cell_data['LK_cluster_completeness'] = cell_data['LK_cluster'].map(cluster_completeness)
+
+    # ambiguity judge
+    ambiguity_judge = cell_data['LK_cell_ambiguity'] <= cell_ambiguity_cutoff
+    # cluster size judge, after ambiguity
+    _pass_cell_data = cell_data[ambiguity_judge]
+    cluster_size_judge = _pass_cell_data['LK_cluster'].value_counts() > \
+                         _pass_cell_data.shape[0] * cluster_portion_cutoff
+    pass_clusters = cluster_size_judge[cluster_size_judge].index
+    cluster_judge = cell_data['LK_cluster'].apply(lambda i: i in pass_clusters)
+
+    # combine judges
+    cell_data['LK_final_judge'] = cluster_judge & ambiguity_judge
+
+    # mask cell's cluster
+    cell_data['LK_masked_cluster'] = cell_data.apply(
+        lambda i: str(i['LK_cluster']) if i['LK_final_judge'] else np.nan, axis=1)
+    return cell_data
 
 
 # this function filter the leiden_kmode_clustering result to automatically
@@ -346,8 +365,32 @@ def judge_leiden_kmode_results(adata,
         print('None of the resolution and K value combination fulfill both the pureness and completeness cutoff. '
               'Try loosen the cutoff or change the resolution and K ranges '
               'in leiden_kmode_clustering and calculate again.')
+              
+    
+def _select_optimal_k(kmode_results, pureness_cutoff=0.99, completeness_cutoff=0.95):
+    overall_dict = {'pureness': {},
+                    'completeness': {},
+                    'n_cluster': {}}
+    for k, result_dict in kmode_results.items():
+        overall_dict['pureness'][k] = result_dict['overall_pureness']
+        overall_dict['completeness'][k] = result_dict['overall_completeness']
+        overall_dict['n_cluster'][k] = result_dict['cluster'].unique().size
+    overall_df = pd.DataFrame(overall_dict).reset_index().rename(columns={'index': 'k'})
+    n_cluster_max = overall_df['n_cluster'].max()
+
+    pass_cutoff = overall_df[(overall_df['pureness'] > pureness_cutoff) &
+                             (overall_df['completeness'] > completeness_cutoff)]
+    rows = []
+    for i, row in pass_cutoff.iterrows():
+        rows.append(row)
+        if row['n_cluster'] == n_cluster_max:
+            # break when see the first max n_cluster, additional row is useless
+            break
+    pass_cutoff = pd.DataFrame(rows)
+    if pass_cutoff.shape[0] == 0:
+        return None
+    optimal_k = int(pass_cutoff['k'].max())
+    return optimal_k
 
 
-def determine_resolution():
-    # automatically determine resolution and cluster range using ARI
-    return
+"""

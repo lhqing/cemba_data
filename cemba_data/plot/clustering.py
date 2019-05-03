@@ -1,4 +1,5 @@
 import seaborn as sns
+import numpy as np
 from .cell import categorical_scatter
 
 
@@ -7,16 +8,16 @@ def _plot_kmode_overall_single_r(ax, overall_df):
                  x='k', y='pureness', ax=ax, label='Pureness',
                  markers=True, dashes=True, legend=None)
     sns.scatterplot(data=overall_df, color='orange',
-                 x='k', y='pureness', ax=ax, legend=None)
+                    x='k', y='pureness', ax=ax, legend=None)
     ax_twin = ax.twinx()
     sns.lineplot(data=overall_df, color='steelblue',
                  x='k', y='completeness', ax=ax_twin, label='Completeness',
                  markers=True, dashes=True, legend=None, )
     sns.scatterplot(data=overall_df, color='steelblue',
-                 x='k', y='completeness', ax=ax_twin, legend=None)
+                    x='k', y='completeness', ax=ax_twin, legend=None)
     ax.grid()
-    ax.set(ylim=(0.98, 1))
-    ax_twin.set(ylim=(0.8, 1))
+    ax.set(ylim=tuple(np.quantile(overall_df['pureness'], q=(0.01, 0.99))))
+    ax_twin.set(ylim=tuple(np.quantile(overall_df['completeness'], q=(0.01, 0.99))))
     return ax
 
 
@@ -47,17 +48,17 @@ def plot_kmode_stats(axes, coord_data, result_dict, coord_base='umap'):
     if ax1.is_first_row():
         ax1.set_title('Cluster')
     sns.scatterplot(data=plot_data, x=f'{coord_base}_0', y=f'{coord_base}_1',
-                    hue=1 - plot_data['cell_ambiguity'], ax=ax2, hue_norm=(0.95, 1),
+                    hue=1 - plot_data['cell_ambiguity'], ax=ax2, hue_norm=(0.9, 1),
                     palette='viridis', s=3, linewidth=0, legend=None)
     if ax2.is_first_row():
         ax2.set_title('1 - Cell Ambiguity')
     sns.scatterplot(data=plot_data, x=f'{coord_base}_0', y=f'{coord_base}_1',
-                    hue='cluster_pureness', ax=ax3, hue_norm=(0.7, 1),
+                    hue='cluster_pureness', ax=ax3, hue_norm=(0, 1),
                     palette='viridis', s=3, linewidth=0, legend=None)
     if ax3.is_first_row():
         ax3.set_title('Cluster Pureness')
     sns.scatterplot(data=plot_data, x=f'{coord_base}_0', y=f'{coord_base}_1',
-                    hue='cluster_completeness', ax=ax4, hue_norm=(0.7, 1),
+                    hue='cluster_completeness', ax=ax4, hue_norm=(0, 1),
                     palette='viridis', s=3, linewidth=0, legend=None)
     if ax4.is_first_row():
         ax4.set_title('Cluster Completeness')
