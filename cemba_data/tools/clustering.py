@@ -116,9 +116,9 @@ def _kmode_on_multi_leiden(multi_leiden_result, k, verbose=0):
         for cell, row in sub_df.iterrows():
             portion = (row == all_modes).sum() / ncols
             cell_ambiguity_records[cell] = 1 - portion
-    pureness = pd.Series(pureness_records)
-    completeness = pd.Series(completeness_records)
-    cell_ambiguity = pd.Series(cell_ambiguity_records)
+    pureness = pd.Series(pureness_records).sort_index()
+    completeness = pd.Series(completeness_records).sort_index()
+    cell_ambiguity = pd.Series(cell_ambiguity_records).sort_index()
 
     final_portion = final_cluster.value_counts() / final_cluster.size
     weighted_cluster_pureness = pureness * final_portion
@@ -126,15 +126,15 @@ def _kmode_on_multi_leiden(multi_leiden_result, k, verbose=0):
     weighted_cluster_completeness = completeness * final_portion
     overall_completeness = weighted_cluster_completeness.sum()
 
-    result_dict = {'cluster': final_cluster,
+    result_dict = {'cluster': final_cluster.values,
                    'n_cluster': final_cluster.unique().size,
-                   'cluster_pureness': pureness,
-                   'weighted_cluster_pureness': weighted_cluster_pureness,
-                   'cluster_completeness': completeness,
-                   'weighted_cluster_completeness': weighted_cluster_completeness,
-                   'cell_ambiguity': cell_ambiguity,
+                   'cluster_pureness': pureness.values,
+                   'cluster_completeness': completeness.values,
+                   'cell_ambiguity': cell_ambiguity.values,
                    'overall_pureness': overall_pureness,
                    'overall_completeness': overall_completeness,
+                   'cluster_index': pureness.index.values,
+                   'cell_index': cell_ambiguity.index.values,
                    'k': _k}
     return result_dict
 
@@ -163,7 +163,7 @@ def _multi_kmode_clustering(multi_leiden_result, k='auto', cpu=1):
             k = future_dict[future]
             try:
                 data = future.result()
-                result_dict[k] = data
+                result_dict[str(k)] = data
             except Exception as exc:
                 print(f'_kmode_on_multi_leiden generated an exception (k={k}): {exc}')
                 raise
@@ -183,7 +183,7 @@ def get_kl_overall_df(adata, delta_pureness_cutoff=0.001):
         for k, result_dict in kmode_results.items():
             overall_dict['pureness'][k] = result_dict['overall_pureness']
             overall_dict['completeness'][k] = result_dict['overall_completeness']
-            overall_dict['n_cluster'][k] = result_dict['cluster'].unique().size
+            overall_dict['n_cluster'][k] = np.unique(result_dict['cluster']).size
         overall_df = pd.DataFrame(overall_dict).reset_index().rename(columns={'index': 'k'})
         overall_df['resolution'] = resolution
         records.append(overall_df)
@@ -215,18 +215,33 @@ def get_selected_cluster_profile(adata, resolution, k,
                                  cluster_completeness_cutoff=0.1,
                                  cluster_cell_portion_cutoff=0.01,
                                  cell_ambiguity_cutoff=0.1):
-    cluster_profile = pd.DataFrame({_key: adata.uns['leiden_kmode_results'][resolution][k][_key]
+    resolution = str(resolution)
+    k = str(k)
+
+    result_dict = adata.uns['leiden_kmode_results'][resolution][k]
+
+    # get cell profile
+    cluster_profile = pd.DataFrame({_key: result_dict[_key]
                                     for _key in ['cluster_pureness',
                                                  'cluster_completeness',
                                                  'weighted_cluster_pureness',
-                                                 'weighted_cluster_completeness']})
-    cluster_profile['cell_count'] = adata.uns['leiden_kmode_results'][resolution][k]['cluster'].value_counts()
+                                                 'weighted_cluster_completeness']},
+                                   index=result_dict['cluster_index'])
+    cell_cluster_series = pd.Series(result_dict['cluster'], index=result_dict['cell_index'])
+    cluster_profile['cell_count'] = cell_cluster_series.value_counts()
+
+    # filter clusters based on both completeness and cell count,
+    # either large cluster or complete cluster are remained
     cluster_profile['judge'] = (cluster_profile['cluster_completeness'] > cluster_completeness_cutoff) | \
                                (cluster_profile['cell_count'] > (adata.shape[0] * cluster_cell_portion_cutoff))
 
-    cell_profile = pd.DataFrame({'cluster': adata.uns['leiden_kmode_results'][resolution][k]['cluster'],
-                                 'cell_ambiguity': adata.uns['leiden_kmode_results'][resolution][k]['cell_ambiguity']})
+    # get cell profile
+    cell_ambiguity_series = pd.Series(result_dict['cell_ambiguity'], index=result_dict['cell_index'])
+    cell_profile = pd.DataFrame({'cluster': cell_cluster_series,
+                                 'cell_ambiguity': cell_ambiguity_series})
+    # mark cell in bad cluster as -1
     cell_profile['cluster'] = cell_profile['cluster'].apply(lambda i: i if cluster_profile.loc[i, 'judge'] else -1)
+    # keep filter cell based on cell ambiguity
     cell_ambiguity_judge = cell_profile['cell_ambiguity'] < cell_ambiguity_cutoff
     cell_profile['cluster'] = [cluster if cell_ambiguity_judge[cell_id] else -1
                                for cell_id, cluster in cell_profile['cluster'].iteritems()]
@@ -255,7 +270,7 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
                 print(f'Resolution {_resolution} have {mode_k} clusters, '
                       f'which seems too extreme. If you really want to run Kmode on this, '
                       f'set kmode_ks manually.')
-                total_results[_resolution] = None
+                total_results[str(_resolution)] = None
                 continue
         else:
             _kmode_ks = kmode_ks
@@ -266,7 +281,7 @@ def leiden_kmode_clustering(adata, resolutions, kmode_ks='auto', cpu=1,
         kmode_results = _multi_kmode_clustering(results,
                                                 k=_kmode_ks,
                                                 cpu=cpu)
-        total_results[_resolution] = kmode_results
+        total_results[str(_resolution)] = kmode_results
     print("Save all KMode results into adata.uns['leiden_kmode_results']")
     print("Save all parameters into adata.uns['leiden_kmode_parameter']")
     adata.uns['leiden_kmode_results'] = total_results
