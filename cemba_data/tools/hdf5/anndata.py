@@ -365,82 +365,83 @@ def rank_features_groups(
         # initialize space for z-scores
         scores = np.zeros(n_genes)
         # First loop: Loop over all genes
-        for imask, mask in enumerate(groups_masks):
-            means[imask], vars[imask] = get_mean_var(X[mask])  # for fold-change only
-            if imask == ireference:
-                continue
-            else:
-                mask_rest = groups_masks[ireference]
-            ns_rest = np.where(mask_rest)[0].size
-            mean_rest, var_rest = get_mean_var(X[mask_rest])  # for fold-change only
-
-            if ns_rest <= 25 or ns[imask] <= 25:
-                log.info('Few observations in a group for '
-                         'normal approximation (<=25). Lower test accuracy.')
-            n_active = ns[imask]
-            m_active = ns_rest
-
-            # Now calculate gene expression ranking in chunkes:
-            chunk = []
-            # Calculate chunk frames
-            n_genes_max_chunk = floor(CONST_MAX_SIZE / (n_active + m_active))
-            if n_genes_max_chunk < n_genes:
-                chunk_index = n_genes_max_chunk
-                while chunk_index < n_genes:
-                    chunk.append(chunk_index)
-                    chunk_index = chunk_index + n_genes_max_chunk
-                chunk.append(n_genes)
-            else:
-                chunk.append(n_genes)
-
-            left = 0
-            # Calculate rank sums for each chunk for the current mask
-            for chunk_index, right in enumerate(chunk):
-                # Check if issparse is true: AnnData objects are currently sparse.csr or ndarray.
-                if issparse(X):
-                    df1 = pd.DataFrame(data=X[mask, left:right].todense())
-                    df2 = pd.DataFrame(data=X[mask_rest, left:right].todense(),
-                                       index=np.arange(start=n_active, stop=n_active + m_active))
+        if reference != 'rest':
+            for imask, mask in enumerate(groups_masks):
+                means[imask], vars[imask] = get_mean_var(X[mask])  # for fold-change only
+                if imask == ireference:
+                    continue
                 else:
-                    df1 = pd.DataFrame(data=X[mask, left:right])
-                    df2 = pd.DataFrame(data=X[mask_rest, left:right],
-                                       index=np.arange(start=n_active, stop=n_active + m_active))
-                df1 = df1.append(df2)
-                ranks = df1.rank()
-                # sum up adjusted_ranks to calculate W_m,n
-                scores[left:right] = np.sum(ranks.loc[0:n_active, :])
-                left = right
+                    mask_rest = groups_masks[ireference]
+                ns_rest = np.where(mask_rest)[0].size
+                mean_rest, var_rest = get_mean_var(X[mask_rest])  # for fold-change only
 
-            # https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test
-            # for large samples, U (score here) is approximately normally distributed
-            scores = (scores - (n_active * (n_active + m_active + 1) / 2)) / sqrt(
-                (n_active * m_active * (n_active + m_active + 1) / 12))
+                if ns_rest <= 25 or ns[imask] <= 25:
+                    log.info('Few observations in a group for '
+                             'normal approximation (<=25). Lower test accuracy.')
+                n_active = ns[imask]
+                m_active = ns_rest
 
-            # for methylation, we are looking for reverse difference
-            scores = scores * -1
+                # Now calculate gene expression ranking in chunkes:
+                chunk = []
+                # Calculate chunk frames
+                n_genes_max_chunk = floor(CONST_MAX_SIZE / (n_active + m_active))
+                if n_genes_max_chunk < n_genes:
+                    chunk_index = n_genes_max_chunk
+                    while chunk_index < n_genes:
+                        chunk.append(chunk_index)
+                        chunk_index = chunk_index + n_genes_max_chunk
+                    chunk.append(n_genes)
+                else:
+                    chunk.append(n_genes)
 
-            scores[np.isnan(scores)] = 0
-            pvals = 2 * stats.distributions.norm.sf(np.abs(scores))
+                left = 0
+                # Calculate rank sums for each chunk for the current mask
+                for chunk_index, right in enumerate(chunk):
+                    # Check if issparse is true: AnnData objects are currently sparse.csr or ndarray.
+                    if issparse(X):
+                        df1 = pd.DataFrame(data=X[mask, left:right].todense())
+                        df2 = pd.DataFrame(data=X[mask_rest, left:right].todense(),
+                                           index=np.arange(start=n_active, stop=n_active + m_active))
+                    else:
+                        df1 = pd.DataFrame(data=X[mask, left:right])
+                        df2 = pd.DataFrame(data=X[mask_rest, left:right],
+                                           index=np.arange(start=n_active, stop=n_active + m_active))
+                    df1 = df1.append(df2)
+                    ranks = df1.rank()
+                    # sum up adjusted_ranks to calculate W_m,n
+                    scores[left:right] = np.sum(ranks.loc[0:n_active, :])
+                    left = right
 
-            if corr_method == 'benjamini-hochberg':
-                pvals[np.isnan(pvals)] = 1  # set Nan values to 1 to properly convert using Benhjamini Hochberg
-                _, pvals_adj, _, _ = multipletests(pvals, alpha=0.05, method='fdr_bh')
-            elif corr_method == 'bonferroni':
-                pvals_adj = np.minimum(pvals * n_genes, 1.0)
-            else:
-                raise ValueError
+                # https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test
+                # for large samples, U (score here) is approximately normally distributed
+                scores = (scores - (n_active * (n_active + m_active + 1) / 2)) / sqrt(
+                    (n_active * m_active * (n_active + m_active + 1) / 12))
 
-            # Fold change
-            foldchanges = (means[imask] + 1e-9) / (mean_rest + 1e-9)  # add small value to remove 0's
-            scores_sort = np.abs(scores) if rankby_abs else scores
-            partition = np.argpartition(scores_sort, -n_genes_user)[-n_genes_user:]
-            partial_indices = np.argsort(scores_sort[partition])[::-1]
-            global_indices = reference_indices[partition][partial_indices]
-            rankings_gene_scores.append(scores[global_indices])
-            rankings_gene_names.append(adata_comp.var_names[global_indices])
-            rankings_gene_logfoldchanges.append(np.log2(foldchanges[global_indices]))
-            rankings_gene_pvals.append(pvals[global_indices])
-            rankings_gene_pvals_adj.append(pvals_adj[global_indices])
+                # for methylation, we are looking for reverse difference
+                scores = scores * -1
+
+                scores[np.isnan(scores)] = 0
+                pvals = 2 * stats.distributions.norm.sf(np.abs(scores))
+
+                if corr_method == 'benjamini-hochberg':
+                    pvals[np.isnan(pvals)] = 1  # set Nan values to 1 to properly convert using Benhjamini Hochberg
+                    _, pvals_adj, _, _ = multipletests(pvals, alpha=0.05, method='fdr_bh')
+                elif corr_method == 'bonferroni':
+                    pvals_adj = np.minimum(pvals * n_genes, 1.0)
+                else:
+                    raise ValueError
+
+                # Fold change
+                foldchanges = (means[imask] + 1e-9) / (mean_rest + 1e-9)  # add small value to remove 0's
+                scores_sort = np.abs(scores) if rankby_abs else scores
+                partition = np.argpartition(scores_sort, -n_genes_user)[-n_genes_user:]
+                partial_indices = np.argsort(scores_sort[partition])[::-1]
+                global_indices = reference_indices[partition][partial_indices]
+                rankings_gene_scores.append(scores[global_indices])
+                rankings_gene_names.append(adata_comp.var_names[global_indices])
+                rankings_gene_logfoldchanges.append(np.log2(foldchanges[global_indices]))
+                rankings_gene_pvals.append(pvals[global_indices])
+                rankings_gene_pvals_adj.append(pvals_adj[global_indices])
 
         # If no reference group exists, ranking needs only to be done once (full mask)
         else:
