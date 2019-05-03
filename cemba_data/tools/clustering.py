@@ -223,9 +223,7 @@ def get_selected_cluster_profile(adata, resolution, k,
     # get cell profile
     cluster_profile = pd.DataFrame({_key: result_dict[_key]
                                     for _key in ['cluster_pureness',
-                                                 'cluster_completeness',
-                                                 'weighted_cluster_pureness',
-                                                 'weighted_cluster_completeness']},
+                                                 'cluster_completeness']},
                                    index=result_dict['cluster_index'])
     cell_cluster_series = pd.Series(result_dict['cluster'], index=result_dict['cell_index'])
     cluster_profile['cell_count'] = cell_cluster_series.value_counts()
