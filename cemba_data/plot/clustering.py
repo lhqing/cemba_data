@@ -28,17 +28,12 @@ def plot_kmode_overall(axes, overall_df):
     return axes
 
 
-def plot_kmode_stats(axes, coord_data, result_dict, coord_base='umap'):
-    cluster_pureness = result_dict['cluster_pureness']
-    cluster_completeness = result_dict['cluster_completeness']
-    cell_ambiguity = result_dict['cell_ambiguity']
-    cluster = result_dict['cluster']
-
+def plot_kmode_stats(axes, coord_data, cell_profile, coord_base='umap'):
     plot_data = coord_data.copy()
-    plot_data['cell_ambiguity'] = cell_ambiguity
-    plot_data['cluster'] = cluster
-    plot_data['cluster_pureness'] = cluster.map(cluster_pureness)
-    plot_data['cluster_completeness'] = cluster.map(cluster_completeness)
+    plot_data['cell_ambiguity'] = cell_profile['cell_ambiguity']
+    plot_data['cluster'] = cell_profile['cluster']
+    plot_data['cluster_pureness'] = cell_profile['cluster_pureness']
+    plot_data['cluster_completeness'] = cell_profile['cluster_completeness']
 
     if axes.size != 4:
         raise ValueError('Number of axes is not 4.')
