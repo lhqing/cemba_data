@@ -118,7 +118,7 @@ def _kmode_on_multi_leiden(multi_leiden_result, k, verbose=0):
             cell_ambiguity_records[cell] = 1 - portion
     pureness = pd.Series(pureness_records).sort_index()
     completeness = pd.Series(completeness_records).sort_index()
-    cell_ambiguity = pd.Series(cell_ambiguity_records).sort_index()
+    cell_ambiguity = pd.Series(cell_ambiguity_records, index=results.index)
 
     final_portion = final_cluster.value_counts() / final_cluster.size
     weighted_cluster_pureness = pureness * final_portion
@@ -134,7 +134,7 @@ def _kmode_on_multi_leiden(multi_leiden_result, k, verbose=0):
                    'overall_pureness': overall_pureness,
                    'overall_completeness': overall_completeness,
                    'cluster_index': pureness.index.values,
-                   'cell_index': cell_ambiguity.index.values,
+                   'cell_index': results.index.values,
                    'k': _k}
     return result_dict
 
@@ -237,6 +237,8 @@ def get_selected_cluster_profile(adata, resolution, k,
     cell_ambiguity_series = pd.Series(result_dict['cell_ambiguity'], index=result_dict['cell_index'])
     cell_profile = pd.DataFrame({'cluster': cell_cluster_series,
                                  'cell_ambiguity': cell_ambiguity_series})
+    cell_profile['cluster_pureness'] = cell_profile['cluster'].map(cluster_profile['cluster_pureness'])
+    cell_profile['cluster_completeness'] = cell_profile['cluster'].map(cluster_profile['cluster_completeness'])
     # mark cell in bad cluster as -1
     cell_profile['cluster'] = cell_profile['cluster'].apply(lambda i: i if cluster_profile.loc[i, 'judge'] else -1)
     # keep filter cell based on cell ambiguity
