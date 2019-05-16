@@ -188,22 +188,23 @@ def get_kl_overall_df(adata, delta_pureness_cutoff=0.001):
         overall_df['resolution'] = resolution
         records.append(overall_df)
     total_df = pd.concat(records, sort=True)
+    total_df['k'] = total_df['k'].astype(int)
 
-    # selected the optimal K for each resolution
-    # judge delta pureness, and select the first TRUE row follow after the last FALSE row
-    # which means: the last K increase accompany with delta_pureness > threshold
-    # which means: the last K that split chimera clusters instead of only ambiguous cells
-    total_df['delta_pureness'] = total_df['pureness'].rolling(2) \
-        .apply(lambda i: i[1] - i[0], raw=True) \
-        .fillna(1)
-    n_row_selected = total_df.groupby('resolution') \
-        .apply(lambda i: i['delta_pureness'] < delta_pureness_cutoff) \
-        .apply(lambda i: np.where(~i)[0][-1] + 1, axis=1)
     records = []
     for resolution, sub_df in total_df.groupby('resolution'):
-        _sub_df = sub_df.copy()
-        nrow = n_row_selected.loc[resolution]
-        judges = [True if i == nrow else False for i in range(sub_df.shape[0])]
+        _sub_df = sub_df.loc[sub_df['k'].sort_values().index].reset_index(drop=True)
+
+        # selected the optimal K for each resolution
+        # judge delta pureness, and select the first TRUE row follow after the last FALSE row
+        # which means: the last K increase accompany with delta_pureness > threshold
+        # which means: the last K that split chimera clusters instead of only ambiguous cells
+        _sub_df['delta_pureness'] = _sub_df['pureness'].rolling(2) \
+            .apply(lambda i: i[1] - i[0], raw=True) \
+            .fillna(1)
+        judge = _sub_df.apply(lambda i: i['delta_pureness'] < delta_pureness_cutoff,
+                              axis=1)
+        n_row_selected = np.where(~judge)[0][-1] + 1
+        judges = [True if i == n_row_selected else False for i in range(sub_df.shape[0])]
         _sub_df['selected_one'] = judges
         records.append(_sub_df)
     total_df = pd.concat(records)

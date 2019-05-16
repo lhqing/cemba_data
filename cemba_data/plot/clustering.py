@@ -3,7 +3,10 @@ import numpy as np
 from .cell import categorical_scatter
 
 
-def _plot_kmode_overall_single_r(ax, overall_df):
+def _plot_kmode_overall_single_r(ax, overall_df, pureness_ylim=None, completeness_ylim=None):
+    overall_df = overall_df.copy()
+    overall_df['k'] = overall_df['k'].astype(int)
+
     sns.lineplot(data=overall_df, color='orange',
                  x='k', y='pureness', ax=ax, label='Pureness',
                  markers=True, dashes=True, legend=None)
@@ -16,14 +19,19 @@ def _plot_kmode_overall_single_r(ax, overall_df):
     sns.scatterplot(data=overall_df, color='steelblue',
                     x='k', y='completeness', ax=ax_twin, legend=None)
     ax.grid()
-    ax.set(ylim=tuple(np.quantile(overall_df['pureness'], q=(0.01, 0.99))))
-    ax_twin.set(ylim=tuple(np.quantile(overall_df['completeness'], q=(0.01, 0.99))))
+    if pureness_ylim is None:
+        pureness_ylim = tuple(np.quantile(overall_df['pureness'], q=(0.01, 0.99)))
+    ax.set(ylim=pureness_ylim)
+
+    if completeness_ylim is None:
+        completeness_ylim = tuple(np.quantile(overall_df['completeness'], q=(0.01, 0.99)))
+    ax_twin.set(ylim=completeness_ylim)
     return ax
 
 
-def plot_kmode_overall(axes, overall_df):
+def plot_kmode_overall(axes, overall_df, pureness_ylim=None, completeness_ylim=None):
     for ax, (resolution, sub_df) in zip(axes.flat, overall_df.groupby('resolution')):
-        _plot_kmode_overall_single_r(ax, sub_df)
+        _plot_kmode_overall_single_r(ax, sub_df, pureness_ylim=pureness_ylim, completeness_ylim=completeness_ylim)
         ax.set_title(f'Resolution = {resolution}')
     return axes
 
