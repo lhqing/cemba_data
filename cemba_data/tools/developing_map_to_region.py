@@ -203,6 +203,7 @@ def _map_to_region_non_overlap_worker(allc_path, chrom, bed_path, context_map, m
                  for pattern in mc_patterns}
 
     with open_allc(allc_path, mode='r', region=chrom) as f, open_gz(bed_path, mode='r', region=chrom) as bed:
+        # TODO empty bed
         cur_region = _Region(bed.readline())
         for line in f:
             site = _Site(line)
@@ -219,10 +220,10 @@ def _map_to_region_non_overlap_worker(allc_path, chrom, bed_path, context_map, m
                                    temp_dict[pattern][0], temp_dict[pattern][1]]
                     record_dict[pattern].append(region_line)
                 cur_region = _Region(bed.readline())
-                temp_dict = {pattern: np.zeros(shape=(2,), dtype=np.uint32)
+                # TODO zero region
+
+                temp_dict = {pattern: np.array(shape=(2,), dtype=np.uint32)
                              for pattern in mc_patterns}
-
-
     return
 
 
