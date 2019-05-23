@@ -1,13 +1,14 @@
 import numpy as np
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-
+import seaborn as sns
 
 class Sankey:
     def __init__(self, ax, data, col_order=None,
                  left_pad=0.05, right_pad=0.05,
                  label_width=0.05, gap_height=0.02,
-                 column_height_scale=1., label_orders=None, strip_min_n=1):
+                 column_height_scale=1., label_orders=None,
+                 strip_min_n=1):
         self.ax = ax
         if col_order is not None:
             for col in col_order:
@@ -80,25 +81,89 @@ class Sankey:
                                                  n=n))
         return
 
-    def draw(self, curve_value=50, fill_kws=None,
-             col_label_facecolor='steelblue', strip_color='left'):
+    def _side_col_text(self, label, text_label_kws, first=True):
+        if first:
+            _x = label.left - label.width / 2
+            _y = label.bottom + label.height / 2
+            ha = 'right'
+        else:
+            _x = label.left + label.width / 2 * 3
+            _y = label.bottom + label.height / 2
+            ha = 'left'
+
+        text = label.name
+        self.ax.text(_x, _y, text, ha=ha, **text_label_kws)
+
+    def _col_text(self, label, text_label_kws):
+        if 'bbox' not in text_label_kws:
+            text_label_kws['bbox'] = dict(boxstyle="round",
+                                          ec=(1., 1, 1, 0.8),
+                                          fc=(1., 1, 1, 0.5))
+        _x = label.left + label.width / 2
+        _y = label.bottom + label.height / 2
+        ha = 'center'
+        text = label.name
+        self.ax.text(_x, _y, text, ha=ha, **text_label_kws)
+        pass
+
+    def _col_title(self, col, text_label_kws, col_title_pad):
+        example_label = col.labels[0]
+        _x = example_label.left + example_label.width / 2
+        _y = -col_title_pad
+        ha = 'center'
+        text = col.name
+        self.ax.text(_x, _y, text, ha=ha, **text_label_kws)
+        pass
+
+    def draw(self, curve_value=50, fill_kws=None, text_label_kws=None,
+             col_label_facecolor='steelblue', strip_color='left', col_title_pad=0.05):
+        if text_label_kws is None:
+            text_label_kws = {}
+
         # draw rectangles
         rectangles = []
         facecolors = []
-        for col in self.columns:
+
+        first_col = 0
+        last_col = len(self.columns) - 1
+
+        for col_i, col in enumerate(self.columns):
             for label in col.labels:
+                # deal with the rectangle
                 if isinstance(col_label_facecolor, dict):
-                    color = col_label_facecolor[(col.name, label.name)]
+                    try:
+                        color = col_label_facecolor[col.name][label.name]
+                    except KeyError:
+                        color = 'steelblue'
                 else:
                     color = col_label_facecolor
                 facecolors.append(color)
                 rectangles.append(label.get_rectangle(facecolor=color))
+
+                # deal with the text annot
+                if col_i == first_col:
+                    self._side_col_text(label=label, text_label_kws=text_label_kws, first=True)
+                elif col_i == last_col:
+                    self._side_col_text(label=label, text_label_kws=text_label_kws, first=False)
+                else:
+                    self._col_text(label=label, text_label_kws=text_label_kws)
+            # plot column names
+            self._col_title(col, text_label_kws, col_title_pad)
+
         # Create patch collection with specified colour/alpha
         pc = PatchCollection(rectangles, facecolors=facecolors)
         self.ax.add_collection(pc)
 
         # draw strips
+        if isinstance(strip_color, str):
+            strip_color_list = [strip_color] * len(self.strips)
+        else:
+            strip_color_list = strip_color
+
         for strip in self.strips:
+            n_col = strip.left_label.col_id
+            strip_color = strip_color_list[n_col]
+
             if strip_color == 'left':
                 facecolor = strip.left_label.color
             elif strip_color == 'right':
@@ -110,6 +175,10 @@ class Sankey:
             if fill_kws is not None:
                 _fill_kws.update(fill_kws)
             strip.plot_strip(ax=self.ax, curve_value=curve_value, **_fill_kws)
+
+        sns.despine(left=True, bottom=True)
+        self.ax.set(xticks=[], yticks=[])
+
         return self.ax
 
 
@@ -138,12 +207,13 @@ class Column:
             label_n = label_n_dict[label]
             self.labels.append(Label(name=label, left=label_left, n=label_n,
                                      width=label_width, unit_height=unit_height,
-                                     bottom=cur_bottom))
+                                     bottom=cur_bottom, col_id=self.col_id))
             cur_bottom = cur_bottom + label_n * unit_height + gap_height
 
 
 class Label:
-    def __init__(self, name, left, n, width, unit_height, bottom):
+    def __init__(self, name, left, n, width, unit_height, bottom, col_id):
+        self.col_id = col_id
         self.name = name
         self.left = left
         self.bottom = bottom
