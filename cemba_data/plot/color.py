@@ -1,5 +1,6 @@
 import seaborn as sns
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -80,11 +81,24 @@ def level_two_palette(major_color, major_sub_dict,
     return color_palette
 
 
-def palplot(pal, ax, transpose=True):
+def palplot(pal, transpose=False):
+    if transpose:
+        fig, ax = plt.subplots(figsize=(1, len(pal)))
+    else:
+        fig, ax = plt.subplots(figsize=(len(pal), 1))
     n = len(pal)
     data = np.arange(n).reshape(1, n)
     if transpose:
         data = data.T
     ax.imshow(data, interpolation="nearest", aspect="auto",
-              cmap=mpl.colors.ListedColormap(list(pal)))
-    return ax
+              cmap=mpl.colors.ListedColormap(list(pal.values())))
+    if not transpose:
+        ax.set(xticklabels=list(pal.keys()),
+               xticks=range(0, len(pal)),
+               yticks=[])
+        ax.xaxis.set_tick_params(labelrotation=90)
+    else:
+        ax.set(yticklabels=list(pal.keys()),
+               yticks=range(0, len(pal)),
+               xticks=[])
+    return fig, ax
