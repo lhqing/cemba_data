@@ -31,3 +31,9 @@ from .pie import \
 from .tree import \
     generate_tree_dict, \
     dendrogram
+
+from .group import \
+    stack_bar_plot
+
+from .sankey import \
+    Sankey
