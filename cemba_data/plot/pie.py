@@ -16,8 +16,39 @@ def sunbrust(pie_data, ax,
              anno_col=None, text_anno='text', anno_layer_size=0.05,
              col_color_dict=None, startangle=0, anno_ang_min=5,
              anno_border=1.2, text_expend=1.05,
-             uniform_section=False):
+             uniform_section=False, order_dict=None):
+    """
+
+    Parameters
+    ----------
+    pie_data
+        Tidy dataframe
+    ax
+    hue
+    hue_portion
+    cmap
+    colorbar
+    colorbar_kws
+    inner_radius
+    outer_radius
+    anno_col
+    text_anno
+    anno_layer_size
+    col_color_dict
+    startangle
+    anno_ang_min
+    anno_border
+    text_expend
+    uniform_section
+    order_dict
+
+    Returns
+    -------
+
+    """
     return_axes = [ax]
+    if order_dict is None:
+        order_dict = {}
 
     # prepare hue colormap
     if hue is not None:
@@ -83,16 +114,20 @@ def sunbrust(pie_data, ax,
         col_pie_data = pie_data[col_name].value_counts()
 
         # manage order
-        if col == 0:
-            _ordered_data = col_pie_data
+        if col_name in order_dict:
+            _ordered_data = col_pie_data.reindex(pd.Index(order_dict[col_name]))
             previous_order = _ordered_data
         else:
-            records = []
-            for section in previous_order.index:
-                section_subs = pie_data[pie_data.iloc[:, col - 1] == section][col_name].unique()
-                records.append(col_pie_data.reindex(pd.Index(section_subs)).sort_values(ascending=False))
-            _ordered_data = pd.concat(records)
-            previous_order = _ordered_data
+            if col == 0:
+                _ordered_data = col_pie_data
+                previous_order = _ordered_data
+            else:
+                records = []
+                for section in previous_order.index:
+                    section_subs = pie_data[pie_data.iloc[:, col - 1] == section][col_name].unique()
+                    records.append(col_pie_data.reindex(pd.Index(section_subs)).sort_values(ascending=False))
+                _ordered_data = pd.concat(records)
+                previous_order = _ordered_data
 
         # plot the real pie charts
         pie_color = _col_color_dict[col_name]
