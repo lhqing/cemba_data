@@ -7,6 +7,7 @@ from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize, LogNorm
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.lines import Line2D
+from adjustText import adjust_text
 from .color import level_one_palette
 from .utilities import tight_hue_range, plot_colorbar
 
@@ -46,31 +47,7 @@ def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=6):
     return
 
 
-def _dodge(point_array, max_movement=0.05):
-    # TODO change this to using adjusttext package
-    print('deprecated, will use adjusttext package')
-    """dodge point to prevent overlap (very naive)"""
-    # add some noise to prevent exact same points
-    noise = (np.random.random(size=point_array.shape) - 0.5) / 10000
-    point_array += noise
-
-    force_list = []
-    for point in point_array:
-        delta = point - point_array
-        delta = delta[delta.sum(axis=1) != 0]
-        # scale y axis to prefer movement on y
-        delta[:, 1] = delta[:, 1] / 2
-        distance = np.sqrt(np.sum(delta ** 2, axis=1))
-        force = (delta / (distance ** 5)[:, None]).sum(axis=0)  # exaggerate distance**4
-        force_list.append(force)
-    force_array = np.array(force_list)
-    movement_array = force_array / force_array.max() * max_movement  # max movement 0.05
-    adj_points = point_array + movement_array
-    return adj_points
-
-
-def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None):
-    # TODO adjust label color, turn white when background is dark
+def _text_anno_scatter(data, ax, dodge_params, dodge_text=True, anno_col='text_anno', text_anno_kws=None):
     """Add text annotation to a scatter plot"""
     _text_anno_kws = dict(fontsize=10,
                           fontweight='black',
@@ -78,42 +55,29 @@ def _text_anno_scatter(data, ax, dodge, anno_col='text_anno', text_anno_kws=None
                           verticalalignment='center')
     if text_anno_kws is not None:
         _text_anno_kws.update(text_anno_kws)
+    text_list = []
+    for text, sub_df in data.groupby(anno_col):
+        text = str(text)
+        if text in ['', 'nan']:
+            continue
+        x, y, *_ = sub_df.median()
+        text = ax.text(x, y, text,
+                       fontdict=_text_anno_kws,
+                       bbox=dict(boxstyle="round",
+                                 ec=(0.5, 0.5, 0.5, 0.2),
+                                 fc=(0.8, 0.8, 0.8, 0.2)))
+        text_list.append(text)
 
-    if dodge is None:
-        # text annotation
-        for text, sub_df in data.groupby(anno_col):
-            text = str(text)
-            if text in ['', 'nan']:
-                continue
-            x, y, *_ = sub_df.median()
-            ax.text(x, y, text,
-                    fontdict=_text_anno_kws,
-                    bbox=dict(boxstyle="round",
-                              ec=(0.5, 0.5, 0.5, 0.2),
-                              fc=(0.8, 0.8, 0.8, 0.2)))
-    else:
-        # text annotation
-        points = []
-        texts = []
-        for text, sub_df in data.groupby(anno_col):
-            x, y = sub_df.median()
-            points.append((x, y))
-            texts.append(text)
-        points = np.array(points)
-
-        # force layout to make label separate
-        adj_points = _dodge(points, max_movement=dodge)
-        for text, (x, y), (adj_x, adj_y) in zip(texts, points, adj_points):
-            ax.text(adj_x, adj_y, text,
-                    fontdict=_text_anno_kws,
-                    bbox=dict(boxstyle="round",
-                              ec=(0.5, 0.5, 0.5, 0.4),
-                              fc=(0.9, 0.9, 0.9, 0.6)))
-            adj_distance = np.sqrt((adj_x - x) ** 2 + (adj_y - y) ** 2)
-            if adj_distance > 0.05:
-                ax.arrow(adj_x, adj_y, x - adj_x, y - adj_y,
-                         color=(0.5, 0.5, 0.5, 0.8),
-                         width=0.003, linewidth=0)
+    if dodge_text:
+        _dodge_parms = dict(force_points=(0.02, 0.05),
+                            arrowprops=dict(arrowstyle="fancy",
+                                            fc=(0.8, 0.8, 0.8, 0.7),
+                                            ec="none",
+                                            connectionstyle="angle3,angleA=0,angleB=-90"),
+                            autoalign='xy')
+        if dodge_params is not None:
+            _dodge_parms.update(dodge_params)
+        adjust_text(text_list, x=data['x'], y=data['y'], **_dodge_parms)
     return
 
 
@@ -182,7 +146,7 @@ def _translate_coord_base(coord_base):
 def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about basic scatter
                         expand_border_scale=0.1, border_quantile=0.01,  # about xlim and ylim
                         hue=None, palette='tab10',  # about hue
-                        text_anno=None, dodge=None, text_anno_kws=None,  # about text anno
+                        text_anno=None, dodge_text=True, dodge_params=None, text_anno_kws=None,  # about text anno
                         show_legend=False, legend_kws=None,  # about legend
                         axis_format='tiny', max_points=5000):  # other adjustment
     data = data.copy()
@@ -244,7 +208,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
         raise ValueError('axis_format need to be one of these: tiny, despine, empty.')
 
     if text_anno:
-        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge_text=dodge_text, dodge_params=dodge_params,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
 
     if show_legend and (hue is not None):
@@ -276,7 +240,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                        colorbar=True, colorbar_label_kws=None,
                        size=None, size_norm=None, size_portion=0.8, sizes=None,
                        sizebar=True, sizebar_label_kws=None,
-                       text_anno=None, dodge=None, text_anno_kws=None,
+                       text_anno=None, dodge_params=None, text_anno_kws=None,
                        axis_format='tiny', max_points=5000):
     data = data.copy()
     # down sample plot data if needed.
@@ -342,7 +306,6 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
     else:
         size_norm = None
         sizes = None
-        snorm = None
 
     if text_anno is not None:
         if isinstance(text_anno, str):
@@ -355,6 +318,10 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                     hue=hue, palette=cmap, hue_norm=cnorm,
                     size=size, sizes=sizes, size_norm=size_norm,
                     ax=ax, **_scatter_kws)
+
+    if text_anno is not None:
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge_params=dodge_params,
+                           anno_col=text_anno, text_anno_kws=text_anno_kws)
 
     # clean axis
     if axis_format == 'tiny':
@@ -403,7 +370,4 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         sax.yaxis.set(ticks=[0, 1], ticklabels=ticklabels)
         sax.set_ylabel(**_sizebar_label_kws)
 
-    if text_anno is not None:
-        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge=dodge,
-                           anno_col=text_anno, text_anno_kws=text_anno_kws)
     return tuple(return_axes)
