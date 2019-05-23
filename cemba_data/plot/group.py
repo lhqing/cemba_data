@@ -18,6 +18,7 @@ Appendix:
 - category brackets
 """
 from .tree import dendrogram
+from .color import level_one_palette
 import seaborn as sns
 import numpy as np
 
@@ -68,28 +69,41 @@ def fancy_heatmap(ax, tidy_data, row_col, col_col,
     return ax
 
 
-def stack_bar_plot(ax, tidy_data, group, group_order, palette, hue, hue_order=None):
-    count_data = tidy_data.groupby([group, hue]) \
-        .apply(lambda i: i.shape[0]) \
-        .unstack() \
-        .fillna(0)
-    rate_table = count_data / count_data.sum(axis=1).values[:, None]
-    if hue_order is None:
-        hue_order = sorted(tidy_data[hue].unique())
-    plot_data = rate_table[hue_order].apply(np.cumsum, axis=1) \
-        .stack() \
-        .reset_index()
+def stack_bar_plot(ax, data, group_col, hue, palette=None, orient='h'):
+    """
+    Plot stacked barplot between group_col and count_col. E.g. Sample portion in each cluster
+    Parameters
+    ----------
+    ax
+    data
+    group_col
+    hue
+    palette
+    orient
 
-    for element in hue_order[::-1]:
-        sub_df = plot_data[plot_data[hue] == element]
-        sns.barplot(
-            x=group,
-            y=0,
-            label=element,
-            data=sub_df,
-            color=palette[element],
-            ax=ax,
-            order=group_order)
-    sns.despine(ax=ax, offset=20)
-    ax.set(ylim=(0, 1))
+    Returns
+    -------
+
+    """
+    raw_count = data.groupby(group_col)[hue].value_counts().unstack().fillna(0)
+    norm_by_row_sum = raw_count.divide(raw_count.sum(axis=1), axis=0)
+    row_cum_sum = np.cumsum(norm_by_row_sum, axis=1)
+
+    if palette is None:
+        palette = level_one_palette(row_cum_sum.columns)
+    elif isinstance(palette, str):
+        palette = level_one_palette(row_cum_sum.columns, palette=palette)
+    else:
+        pass
+
+    for col_name, data in list(row_cum_sum.iteritems())[::-1]:
+        if orient == 'h':
+            sns.barplot(y=row_cum_sum.index, x=data,
+                        label=col_name, color=palette[col_name],
+                        orient=orient, ax=ax)
+        else:
+            sns.barplot(x=row_cum_sum.index, y=data,
+                        label=col_name, color=palette[col_name],
+                        orient=orient, ax=ax)
+    ax.set(ylabel=group_col, xlabel='Portion')
     return ax
