@@ -222,10 +222,18 @@ def get_selected_cluster_profile(adata, resolution, k,
     result_dict = adata.uns['leiden_kmode_results'][resolution][k]
 
     # get cell profile
-    cluster_profile = pd.DataFrame({_key: result_dict[_key]
-                                    for _key in ['cluster_pureness',
-                                                 'cluster_completeness']},
-                                   index=result_dict['cluster_index'])
+    ncluster = result_dict['n_cluster']
+
+    if ncluster != 1:
+        cluster_profile = pd.DataFrame({_key: result_dict[_key]
+                                        for _key in ['cluster_pureness',
+                                                     'cluster_completeness']},
+                                       index=result_dict['cluster_index'])
+    else:
+        cluster_profile = pd.DataFrame({_key: [result_dict[_key]]
+                                        for _key in ['cluster_pureness',
+                                                     'cluster_completeness']},
+                                       index=[result_dict['cluster_index']])
     cell_cluster_series = pd.Series(result_dict['cluster'], index=result_dict['cell_index'])
     cluster_profile['cell_count'] = cell_cluster_series.value_counts()
 
