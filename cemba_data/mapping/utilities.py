@@ -26,7 +26,7 @@ def get_configuration(config_path=None):
 
 def test_cmd(tool_name, cmd_list):
     try:
-        subprocess.run(cmd_list, stderr=subprocess.PIPE, check=True)
+        subprocess.run(cmd_list, check=True)
     except subprocess.CalledProcessError as e:
         log.error(f'Test {tool_name} got returncode {e.returncode}')
         log.error(e.stderr)
