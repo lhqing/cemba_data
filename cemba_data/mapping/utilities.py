@@ -40,9 +40,9 @@ def valid_environments(config):
     # test cutadapt
     test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '-h'])
     # test samtools
-    test_cmd(tool_name='samtools', cmd_list=['samtools'])
+    test_cmd(tool_name='samtools', cmd_list=['samtools', '--version'])
     # test picard
-    test_cmd(tool_name='picard', cmd_list=['picard'])
+    test_cmd(tool_name='picard', cmd_list=['picard', 'MarkDuplicates', '--version'])
     # test bismark
     test_cmd(tool_name='bismark', cmd_list=['bismark', '-h'])
     # test bowtie2
