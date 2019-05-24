@@ -12,6 +12,7 @@ import shlex
 import functools
 import operator
 import logging
+from .pipeline import get_configuration
 
 # logger
 log = logging.getLogger(__name__)
@@ -85,13 +86,13 @@ def bismark(fastq_final_result, out_dir, config):
     """
 
     if isinstance(config, str):
-        from .pipeline import get_configuration
         config = get_configuration(config)
 
     bismark_reference = config['bismark']['bismark_reference']
     cores = int(config['bismark']['cores'])
     read_min = int(config['bismark']['read_min'])
     read_max = int(config['bismark']['read_max'])
+    remove_fastq_input = config['bismark']['remove_fastq_input']
 
     bismark_run = functools.partial(subprocess.run,
                                     stdout=subprocess.PIPE,
@@ -116,13 +117,13 @@ def bismark(fastq_final_result, out_dir, config):
             log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
             continue
         ran_samples.append((uid, index_name))
-        r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq.gz'
+        r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq'
         r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} --pbat -o {out_dir} --temp_dir {out_dir}'
         # each bismark job actually use 250%
         result = pool.apply_async(bismark_run, (shlex.split(r1_cmd),))
         r1_results.append(result)
 
-        r2_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R2.trimed.fq.gz'
+        r2_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R2.trimed.fq'
         r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq} -o {out_dir} --temp_dir {out_dir}'
         result = pool.apply_async(bismark_run, (shlex.split(r2_cmd),))
         r2_results.append(result)
@@ -140,6 +141,13 @@ def bismark(fastq_final_result, out_dir, config):
             log.error(e.stderr)
             raise e
 
+    # cleaning
+    if remove_fastq_input.lower() in {'true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh'}:
+        for (uid, index_name), _ in fastq_final_result.groupby(['uid', 'index_name']):
+            r_path_pattern = f'{out_dir}/{uid}_{index_name}_R*.trimed.fq'
+            r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
+            subprocess.run(r_rm_cmd, shell=True)
+
     if len(ran_samples) != 0:
         report_path_dict = {}
         for (uid, index_name) in ran_samples:
@@ -155,4 +163,3 @@ def bismark(fastq_final_result, out_dir, config):
     else:
         # in rare case that all cells are dropped
         return pd.DataFrame()
-
