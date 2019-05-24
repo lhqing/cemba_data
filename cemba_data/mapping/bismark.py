@@ -92,7 +92,12 @@ def bismark(fastq_final_result, out_dir, config):
     cores = int(config['bismark']['cores'])
     read_min = int(config['bismark']['read_min'])
     read_max = int(config['bismark']['read_max'])
-    remove_fastq_input = config['bismark']['remove_fastq_input']
+    try:
+        remove_fastq_input = config['bismark']['remove_fastq_input']
+    except KeyError:
+        remove_fastq_input = True
+        log.warning('remove_fastq_input not found in config.ini file, you are using the old version'
+                    'please update your config.ini use yap defalut-mapping-config')
 
     bismark_run = functools.partial(subprocess.run,
                                     stdout=subprocess.PIPE,
