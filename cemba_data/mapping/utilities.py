@@ -41,8 +41,8 @@ def valid_environments(config):
     test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '-h'])
     # test samtools
     test_cmd(tool_name='samtools', cmd_list=['samtools', '--version'])
-    # test picard
-    test_cmd(tool_name='picard', cmd_list=['picard', 'MarkDuplicates', '--version'])
+    # test picard, picard always have return code 1...
+    test_cmd(tool_name='picard', cmd_list=['which', 'picard'])
     # test bismark
     test_cmd(tool_name='bismark', cmd_list=['bismark', '-h'])
     # test bowtie2
