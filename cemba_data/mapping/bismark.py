@@ -122,13 +122,13 @@ def bismark(fastq_final_result, out_dir, config):
             log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
             continue
         ran_samples.append((uid, index_name))
-        r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq'
+        r1_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R1.trimed.fq.gz'
         r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} --pbat -o {out_dir} --temp_dir {out_dir}'
         # each bismark job actually use 250%
         result = pool.apply_async(bismark_run, (shlex.split(r1_cmd),))
         r1_results.append(result)
 
-        r2_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R2.trimed.fq'
+        r2_fastq = pathlib.Path(out_dir) / f'{uid}_{index_name}_R2.trimed.fq.gz'
         r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq} -o {out_dir} --temp_dir {out_dir}'
         result = pool.apply_async(bismark_run, (shlex.split(r2_cmd),))
         r2_results.append(result)

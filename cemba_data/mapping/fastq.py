@@ -53,8 +53,8 @@ def _make_command_dataframe(fastq_dataframe, out_dir, config):
         tmp_sub_df = sub_df.set_index('read_type')
         r1_in = tmp_sub_df.loc['R1', 'fastq_path']
         r2_in = tmp_sub_df.loc['R2', 'fastq_path']
-        r1_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R1.fq")
-        r2_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R2.fq")
+        r1_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R1.fq.gz")
+        r2_out = pathlib.Path(out_dir) / (f"{uid}_{lane}" + "_{name}_R2.fq.gz")
         cmd = f"cutadapt {adapter_parms} -O {overlap} -o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in}"
         records.append([uid, lane, cmd])
 
@@ -195,8 +195,8 @@ def fastq_qc(demultiplex_result, out_dir, config):
                      f'due to too less reads: {sample_demultiplex_total}')
             continue
         # merge R1
-        r1_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R1.fq'
-        r1_merge_cmd= f'cat {r1_path_pattern} | pigz'
+        r1_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R1.fq.gz'
+        r1_merge_cmd = f'pigz -cd {r1_path_pattern} | pigz'
         r1_merge_result = subprocess.run(r1_merge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          shell=True, check=True)
         r1_raw_out = f'{out_dir}/{uid}_{index_name}_R1.raw.fq.gz'
@@ -204,7 +204,7 @@ def fastq_qc(demultiplex_result, out_dir, config):
             f.write(r1_merge_result.stdout)
 
         # process R1
-        r1_out = f'{out_dir}/{uid}_{index_name}_R1.trimed.fq'
+        r1_out = f'{out_dir}/{uid}_{index_name}_R1.trimed.fq.gz'
         r1_cmd = f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
                  f'-q {quality_threshold} -u {r1_left_cut} ' \
                  f'-u -{r1_right_cut} -m {length_threshold} ' \
@@ -232,8 +232,8 @@ def fastq_qc(demultiplex_result, out_dir, config):
         results.append(s)
 
         # merge R2
-        r2_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R2.fq'
-        r2_merge_cmd= f'cat {r2_path_pattern} | pigz'
+        r2_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R2.fq.gz'
+        r2_merge_cmd = f'pigz -cd {r2_path_pattern} | pigz'
         r2_merge_result = subprocess.run(r2_merge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          shell=True, check=True)
         r2_raw_out = f'{out_dir}/{uid}_{index_name}_R2.raw.fq.gz'
@@ -241,7 +241,7 @@ def fastq_qc(demultiplex_result, out_dir, config):
             f.write(r2_merge_result.stdout)
 
         # process R2
-        r2_out = f'{out_dir}/{uid}_{index_name}_R2.trimed.fq'
+        r2_out = f'{out_dir}/{uid}_{index_name}_R2.trimed.fq.gz'
         r2_cmd = f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
                  f'-q {quality_threshold} -u {r2_left_cut} ' \
                  f'-u -{r2_right_cut} -m {length_threshold} ' \
@@ -278,12 +278,12 @@ def fastq_qc(demultiplex_result, out_dir, config):
 
     # clean up
     for (uid, index_name), sub_df in demultiplex_result.groupby(['uid', 'index_name']):
-        r_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R*.fq'
+        r_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R*.fq.gz'
         r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
     for uid in demultiplex_result['uid'].unique():
         # remove unknown reads
-        r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq'
+        r_path_pattern = f'{out_dir}/{uid}_L*_unknown_R*.fq.gz'
         r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
         subprocess.run(r_rm_cmd, shell=True)
 
