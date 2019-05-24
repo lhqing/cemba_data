@@ -1,30 +1,17 @@
 import pandas as pd
 import pathlib
-import configparser
 import os
 import collections
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
 from .allc import batch_call_methylated_sites
 from .bam import bam_qc
+from .utilities import get_configuration
 import logging
 
 # logger
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
-
-
-def get_configuration(config_path=None):
-    """
-    Read .ini config file from given path
-    """
-    ref_path_config = configparser.ConfigParser()
-    if config_path is None:
-        log.info('config path not provided, use default config')
-        ref_path_config.read(os.path.dirname(__file__) + '/mapping_config.ini')
-    else:
-        ref_path_config.read(config_path)
-    return ref_path_config
 
 
 def print_default_configuration(out_path=None):

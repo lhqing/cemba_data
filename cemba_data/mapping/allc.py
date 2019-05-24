@@ -222,6 +222,7 @@ import collections
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from ..tools.utilities import genome_region_chunks
 from ..tools.open import open_allc, open_bam
+from .utilities import get_configuration
 import logging
 
 # logger
@@ -610,7 +611,6 @@ def batch_call_methylated_sites(bam_result_df, out_dir, config):
     # read python doc 1st, implement cutadapt pipeline mode
 
     if isinstance(config, str):
-        from .pipeline import get_configuration
         config = get_configuration(config)
 
     reference_fasta = config['callMethylation']['reference_fasta']

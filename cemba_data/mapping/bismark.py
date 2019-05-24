@@ -12,7 +12,7 @@ import shlex
 import functools
 import operator
 import logging
-from .pipeline import get_configuration
+from .utilities import get_configuration
 
 # logger
 log = logging.getLogger(__name__)

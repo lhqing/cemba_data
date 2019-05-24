@@ -11,6 +11,7 @@ import multiprocessing
 import shlex
 import glob
 import logging
+from .utilities import get_configuration
 
 # logger
 log = logging.getLogger(__name__)
@@ -47,7 +48,6 @@ def bam_qc(bismark_result, out_dir, config):
     """
 
     if isinstance(config, str):
-        from .pipeline import get_configuration
         config = get_configuration(config)
 
     cores = int(config['bamFilter']['cores'])
