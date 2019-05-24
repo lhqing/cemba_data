@@ -1,12 +1,9 @@
-import pandas as pd
-import pathlib
-import os
 import collections
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
 from .allc import batch_call_methylated_sites
 from .bam import bam_qc
-from .utilities import get_configuration
+from .utilities import *
 import logging
 
 # logger
@@ -27,38 +24,6 @@ def print_default_configuration(out_path=None):
         for line in configs:
             print(line, end='')
     return
-
-
-def validate_fastq_dataframe(fastq_dataframe):
-    """
-    Check if fastq_dataframe is
-    1. have required columns
-    2. uid is unique
-    """
-    if isinstance(fastq_dataframe, str):
-        fastq_dataframe = pd.read_csv(fastq_dataframe, index_col=None, sep='\t')
-
-    for required in ['uid', 'lane', 'read_type', 'fastq_path']:
-        if required not in fastq_dataframe.columns:
-            raise ValueError(f'column {required} not in fastq dataframe columns, '
-                             f'remember that the 4 required columns of fastq dataframe are: '
-                             f'uid, lane, read_type, fastq_path. '
-                             f'The orders do not matter, but the names need to be exact.')
-
-    for _, df in fastq_dataframe.groupby(['lane', 'read_type']):
-        if df['uid'].unique().size != df['uid'].size:
-            raise ValueError('uid column are not unique for each lane and read-type combination.')
-
-    # modify fastq dataframe column names
-    fastq_dataframe.columns = [column.replace('-', '_') for column in fastq_dataframe.columns]
-
-    # modify fastq columns, because '_' is used in file name and we split by '_'
-    # I know this is stupid...
-    fastq_dataframe['uid'] = fastq_dataframe['uid'].apply(lambda i: i.replace('_', '-'))
-    fastq_dataframe['lane'] = fastq_dataframe['lane'].apply(lambda i: i.replace('_', '-'))
-    fastq_dataframe['read_type'] = fastq_dataframe['read_type'].apply(lambda i: i.replace('_', '-'))
-
-    return fastq_dataframe
 
 
 def summary_pipeline_stat(out_dir):
@@ -201,11 +166,6 @@ def summary_pipeline_stat(out_dir):
         bam_dict[(uid, index_name)] = str(f)
     total_meta['BamPath'] = pd.Series(allc_dict)
     return total_meta
-
-
-def valid_environments(config):
-    # TODO Write a full environment validation func, check all path
-    return
 
 
 def pipeline(fastq_dataframe, out_dir, config_path=None):

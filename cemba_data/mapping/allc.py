@@ -607,7 +607,6 @@ def batch_call_methylated_sites(bam_result_df, out_dir, config):
     allc_count_df
         id columns are: uid, index_name
     """
-    # TODO make this into CLI, and parallel on single bam level
     # read python doc 1st, implement cutadapt pipeline mode
 
     if isinstance(config, str):
