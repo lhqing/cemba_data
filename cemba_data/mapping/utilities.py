@@ -38,13 +38,13 @@ def valid_environments(config):
     log.info('Test mapping environments')
 
     # test cutadapt
-    test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '-h'])
+    test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '--version'])
     # test samtools
     test_cmd(tool_name='samtools', cmd_list=['samtools', '--version'])
     # test picard, picard always have return code 1...
     test_cmd(tool_name='picard', cmd_list=['which', 'picard'])
     # test bismark
-    test_cmd(tool_name='bismark', cmd_list=['bismark', '-h'])
+    test_cmd(tool_name='bismark', cmd_list=['bismark', '--version'])
     # test bowtie2
     test_cmd(tool_name='bowtie2', cmd_list=['bowtie2', '--version'])
     # test pigz
