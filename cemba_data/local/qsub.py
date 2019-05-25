@@ -455,7 +455,9 @@ class _Command:
             print(f'Job {self.qsub_id} start time: {self.start_time} (default is None)')
             print(f'Job {self.qsub_id} end time: {self.end_time} (default is None)')
             print(f'Output log for job {self.qsub_id} {self.unique_id} is not complete, this job may failed.')
-        self.duration_second = (self.end_time - self.start_time).total_seconds()
+            self.duration_second = None
+        else:
+            self.duration_second = (self.end_time - self.start_time).total_seconds()
         return
 
 
