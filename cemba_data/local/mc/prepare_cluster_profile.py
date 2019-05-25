@@ -15,6 +15,76 @@ import pathlib
 import json
 
 
+def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cutoff=0,
+                       cpu=10, h_vmem='5G'):
+    """
+    Prepare qsub command.json from a group table, following this format:
+        1st column: the unique input file id
+        2nd column: the group label
+        3rd column: the absolute input file path
+        Any other columns are ignored.
+    This will generate all necessary file in the output_dir and can be directly used in qsub.
+
+    Parameters
+    ----------
+    output_dir
+        Path to put output files, merged ALLC file will also save in this directory. Will create one if not exist.
+    group_table
+        Path or dataframe that contain group and input ALLC path information, first row must be column names
+    chrom_size_file
+        Path to UCSC chrom size file, chromosome names must agree with all the ALLC files.
+    skip_n_cell_cutoff
+        Skip small clusters with cell number <= cutoff, default is 0, which means not skip anything.
+    cpu
+        Number of CPUs to use in each merge command
+    h_vmem
+        MEM requirement for each merge command
+
+    Returns
+    -------
+
+    """
+    if isinstance(group_table, str):
+        group_table = pd.read_csv(group_table, sep='\t', header=None)
+    group_table.columns = ['uid', 'group', 'allc_path']
+    group_table.set_index('uid', inplace=True)
+    if group_table.index.duplicated().sum() != 0:
+        raise ValueError('Input file ID in the first column of group_table is not unique.')
+
+    path_dict = {}
+    allc_list_dict = {}
+    cmd_list = []
+    for cluster, n_cell in group_table['group'].value_counts().iteritems():
+        sub_df = group_table[group_table['group'] == cluster]
+        n_cell = sub_df.shape[0]
+        if n_cell <= skip_n_cell_cutoff:
+            continue
+
+        unique_file_path = output_dir / f'{cluster}.allc.tsv.gz'
+        unique_cell_list_path = output_dir / f'{cluster}.allc_path.txt'
+
+        path_dict[cluster] = str(unique_file_path)
+        allc_list_dict[cluster] = sub_df['allc_path'].tolist()
+        with open(unique_cell_list_path, 'w') as f:
+            f.write('\n'.join(allc_list_dict[cluster]))
+
+        if n_cell > 1:
+            cmd = f'yap merge-allc --allc_paths {unique_cell_list_path} ' \
+                  f'--out_path {unique_file_path} --chrom_size_file {chrom_size_file} --cpu {cpu}'
+            cmd_dict = {'command': cmd, 'pe smp': cpu, 'h_vmem': h_vmem}
+        else:
+            # for cluster with only one cell (if possible), we just copy them to maintain structure
+            cmd = f'cp {sub_df["allc_path"].iloc[0]} {unique_file_path}'
+            cmd_dict = {'command': cmd, 'pe smp': 1, 'h_vmem': '1G'}
+        cmd_list.append(cmd_dict)
+
+    with open(output_dir / 'ClusterName_to_AllcPath.json', 'w') as f:
+        json.dump(path_dict, f)
+    with open(output_dir / 'command.json', 'w') as f:
+        json.dump(cmd_list, f)
+    return
+
+
 def _generate_merge_strategy(cluster_table, min_group, keep_unique_cluster=True):
     """
     Generate merge strategy for multilayer cluster assignment. The cluster assignment do not need to be hierarchical.
