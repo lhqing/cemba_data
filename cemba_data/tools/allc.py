@@ -2,7 +2,7 @@ from .utilities import *
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
-from subprocess import run, PIPE
+from subprocess import run, PIPE, CalledProcessError
 import shlex
 from collections import defaultdict
 import pandas as pd
@@ -362,17 +362,60 @@ def get_md5(file_path):
     return file_md5
 
 
-def standardize_allc(allc_path, genome_size_path, compress_level=6,
-                     idx=True, remove_additional_chrom=False):
-    # if tabix exist and newer than allc, skip and return md5
-    if os.path.exists(allc_path + '.tbi'):
-        tbi_time = os.path.getmtime(allc_path + '.tbi')
-        allc_time = os.path.getmtime(allc_path)
-        if allc_time < tbi_time:
-            file_md5 = get_md5(allc_path)
-            return file_md5
+def _check_allc_chroms(allc_path, genome_dict):
+    tbi_time = os.path.getmtime(allc_path + '.tbi')
+    allc_time = os.path.getmtime(allc_path)
+    if allc_time > tbi_time:
+        # tabix file create earlier than ALLC, something may changed for ALLC.
+        return False
 
-    genome_dict = parse_chrom_size(genome_size_path)
+    allc_tabix_path = pathlib.Path(str(allc_path) + '.tbi')
+    if not allc_tabix_path.exists():
+        return False
+    try:
+        chroms = run(['tabix', '-l', allc_path],
+                     stdout=PIPE,
+                     encoding='utf8',
+                     check=True).stdout.strip().split('\n')
+        if len(set(chroms) - genome_dict.keys()) != 0:
+            return False
+    except CalledProcessError:
+        return False
+    return True
+
+
+def standardize_allc(allc_path, chrom_size_path, compress_level=5,
+                     idx=False, remove_additional_chrom=False):
+    """
+    Standardize 1 ALLC file by checking:
+        1. No header in the ALLC file;
+        2. Chromosome names in ALLC must be same as those in the chrom_size_path file, including "chr";
+        3. Output file will be bgzipped with .tbi index
+        4. Remove additional chromosome (remove_additional_chrom=True) or
+           raise KeyError if unknown chromosome found (default)
+
+    Parameters
+    ----------
+    allc_path
+        Path of 1 ALLC file
+    chrom_size_path
+        Path of UCSC chrom size file
+    compress_level
+        Level of bgzip compression
+    idx
+        Whether to save methylpy index for back compatibility
+    remove_additional_chrom
+        Whether to remove rows with unknown chromosome instead of raising KeyError
+    Returns
+    -------
+
+    """
+
+    genome_dict = parse_chrom_size(chrom_size_path)
+    if _check_allc_chroms(allc_path, genome_dict):
+        # means ALLC is already standard
+        return
+
     if 'chr1' in genome_dict:
         raw_add_chr = True
     else:
@@ -429,36 +472,6 @@ def standardize_allc(allc_path, genome_size_path, compress_level=6,
         index_lines.append("#eof\n")
         with open(allc_path + '.idx', 'w') as idxf:
             idxf.writelines(index_lines)
-    else:
-        if os.path.exists(allc_path + '.idx'):
-            run(shlex.split(f'rm -f {allc_path}.idx'), check=True)
     tabix_allc(allc_path, reindex=True)
+    return
 
-    file_md5 = get_md5(allc_path)
-    return file_md5
-
-
-def batch_standardize_allc(allc_dir, genome_size_path, compress_level=6,
-                           idx=True, remove_additional_chrom=False, process=10):
-    allc_paths = list(pathlib.Path(allc_dir).glob('**/allc*tsv.gz'))
-    with ProcessPoolExecutor(max_workers=process) as executor:
-        future_result = {executor.submit(standardize_allc,
-                                         allc_path=str(allc_path),
-                                         genome_size_path=genome_size_path,
-                                         idx=idx, remove_additional_chrom=remove_additional_chrom,
-                                         compress_level=compress_level): allc_path
-                         for allc_path in allc_paths}
-    md5_dict = {}
-    for future in as_completed(future_result):
-        allc_path = future_result[future]
-        try:
-            data = future.result()
-        except OSError as exc:
-            print(f'{allc_path} generated an exception: {exc}')
-        else:
-            md5_dict[str(allc_path)] = data
-
-    with open(allc_dir + '/md5_list.txt', 'w') as f:
-        for k, v in md5_dict.items():
-            f.write('\t'.join([k, v]) + '\n')
-    return md5_dict

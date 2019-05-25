@@ -741,47 +741,44 @@ def extract_context_allc_register_subparser(subparser):
 def standardize_allc_register_subparser(subparser):
     parser = subparser.add_parser('allc-standardize',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Standardize ALLC files in a whole directory by: "
-                                       "1. use bgzip; "
-                                       "2. tabix ALLC file; "
-                                       "3. remove header line because ALLC columns are always fixed; "
-                                       "4. fix 'chr' problem in first column. "
-                                       "Use whatever same as the UCSC genome size file provided; "
-                                       "5. Generate md5 sum for each processed file and "
-                                       "save to md5_list.txt in the same dir.")
+                                  help="Standardize one ALLC file by following these rules: "
+                                       "1. No header in the ALLC file; "
+                                       "2. Chromosome names in ALLC must be same as those "
+                                       "in the chrom_size_path file, including 'chr'; "
+                                       "3. Output file will be bgzipped with .tbi index; "
+                                       "4. Remove additional chromosome (remove_additional_chrom=True) or "
+                                       "raise KeyError if unknown chromosome found (default)")
 
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
 
     parser_req.add_argument(
-        "--allc_dir",
+        "--allc_path",
         type=str,
         required=True,
-        help="Path of the ALLC directory."
+        help="Path of 1 ALLC file"
     )
 
     parser_req.add_argument(
-        "--genome_size_path",
+        "--chrom_size_path",
         type=str,
         required=True,
-        help="Path of UCSC genome size file, used for check chromosome names. "
-             "You should use the same file as the genome you used for mapping "
-             "and never change chromosome name by no means."
+        help="Path of UCSC chrom size file"
     )
 
     parser_opt.add_argument(
         "--compress_level",
         type=int,
         required=False,
-        default=6,
-        help="Level of ALLC compression level"
+        default=5,
+        help="Level of bgzip compression"
     )
 
     parser_opt.add_argument(
         "--idx",
         type=bool,
         required=False,
-        default=True,
+        default=False,
         help="Whether add the .idx file for back compatibility."
     )
 
@@ -790,16 +787,7 @@ def standardize_allc_register_subparser(subparser):
         type=bool,
         required=False,
         default=False,
-        help="Whether remove chroms in ALLC that are not exist in genome size file, "
-             "if False and unknown chrom find, will raise error."
-    )
-
-    parser_opt.add_argument(
-        "--process",
-        type=int,
-        required=False,
-        default=10,
-        help="Number of processes to use in parallel."
+        help="Whether to remove rows with unknown chromosome instead of raising KeyError"
     )
 
 
@@ -1084,7 +1072,7 @@ def main():
     elif cur_command == 'allc-extract':
         from .tools.allc import extract_context_allc as func
     elif cur_command == 'allc-standardize':
-        from .tools.allc import batch_standardize_allc as func
+        from .tools.allc import standardize_allc as func
     elif cur_command == 'mapping-summary':
         from .mapping.pipeline import summary_pipeline_stat as func
     elif cur_command == 'cluster-merge':
