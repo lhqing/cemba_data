@@ -3,6 +3,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 import seaborn as sns
 
+
 class Sankey:
     def __init__(self, ax, data, col_order=None,
                  left_pad=0.05, right_pad=0.05,
@@ -294,8 +295,7 @@ class Strip:
         return ax
 
 
-""" test
-
+"""
 farms = np.random.randint(1, 5, size=300)
 stations = np.random.randint(1, 5, size=300)
 customers = np.random.randint(1, 5, size=300)
@@ -306,22 +306,27 @@ sankey_data = pd.DataFrame({'farms': farms,
                             'customers': customers,
                             'gender': gender})
 
-color_dict = {('farms', 1): 'red', 
-             ('farms', 2): 'green', 
-             ('farms', 3): 'blue', 
-             ('farms', 4): 'orange', 
-             ('customers', 1): 'red', 
-             ('customers', 2): 'green', 
-             ('customers', 3): 'blue', 
-             ('customers', 4): 'orange',  
-             ('stations', 1): 'red', 
-             ('stations', 2): 'green', 
-             ('stations', 3): 'blue', 
-             ('stations', 4): 'orange', 
-             ('gender', 1): 'blue', 
-             ('gender', 2): 'orange'}
+sankey_palette = {
+    'farms': {
+        1: 'red',
+        2: 'green',
+        3: 'blue',
+        4: 'orange'},
+    'customers': {
+        1: 'red',
+        2: 'green',
+        3: 'blue',
+        4: 'orange'},
+    'stations': {
+        1: 'red',
+        2: 'green',
+        3: 'blue',
+        4: 'orange'},
+    'gender': {
+        1: 'blue',
+        2: 'orange'}}
 
 fig, ax = plt.subplots(figsize=(8, 8))
 sankey = Sankey(ax=ax, data=sankey_data, gap_height=0.005, strip_min_n=0)
-sankey.draw(curve_value=50, col_label_facecolor=color_dict, strip_color='left')
+sankey.draw(curve_value=50, col_label_facecolor=sankey_palette, strip_color='left')
 """
