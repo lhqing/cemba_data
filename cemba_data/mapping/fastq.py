@@ -196,7 +196,7 @@ def fastq_qc(demultiplex_result, out_dir, config):
             continue
         # merge R1
         r1_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R1.fq.gz'
-        r1_merge_cmd = f'pigz -cd {r1_path_pattern} | pigz'
+        r1_merge_cmd = f'pigz -cd -p {cutadapt_cores} {r1_path_pattern} | pigz'
         r1_merge_result = subprocess.run(r1_merge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          shell=True, check=True)
         r1_raw_out = f'{out_dir}/{uid}_{index_name}_R1.raw.fq.gz'
@@ -233,7 +233,7 @@ def fastq_qc(demultiplex_result, out_dir, config):
 
         # merge R2
         r2_path_pattern = f'{out_dir}/{uid}_*_{index_name}_R2.fq.gz'
-        r2_merge_cmd = f'pigz -cd {r2_path_pattern} | pigz'
+        r2_merge_cmd = f'pigz -cd -p {cutadapt_cores} {r2_path_pattern} | pigz'
         r2_merge_result = subprocess.run(r2_merge_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          shell=True, check=True)
         r2_raw_out = f'{out_dir}/{uid}_{index_name}_R2.raw.fq.gz'
