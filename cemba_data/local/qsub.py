@@ -410,9 +410,12 @@ class _Command:
         if not os.path.exists(self.status_path):
             # do noting
             return None
-
-        with open(self.status_path) as f:
-            status_dict = json.load(f)
+        try:
+            with open(self.status_path) as f:
+                status_dict = json.load(f)
+        except json.decoder.JSONDecodeError:
+            print('Fail to load status dict, treat as failed.')
+            return None
 
         self.submitted = True
         self.finish = True
