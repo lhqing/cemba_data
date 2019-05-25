@@ -149,7 +149,7 @@ def bismark(fastq_final_result, out_dir, config):
     # cleaning
     if remove_fastq_input.lower() in {'true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh'}:
         for (uid, index_name), _ in fastq_final_result.groupby(['uid', 'index_name']):
-            r_path_pattern = f'{out_dir}/{uid}_{index_name}_R*.trimed.fq'
+            r_path_pattern = f'{out_dir}/{uid}_{index_name}_R*.trimed.fq.gz'
             r_rm_cmd = f'ionice -c 2 -n 0 rm -f {r_path_pattern}'
             subprocess.run(r_rm_cmd, shell=True)
 
