@@ -363,15 +363,16 @@ def get_md5(file_path):
 
 
 def _check_allc_chroms(allc_path, genome_dict):
-    tbi_time = os.path.getmtime(allc_path + '.tbi')
+    allc_tabix_path = pathlib.Path(str(allc_path) + '.tbi')
+    if not allc_tabix_path.exists():
+        return False
+
+    tbi_time = os.path.getmtime(allc_tabix_path)
     allc_time = os.path.getmtime(allc_path)
     if allc_time > tbi_time:
         # tabix file create earlier than ALLC, something may changed for ALLC.
         return False
 
-    allc_tabix_path = pathlib.Path(str(allc_path) + '.tbi')
-    if not allc_tabix_path.exists():
-        return False
     try:
         chroms = run(['tabix', '-l', allc_path],
                      stdout=PIPE,
