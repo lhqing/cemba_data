@@ -3,7 +3,7 @@ import os
 import json
 import glob
 import pandas as pd
-from cemba_data.mapping.utilities import validate_fastq_dataframe
+from ...mapping.utilities import validate_fastq_dataframe
 import logging
 
 # logger

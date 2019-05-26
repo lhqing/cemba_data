@@ -16,7 +16,7 @@ import json
 
 
 def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cutoff=0,
-                       cpu=10, h_vmem='5G'):
+                       cpu=10, h_vmem='5G', single_mode='copy'):
     """
     Prepare qsub command.json from a group table, following this format:
         1st column: the unique input file id
@@ -44,6 +44,13 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
     -------
 
     """
+    if single_mode.lower() in ['copy', 'cp']:
+        copy = True
+    elif single_mode.lower() in ['ln', 'symlink']:
+        copy = False
+    else:
+        raise ValueError(f"single_mode can only be in ['copy', 'cp', 'ln', 'symlink'], got {single_mode}")
+
     if isinstance(group_table, str):
         group_table = pd.read_csv(group_table, sep='\t', header=None)
     group_table.columns = ['uid', 'group', 'allc_path']
@@ -73,12 +80,15 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
                   f'--out_path {unique_file_path} --chrom_size_file {chrom_size_file} --cpu {cpu}'
             cmd_dict = {'command': cmd, 'pe smp': cpu, 'h_vmem': h_vmem}
         else:
-            # for cluster with only one cell (if possible), we just copy them to maintain structure
-            cmd = f'cp {sub_df["allc_path"].iloc[0]} {unique_file_path}'
+            # for cluster with only one cell (if possible), we just copy/symlink them to maintain structure
+            if copy:
+                cmd = f'cp {sub_df["allc_path"].iloc[0]} {unique_file_path}'
+            else:
+                cmd = f'ln -s {sub_df["allc_path"].iloc[0]} {unique_file_path}'
             cmd_dict = {'command': cmd, 'pe smp': 1, 'h_vmem': '1G'}
         cmd_list.append(cmd_dict)
 
-    with open(output_dir / 'ClusterName_to_AllcPath.json', 'w') as f:
+    with open(output_dir / 'GroupName_to_AllcPath.json', 'w') as f:
         json.dump(path_dict, f)
     with open(output_dir / 'command.json', 'w') as f:
         json.dump(cmd_list, f)
