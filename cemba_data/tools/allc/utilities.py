@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 import os
 import pathlib
+from typing import Union
+from glob import glob
 from .open import open_allc
 
 
@@ -184,63 +186,84 @@ def map_to_region(allc_path, out_path_prefix,
     return
 
 
-def extract_context_allc(allc_path, out_path, merge_strand=True, mc_context='CGN'):
-    # TODO support multiple context
-    if isinstance(mc_context, list):
-        if len(mc_context) > 1:
-            raise NotImplementedError('TODO support multiple context')
-        mc_context = mc_context[0]
+def _merge_cg_strand(in_path, out_path):
+    """
+    Merge Strand used after extract ALLC step in extract_allc_context, so no need to check context.
+    """
+    prev_line = None
+    cur_chrom = None
 
-    if 'CG' not in mc_context:
-        merge_strand = False
-
-    if allc_path.endswith('gz'):
-        opener = partial(gzip.open, mode='rt')
-    else:
-        opener = partial(open, mode='r')
-    writer = partial(gzip.open, mode='wt')
-
-    context_set = parse_mc_pattern(mc_context)
-    with opener(allc_path) as allc, \
-            writer(out_path) as out_allc:
-        if merge_strand:
-            prev_line = None
-            cur_chrom = None
-            for line in allc:
-                cur_line = line.strip('\n').split('\t')
-                if cur_line[3] not in context_set:
-                    continue
-                if cur_line[0] != cur_chrom:
-                    if prev_line is not None:
-                        out_allc.write('\t'.join(prev_line) + '\n')
-                    prev_line = cur_line
-                    cur_chrom = cur_line[0]
-                    continue
-                if prev_line is None:
-                    prev_line = cur_line
-                    continue
+    with open_allc(in_path) as allc, \
+            open_allc(out_path, 'w') as out_allc:
+        for line in allc:
+            cur_line = line.strip('\n').split('\t')
+            if cur_line[0] != cur_chrom:
+                if prev_line is not None:
+                    out_allc.write('\t'.join(prev_line) + '\n')
+                prev_line = cur_line
+                cur_chrom = cur_line[0]
+                continue
+            if prev_line is None:
+                prev_line = cur_line
+                continue
+            else:
+                # pos should be continuous, strand should be reverse
+                if int(prev_line[1]) + 1 == int(cur_line[1]) and prev_line[2] != cur_line[2]:
+                    new_line = prev_line[:4] + [str(int(prev_line[4]) + int(cur_line[4])),
+                                                str(int(prev_line[5]) + int(cur_line[5])), '1']
+                    out_allc.write('\t'.join(new_line) + '\n')
+                    prev_line = None
+                # otherwise, only write and update prev_line
                 else:
-                    # pos should be continuous, strand should be reverse
-                    if int(prev_line[1]) + 1 == int(cur_line[1]) and prev_line[2] != cur_line[2]:
-                        new_line = prev_line[:4] + [str(int(prev_line[4]) + int(cur_line[4])),
-                                                    str(int(prev_line[5]) + int(cur_line[5])), '1']
-                        out_allc.write('\t'.join(new_line) + '\n')
-                        prev_line = None
-                    # otherwise, only write and update prev_line
-                    else:
-                        out_allc.write('\t'.join(prev_line) + '\n')
-                        prev_line = cur_line
-        else:
-            for line in allc:
-                cur_line = line.strip('\n').split('\t')
-                if cur_line[3] not in context_set:
-                    continue
-                out_allc.write('\t'.join(cur_line) + '\n')
-    print(f'Extract {mc_context} finished:', out_path)
+                    out_allc.write('\t'.join(prev_line) + '\n')
+                    prev_line = cur_line
+    return None
+
+
+def extract_allc_context(allc_path: str,
+                         out_prefix: str,
+                         merge_strand_cg: bool = True,
+                         mc_contexts: Union[str, list] = 'CGN') -> None:
+    out_prefix = out_prefix.rstrip('.')
+    if isinstance(mc_contexts, str):
+        mc_contexts = mc_contexts.split(' ')
+
+    context_handle = {}
+    handle_collect = []
+    for mc_context in mc_contexts:
+        _handle = open_allc(out_prefix + f'.extract_{mc_context}.tsv.gz', 'w')
+        handle_collect.append(_handle)
+        parsed_context_set = parse_mc_pattern(mc_context)
+        for pattern in parsed_context_set:
+            context_handle[pattern] = _handle
+
+    # split file first
+    with open_allc(allc_path) as allc:
+        for line in allc:
+            cur_line = line.strip('\n').split('\t')
+            try:
+                context_handle[cur_line[3]].write(line)
+            except KeyError:
+                continue
+    for handle in handle_collect:
+        handle.close()
+
+    # deal with CpG context file
+    if merge_strand_cg:
+        for mc_context in mc_contexts:
+            if 'CG' not in mc_context:
+                continue
+            in_path = out_prefix + f'.extract_{mc_context}.tsv.gz'
+            out_path = out_prefix + f'.extract_{mc_context}.merge_strand.tsv.gz'
+            _merge_cg_strand(in_path, out_path)
+            run(['rm', '-f', in_path], check=True)
+
+    for path in glob(out_prefix+'.extract*.tsv.gz'):
+        tabix_allc(path)
     return
 
 
-def get_allc_profile(allc_path, drop_n=True, n_rows=100000000, out_path=None):
+def profile_allc(allc_path, drop_n=True, n_rows=100000000, out_path=None):
     """
     Generate approximate profile for allc file. 1e8 rows finish in about 5 min.
 
