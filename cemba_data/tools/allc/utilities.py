@@ -227,22 +227,25 @@ def extract_allc_context(allc_path: str,
     out_prefix = out_prefix.rstrip('.')
     if isinstance(mc_contexts, str):
         mc_contexts = mc_contexts.split(' ')
+    mc_contexts = list(set(mc_contexts))
 
-    context_handle = {}
+    # because mc_contexts can overlap (e.g. CHN, CAN)
+    # each context may associate to multiple handle
+    context_handle = defaultdict(list)
     handle_collect = []
     for mc_context in mc_contexts:
         _handle = open_allc(out_prefix + f'.extract_{mc_context}.tsv.gz', 'w')
         handle_collect.append(_handle)
         parsed_context_set = parse_mc_pattern(mc_context)
         for pattern in parsed_context_set:
-            context_handle[pattern] = _handle
+            context_handle[pattern].append(_handle)
 
     # split file first
     with open_allc(allc_path) as allc:
         for line in allc:
             cur_line = line.strip('\n').split('\t')
             try:
-                context_handle[cur_line[3]].write(line)
+                [h.write(line) for h in context_handle[cur_line[3]]]
             except KeyError:
                 continue
     for handle in handle_collect:
@@ -355,7 +358,7 @@ def profile_allc(allc_path, drop_n=True, n_rows=100000000, out_path=None):
 def tabix_allc(allc_path, reindex=False):
     if os.path.exists(f'{allc_path}.tbi') and not reindex:
         return
-    run(shlex.split(f'tabix -b 2 -e 2 -s 1 {allc_path}'),
+    run(shlex.split(f'tabix -f -b 2 -e 2 -s 1 {allc_path}'),
         check=True)
     return
 
