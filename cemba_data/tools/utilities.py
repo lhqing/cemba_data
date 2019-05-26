@@ -24,7 +24,7 @@ IUPAC_TABLE = {
 
 
 @functools.lru_cache(maxsize=100)
-def parse_mc_pattern(pattern):
+def parse_mc_pattern(pattern: str) -> set:
     """
     parse mC context pattern
     """

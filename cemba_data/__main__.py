@@ -710,26 +710,26 @@ def extract_context_allc_register_subparser(subparser):
         "--allc_path",
         type=str,
         required=True,
-        help="Path of the ALLC file."
+        help="Path of the input ALLC file."
     )
 
     parser_req.add_argument(
-        "--out_path",
+        "--out_prefix",
         type=str,
         required=True,
-        help="Path of the output ALLC file."
+        help="Path prefix of the output ALLC file."
     )
 
     parser_opt.add_argument(
-        "--merge_strand",
+        "--merge_strand_cg",
         type=bool,
         required=False,
         default=True,
-        help="Whether to merge the continuous +/- strand mC and cov, only valid for mCG"
+        help="Whether to merge the continuous +/- strand mC and cov, only valid for mCG (normal CG, HCG, GCG etc.)"
     )
 
     parser_opt.add_argument(
-        "--mc_context",
+        "--mc_contexts",
         type=str,
         required=False,
         default=['CGN'],
@@ -1056,7 +1056,7 @@ def main():
     elif cur_command == 'generate-dataset':
         from .local.mc.prepare_dataset import generate_dataset as func
     elif cur_command == 'map-to-region':
-        from .tools.allc.allc import map_to_region as func
+        from .tools.allc.utilities import map_to_region as func
     elif cur_command == 'assemble-dataset':
         from .local.mc.prepare_dataset import assemble_dataset as func
     elif cur_command == 'allc-to-bigwig':
@@ -1064,15 +1064,15 @@ def main():
     elif cur_command == 'merge-allc':
         from cemba_data.tools.allc.merge_allc import merge_allc_files as func
     elif cur_command == 'allc-profile':
-        from .tools.allc.allc import get_allc_profile as func
+        from .tools.allc.utilities import profile_allc as func
     elif cur_command == 'simulate-long-reads-coverage':
         from .tools.simulation import simulate_long_reads_coverage as func
     elif cur_command == 'simulate-allc':
         from .tools.simulation import simulate_allc as func
     elif cur_command == 'allc-extract':
-        from .tools.allc.allc import extract_context_allc as func
+        from .tools.allc.utilities import extract_allc_context as func
     elif cur_command == 'allc-standardize':
-        from .tools.allc.allc import standardize_allc as func
+        from .tools.allc.utilities import standardize_allc as func
     elif cur_command == 'mapping-summary':
         from .mapping.pipeline import summary_pipeline_stat as func
     elif cur_command == 'cluster-merge':
