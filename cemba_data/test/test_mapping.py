@@ -5,13 +5,6 @@ Mapping related functions from FASTQ to ALLC, together with the mapping statisti
 Testing related files should exist in ./_data/mapping
 """
 
-from cemba_data.mapping.fastq import demultiplex, fastq_qc
-from cemba_data.mapping.bam import bam_qc
-from cemba_data.mapping.bismark import bismark
-from cemba_data.mapping.allc import batch_call_methylated_sites
-from cemba_data.mapping.pipeline import pipeline, summary_pipeline_stat
-from cemba_data.mapping.utilities import validate_fastq_dataframe
-
 
 def test_demultiplex():
     return

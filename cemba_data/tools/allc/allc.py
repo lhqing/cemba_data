@@ -1,4 +1,4 @@
-from .utilities import *
+from ..utilities import *
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
@@ -10,7 +10,6 @@ import numpy as np
 import os
 import pathlib
 from .open import open_allc
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
@@ -100,7 +99,6 @@ def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
     return path_dict
 
 
-# TODO: change map to region using tabix, prevent output temp file and include parallel
 def map_to_region(allc_path, out_path_prefix,
                   region_bed_path, region_name, genome_size_path,
                   context_pattern, max_cov_cutoff, remove_tmp):
@@ -183,23 +181,6 @@ def map_to_region(allc_path, out_path_prefix,
             run(['rm', '-f', path])
     cleanup()  # pybedtools tmp files
     print('Finish')
-    return
-
-
-def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
-    # TODO add allc to bigwig COV version, not calculate mC but only compute cov
-    from .allc_utilities import convert_allc_to_bigwig
-    convert_allc_to_bigwig(allc_path,
-                           out_path,
-                           chrom_size,
-                           mc_type=mc_type,
-                           bin_size=100,
-                           path_to_wigtobigwig="",
-                           min_bin_sites=0,
-                           min_bin_cov=0,
-                           max_site_cov=None,
-                           min_site_cov=0,
-                           add_chr_prefix=True)
     return
 
 
@@ -475,4 +456,3 @@ def standardize_allc(allc_path, chrom_size_path, compress_level=5,
             idxf.writelines(index_lines)
     tabix_allc(allc_path, reindex=True)
     return
-

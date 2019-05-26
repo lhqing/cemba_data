@@ -1,7 +1,7 @@
 from heapq import heappop, heappush
 import numpy as np
 from .open import open_gz, open_allc
-from .utilities import parse_mc_pattern, parse_chrom_size
+from ..utilities import parse_mc_pattern, parse_chrom_size
 
 
 class _Region:

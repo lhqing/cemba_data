@@ -311,10 +311,13 @@ class PipedBamReader(Closing):
         return data
 
 
-def open_bam(filename, mode='r', region=None, include_header=True, samtools_parms_str=None):
+def open_bam(file_path, mode='r', region=None, include_header=True, samtools_parms_str=None):
     if 'r' in mode:
+        if region is not None:
+            if not has_bai(file_path):
+                raise FileNotFoundError(f'.bai index file not found for {file_path}. Index before region query.')
         try:
-            return PipedBamReader(filename, region=region, mode=mode,
+            return PipedBamReader(file_path, region=region, mode=mode,
                                   include_header=include_header,
                                   samtools_parms_str=samtools_parms_str)
         except OSError as e:
@@ -323,28 +326,28 @@ def open_bam(filename, mode='r', region=None, include_header=True, samtools_parm
         raise NotImplementedError('BAM writer not implemented yet... I am lazy')
 
 
-def open_gz(filename, mode='r', compresslevel=3, threads=1, region=None):
+def open_gz(file_path, mode='r', compresslevel=3, threads=1, region=None):
     if 'r' in mode:
         try:
-            return PipedGzipReader(filename, region=region, mode=mode)
+            return PipedGzipReader(file_path, region=region, mode=mode)
         except OSError:
             # gzip not installed
-            return gzip.open(filename, mode)
+            return gzip.open(file_path, mode)
     else:
         try:
-            return PipedGzipWriter(filename, mode, compresslevel, threads=threads)
+            return PipedGzipWriter(file_path, mode, compresslevel, threads=threads)
         except OSError:
-            return gzip.open(filename, mode, compresslevel=compresslevel)
+            return gzip.open(file_path, mode, compresslevel=compresslevel)
 
 
-def open_allc(filename, mode='r', compresslevel=3, threads=1,
+def open_allc(file_path, mode='r', compresslevel=3, threads=1,
               region=None):
     """
     A replacement for the "open" function that can also open files that have
-    been compressed with gzip, bzip2 or xz. If the filename is '-', standard
+    been compressed with gzip, bzip2 or xz. If the file_path is '-', standard
     output (mode 'w') or input (mode 'r') is returned.
 
-    The file type is determined based on the filename: .gz is gzip, .bz2 is bzip2 and .xz is
+    The file type is determined based on the file_path: .gz is gzip, .bz2 is bzip2 and .xz is
     xz/lzma.
 
     When writing a gzip-compressed file, the following methods are tried in order to get the
@@ -364,68 +367,26 @@ def open_allc(filename, mode='r', compresslevel=3, threads=1,
         mode += 't'
     if mode not in ('rt', 'rb', 'wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
-    if not isinstance(filename, str):
-        raise ValueError("the filename must be a string")
+    if not isinstance(file_path, str):
+        raise ValueError("the file_path must be a string")
     if compresslevel not in range(1, 10):
         raise ValueError("compresslevel must be between 1 and 9")
     if region is not None:
         # unzipped file
-        if not filename.endswith('gz'):
+        if not file_path.endswith('gz'):
             raise ValueError('File must be compressed by bgzip to use region query.')
         # normal gzipped file
-        if not has_tabix(filename):
-            raise ValueError(f'Tried inspect {filename}, '
+        if not has_tabix(file_path):
+            raise ValueError(f'Tried inspect {file_path}, '
                              'File is compressed by normal gzip, but region query only apply to bgzip')
 
-        if not os.path.exists(filename + '.tbi'):
+        if not os.path.exists(file_path + '.tbi'):
             raise FileNotFoundError('region query provided, but .tbi index not found')
 
-    if filename.endswith('gz'):
-        return open_gz(filename, mode, compresslevel, threads, region=region)
+    if file_path.endswith('gz'):
+        return open_gz(file_path, mode, compresslevel, threads, region=region)
     else:
-        return open(filename, mode)
-
-
-def rezip_use_bgzip(filename):
-    if is_bgzip(filename):
-        return
-
-    tmp_filename = filename + '_rezipping'
-    if os.path.exists(tmp_filename):
-        raise FileExistsError(f'Temp file {tmp_filename} exist')
-    run(['mv', filename, tmp_filename], check=True)
-    reader = Popen(['gzip', '-cd', tmp_filename],
-                   stdout=PIPE).stdout
-    try:
-        with open(filename, 'w') as f:
-            writer = Popen(['bgzip'], stdin=reader, stdout=f)
-            writer.wait()
-        run(['rm', '-f', tmp_filename])
-    except OSError as e:
-        run(['mv', tmp_filename, filename], check=True)
-        raise e
-    return
-
-
-def is_bgzip(filename):
-    # TODO This function is not perfect, figure out a more substantial way to determine bgzip
-    # a bad example is here, its bgziped, but file provide something strange
-    # /gale/raidix/rdx-4/CEMBA_RS1/4C/CEMBA180417_4C/allc/
-    # allc_180605_CEMBA_mm_P56_P63_4C_CEMBA180417_4C_7_CEMBA180417_4C_8_C8_AD001_indexed.tsv.gz
-    print('Warning: is_bgzip(), This function is not perfect, figure out a more substantial way to determine bgzip')
-    if not filename.endswith('gz'):
-        return False
-
-    file_type_descript = run(['file', filename],
-                             stdout=PIPE, encoding='utf8').stdout
-    # for bgzip format, I don't have a better idea to check
-    # this "gzip compressed data, extra field" description is different from normal gzip
-    # for normal gzip, result looks like:
-    # test.tsv.gz: gzip compressed data, was "test.tsv", from Unix, last modified: Fri Jan  4 17:17:31 2019
-    if 'gzip compressed data, extra field' in file_type_descript:
-        return True
-    else:
-        return False
+        return open(file_path, mode)
 
 
 def has_tabix(filename):

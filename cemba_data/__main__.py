@@ -1056,29 +1056,29 @@ def main():
     elif cur_command == 'generate-dataset':
         from .local.mc.prepare_dataset import generate_dataset as func
     elif cur_command == 'map-to-region':
-        from .tools.allc import map_to_region as func
+        from .tools.allc.allc import map_to_region as func
     elif cur_command == 'assemble-dataset':
         from .local.mc.prepare_dataset import assemble_dataset as func
     elif cur_command == 'allc-to-bigwig':
-        from .tools.allc import allc_to_bigwig as func
+        from .tools.allc.allc_to_bigwig import allc_to_bigwig as func
     elif cur_command == 'merge-allc':
-        from .tools.allc_utilities import merge_allc_files as func
+        from cemba_data.tools.allc.merge_allc import merge_allc_files as func
     elif cur_command == 'allc-profile':
-        from .tools.allc import get_allc_profile as func
+        from .tools.allc.allc import get_allc_profile as func
     elif cur_command == 'simulate-long-reads-coverage':
         from .tools.simulation import simulate_long_reads_coverage as func
     elif cur_command == 'simulate-allc':
         from .tools.simulation import simulate_allc as func
     elif cur_command == 'allc-extract':
-        from .tools.allc import extract_context_allc as func
+        from .tools.allc.allc import extract_context_allc as func
     elif cur_command == 'allc-standardize':
-        from .tools.allc import standardize_allc as func
+        from .tools.allc.allc import standardize_allc as func
     elif cur_command == 'mapping-summary':
         from .mapping.pipeline import summary_pipeline_stat as func
     elif cur_command == 'cluster-merge':
         from .local.mc.prepare_cluster_profile import cluster_merge_pipeline as func
     elif cur_command == 'bam-to-allc':
-        from .mapping.allc import call_methylated_sites as func
+        from .tools.allc.bam_to_allc import call_methylated_sites as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

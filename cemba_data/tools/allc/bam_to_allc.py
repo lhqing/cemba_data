@@ -220,9 +220,9 @@ import pandas as pd
 import multiprocessing
 import collections
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from ..tools.utilities import genome_region_chunks
-from ..tools.open import open_allc, open_bam
-from .utilities import get_configuration
+from cemba_data.tools.utilities import genome_region_chunks
+from cemba_data.tools.allc.open import open_allc, open_bam
+from cemba_data.mapping.utilities import get_configuration
 import logging
 
 # logger
@@ -563,7 +563,7 @@ def call_methylated_sites(bam_path, reference_fasta, cpu=1,
 
             # index
             if idx:
-                from ..tools.allc_utilities import index_allc_file
+                from .allc_to_bigwig import index_allc_file
                 index_allc_file(output_path)
 
             # tabix
