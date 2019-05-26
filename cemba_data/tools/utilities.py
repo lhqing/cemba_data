@@ -1,6 +1,7 @@
 import itertools
 import functools
 import collections
+import pathlib
 import numpy as np
 
 IUPAC_TABLE = {
@@ -131,14 +132,10 @@ def get_mean_var(X):
     return mean, var
 
 
-def parse_file_paths(input_file_paths):
+def parse_file_paths(input_file_paths) -> list:
     if isinstance(input_file_paths, list):
-        if len(input_file_paths) > 1:
-            return input_file_paths
-        else:
-            input_file_paths = input_file_paths[0]
-
-    if isinstance(input_file_paths, str):
+        _file_list = input_file_paths
+    elif isinstance(input_file_paths, str):
         if '*' in input_file_paths:
             import glob
             file_list = glob.glob(input_file_paths)
@@ -147,6 +144,14 @@ def parse_file_paths(input_file_paths):
             with open(input_file_paths) as f:
                 for line in f:
                     file_list.append(line.strip('\n'))
-        return file_list
+        _file_list = file_list
     else:
         raise TypeError('File paths input is neither str nor list.')
+
+    final_file_list = []
+    for path in _file_list:
+        real_path = pathlib.Path(path).resolve()
+        if not real_path.exists():
+            raise FileNotFoundError(f'{path} provided do not exist.')
+        final_file_list.append(str(real_path))
+    return _file_list
