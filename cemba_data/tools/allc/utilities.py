@@ -456,9 +456,13 @@ def standardize_allc(allc_path, chrom_size_path, compress_level=5,
             if not line.startswith(cur_start):
                 fields = line.split("\t")
                 cur_chrom = fields[0]
-                if (cur_chrom not in genome_dict) and (not remove_additional_chrom):
-                    raise KeyError(f'{cur_chrom} not exist in genome size file, '
-                                   f'set remove_additional_chrom=True if want to remove additional chroms')
+                if cur_chrom not in genome_dict:
+                    if not remove_additional_chrom:
+                        raise KeyError(f'{cur_chrom} not exist in genome size file, '
+                                       f'set remove_additional_chrom=True if want to remove additional chroms')
+                    else:
+                        # skip unknown chromosome
+                        continue
                 index_lines.append(cur_chrom + "\t" + str(cur_pointer) + "\n")
                 cur_start = cur_chrom + '\t'
             cur_pointer += len(line)
