@@ -6,7 +6,7 @@ Original author: Yupeng He
 
 import shlex
 import subprocess
-from ..utilities import parse_mc_pattern
+from ..utilities import parse_chrom_size
 from .open import open_allc
 import logging
 
@@ -15,129 +15,104 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def _allc_to_bigwig(input_allc_file,
-                    output_file,
-                    chrom_size_file,
-                    mc_type="CGN",
-                    bin_size=100,
-                    path_to_wigtobigwig="",
-                    min_bin_sites=0,
-                    min_bin_cov=0,
-                    max_site_cov=None,
-                    min_site_cov=0,
-                    add_chr_prefix=False):
-    # TODO add option for only convert cov bigwig
-    if not isinstance(mc_type, list):
-        if isinstance(mc_type, str):
-            mc_type = [mc_type]
-        else:
-            exit("mc_type must be a list of string(s)")
-    # TODO add supports for multiple mc_type
-    mc_type = mc_type[0]
+def _allc_to_bedgraph(allc_path, out_prefix, chrom_size_file,
+                      remove_additional_chrom=False, bin_size=50):
+    """
+    Simply calculate cov and mc_rate for fixed genome bins. No mC context filter.
 
-    if len(path_to_wigtobigwig):
-        path_to_wigtobigwig += "/"
+    Parameters
+    ----------
+    allc_path
+    out_prefix
+    chrom_size_file
+    remove_additional_chrom
+    bin_size
 
-    mc_class = parse_mc_pattern(mc_type)
+    Returns
+    -------
 
-    chrom_end = {}
+    """
+    chrom_dict = parse_chrom_size(chrom_size_file)
+    cur_chrom = 'TOTALLY_NOT_A_CHROM'
+    cur_chrom_end = 0
+    bin_start = 0
+    bin_end = min(cur_chrom_end, bin_size)
+    temp_mc, temp_cov = 0, 0
 
-    # chromosome size
-    f = open(chrom_size_file, 'r')
-    g = open(output_file + ".chrom_size", 'w')
-    for line in f:
-        fields = line.split("\t")
-        if not fields[0].startswith("chr"):
-            fields[0] = "chr" + fields[0]
-        chrom_end[fields[0]] = int(fields[1])
-        g.write(fields[0] + "\t" + fields[1] + "\n")
-    g.close()
+    out_prefix = out_prefix.rstrip('.')
+    out_rate = out_prefix + '.rate.bg'
+    out_cov = out_prefix + '.cov.bg'
 
-    # prepare wig file
-    cur_chrom = ""
-    bin_start, bin_end = 0, 0
-    bin_mc, bin_h, bin_site = 0, 0, 0
-    g = open(output_file + ".wig", 'w')
-    with open_allc(input_allc_file) as f:
-        for line in f:
-            fields = line.split("\t")
-            if fields[3] not in mc_class:
-                continue
-            pos = int(fields[1]) - 1
-            if cur_chrom != fields[0] or pos >= bin_end:
-                try:
-                    if fields[0].startswith("chr"):
-                        cur_chrom_end = chrom_end[fields[0]]
-                    else:
-                        cur_chrom_end = chrom_end["chr" + fields[0]]
-                except KeyError:
-                    # chrom not in chrom size file
-                    continue
+    with open_allc(allc_path) as allc, \
+            open(out_rate, 'w') as rate_handle, \
+            open(out_cov, 'w') as cov_handle:
+        for line in allc:
+            chrom, pos, _, _, mc, cov, *_ = line.split("\t")
+            pos = int(pos)
+            mc = int(mc)
+            cov = int(cov)
+            if pos >= bin_end or cur_chrom != chrom:
+                # write line
+                if temp_cov > 0:
+                    mc_level = temp_mc / temp_cov
+                    rate_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end, mc_level])) + "\n")
+                    cov_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end, temp_cov])) + "\n")
 
-                if bin_h > 0 and bin_site >= min_bin_sites and bin_h >= min_bin_cov:
-                    mc_level = str(float(bin_mc) / float(bin_h))
-                    if add_chr_prefix and not cur_chrom.startswith("chr"):
-                        g.write("\t".join(["chr" + cur_chrom,
-                                           str(bin_start),
-                                           str(bin_end),
-                                           mc_level]) + "\n")
-                    else:
-                        g.write("\t".join([cur_chrom,
-                                           str(bin_start),
-                                           str(bin_end),
-                                           mc_level]) + "\n")
+                # reset_chrom
+                if cur_chrom != chrom:
+                    cur_chrom = chrom
+                    try:
+                        cur_chrom_end = chrom_dict[chrom]
+                    except KeyError as e:
+                        # chrom not in chrom size file
+                        if remove_additional_chrom:
+                            continue
+                        else:
+                            raise e
 
-                if pos >= cur_chrom_end:
-                    cur_chrom = fields[0]
-                    bin_mc, bin_h, bin_site = 0, 0, 0
-                    continue
-                # reset
-                cur_chrom = fields[0]
-                bin_mc, bin_h, bin_site = 0, 0, 0
-                bin_end = int(float(pos) / float(bin_size) + 1) * bin_size
-                bin_start = bin_end - bin_size
-                if bin_end > cur_chrom_end:
-                    bin_end = cur_chrom_end
-            # update mc, h and site
-            h_site = int(fields[5])
-            if h_site >= min_site_cov \
-                    and (max_site_cov is None or h_site <= max_site_cov):
-                bin_mc += int(fields[4])
-                bin_h += h_site
-                bin_site += 1
-    if bin_h > 0 and bin_site >= min_bin_sites and bin_h >= min_bin_cov:
-        mc_level = str(float(bin_mc) / float(bin_h))
-        if add_chr_prefix and not cur_chrom.startswith("chr"):
-            g.write("\t".join(["chr" + cur_chrom,
-                               str(bin_start),
-                               str(bin_end),
-                               mc_level]) + "\n")
-        else:
-            g.write("\t".join([cur_chrom,
-                               str(bin_start),
-                               str(bin_end),
-                               mc_level]) + "\n")
-    g.close()
+                # reset bin
+                temp_mc, temp_cov = mc, cov
+                bin_start = pos // bin_size * bin_size
+                bin_end = min(cur_chrom_end, bin_start + bin_size)
+            else:
+                temp_mc += mc
+                temp_cov += cov
+        # write last piece
+        if temp_cov > 0:
+            mc_level = temp_mc / temp_cov
+            rate_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end, mc_level])) + "\n")
+            cov_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end, temp_cov])) + "\n")
+    return out_rate, out_cov
+
+
+def _bedgraph_to_bigwig(input_file, chrom_size_file, path_to_wigtobigwig, remove_bedgraph=True):
+    output_file = input_file.rstrip('.bg') + '.bw'
+    cmd = f'{path_to_wigtobigwig}wigToBigWig {input_file} {chrom_size_file} {output_file}'
+
+    subprocess.run(shlex.split(cmd), check=True)
+    if remove_bedgraph:
+        subprocess.run(shlex.split(f'rm -f {input_file}'), check=True)
+    return output_file
+
+
+def allc_to_bigwig(allc_path,
+                   out_prefix,
+                   chrom_size_file,
+                   bin_size=50,
+                   remove_additional_chrom=False,
+                   remove_temp_bedgraph=True,
+                   path_to_wigtobigwig=""):
+    # test wigToBigWig
+    p = subprocess.run(f'{path_to_wigtobigwig}wigToBigWig', stderr=subprocess.PIPE, encoding='utf8')
+    if p.returncode != 255:
+        raise OSError(f'Try {path_to_wigtobigwig}wigToBigWig, got error {p.stderr}')
+
+    # prepare bedgraph
+    out_rate, out_cov = _allc_to_bedgraph(allc_path, out_prefix, chrom_size_file,
+                                          remove_additional_chrom=remove_additional_chrom,
+                                          bin_size=bin_size)
 
     # generate bigwig file
-    subprocess.check_call(shlex.split(path_to_wigtobigwig + "wigToBigWig "
-                                      + "%s.wig " % output_file
-                                      + "%s.chrom_size " % output_file
-                                      + output_file), stderr=subprocess.PIPE)
-    subprocess.check_call(shlex.split("rm " + output_file + ".wig " + output_file + ".chrom_size"))
-
-
-def allc_to_bigwig(allc_path, out_path, chrom_size, mc_type='CGN'):
-    # TODO add allc to bigwig COV version, not calculate mC but only compute cov
-    _allc_to_bigwig(allc_path,
-                    out_path,
-                    chrom_size,
-                    mc_type=mc_type,
-                    bin_size=100,
-                    path_to_wigtobigwig="",
-                    min_bin_sites=0,
-                    min_bin_cov=0,
-                    max_site_cov=None,
-                    min_site_cov=0,
-                    add_chr_prefix=True)
+    _bedgraph_to_bigwig(out_rate, chrom_size_file, path_to_wigtobigwig, remove_temp_bedgraph)
+    _bedgraph_to_bigwig(out_cov, chrom_size_file, path_to_wigtobigwig, remove_temp_bedgraph)
     return
