@@ -3,6 +3,7 @@ import functools
 import collections
 import pathlib
 import numpy as np
+from typing import Union
 
 IUPAC_TABLE = {
     'A': 'A',
@@ -132,10 +133,11 @@ def get_mean_var(X):
     return mean, var
 
 
-def parse_file_paths(input_file_paths) -> list:
-    if isinstance(input_file_paths, list):
-        _file_list = input_file_paths
-    elif isinstance(input_file_paths, str):
+def parse_file_paths(input_file_paths: Union[str, list]) -> list:
+    if isinstance(input_file_paths, list) and (len(input_file_paths) == 1):
+        input_file_paths = input_file_paths[0]
+
+    if isinstance(input_file_paths, str):
         if '*' in input_file_paths:
             import glob
             file_list = glob.glob(input_file_paths)
@@ -145,6 +147,8 @@ def parse_file_paths(input_file_paths) -> list:
                 for line in f:
                     file_list.append(line.strip('\n'))
         _file_list = file_list
+    elif isinstance(input_file_paths, list):
+        _file_list = input_file_paths
     else:
         raise TypeError('File paths input is neither str nor list.')
 
