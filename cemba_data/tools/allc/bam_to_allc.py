@@ -221,7 +221,7 @@ import multiprocessing
 import collections
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from cemba_data.tools.utilities import genome_region_chunks
-from cemba_data.tools.allc.open import open_allc, open_bam
+from cemba_data.tools.allc._open import open_allc, open_bam
 from cemba_data.mapping.utilities import get_configuration
 import logging
 

@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from .utilities import parse_chrom_size, parse_mc_pattern
-from .allc.open import open_allc, open_gz
+from .allc._open import open_allc, open_gz
 import logging
 
 # logger

@@ -7,7 +7,7 @@ Original author: Yupeng He
 import shlex
 import subprocess
 from ..utilities import parse_chrom_size
-from .open import open_allc
+from ._open import open_allc
 import logging
 
 # logger

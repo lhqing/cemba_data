@@ -1,6 +1,6 @@
 from heapq import heappop, heappush
 import numpy as np
-from .open import open_gz, open_allc
+from ._open import open_gz, open_allc
 from ..utilities import parse_mc_pattern, parse_chrom_size
 
 
@@ -260,4 +260,84 @@ def map_to_region(allc_path, bed_paths, bed_names, mc_patterns,
         handle.close()
     return
 
-# TODO add non-overlap worker
+
+def _transfer_bin_size(bin_size: int) -> str:
+    """Get proper str for a large bin_size"""
+    if bin_size > 1000000:
+        bin_size_mode = bin_size % 1000000
+        bin_size_mode = f'{bin_size_mode/1000000:.1f}'[1:] if bin_size_mode >= 100000 else ''
+        bin_size_str = f'{bin_size//1000000}{bin_size_mode}Mb'
+    elif bin_size > 1000:
+        bin_size_mode = bin_size % 1000
+        bin_size_mode = f'{bin_size_mode/1000:.1f}'[1:] if bin_size_mode >= 100 else ''
+        bin_size_str = f'{bin_size//1000}{bin_size_mode}Kb'
+    else:
+        bin_size_str = f'{bin_size}bp'
+    return bin_size_str
+
+
+# TODO: Compare this to the OOP function
+def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
+                            remove_additional_chrom=False, bin_size=50):
+    """
+    Parameters
+    ----------
+    allc_path
+    out_prefix
+    chrom_size_file
+    remove_additional_chrom
+    bin_size
+
+    Returns
+    -------
+
+    """
+    chrom_dict = parse_chrom_size(chrom_size_file)
+    cur_chrom = 'TOTALLY_NOT_A_CHROM'
+    cur_chrom_end = 0
+    bin_end = min(cur_chrom_end, bin_size)
+    bin_id = -1
+    temp_mc, temp_cov = 0, 0
+
+    out_prefix = out_prefix.rstrip('.')
+    out_path = out_prefix + f'.{_transfer_bin_size(bin_size)}.sparse_table.tsv.gz'
+
+    with open_allc(allc_path) as allc, \
+            open_gz(out_path, 'w') as out_handle:
+        # add header to indicate chromosome order
+        for chrom, chrom_size in chrom_dict.items():
+            out_handle.write(f'#{chrom}\t{chrom_size}\n')
+
+        for line in allc:
+            chrom, pos, _, _, mc, cov, *_ = line.split("\t")
+            pos = int(pos) - 1  # bed format
+            mc = int(mc)
+            cov = int(cov)
+            if pos >= bin_end or cur_chrom != chrom:
+                # write line
+                if temp_cov > 0:
+                    out_handle.write("\t".join(map(str, [bin_id, temp_mc, temp_cov])) + "\n")
+
+                # reset_chrom
+                if cur_chrom != chrom:
+                    cur_chrom = chrom
+                    try:
+                        cur_chrom_end = chrom_dict[chrom]
+                    except KeyError as e:
+                        # chrom not in chrom size file
+                        if remove_additional_chrom:
+                            continue
+                        else:
+                            raise e
+
+                # reset bin
+                temp_mc, temp_cov = mc, cov
+                bin_end = min(cur_chrom_end, pos // bin_size * bin_size + bin_size)
+                bin_id += 1
+            else:
+                temp_mc += mc
+                temp_cov += cov
+        # write last piece
+        if temp_cov > 0:
+            out_handle.write("\t".join(map(str, [bin_id, temp_mc, temp_cov])) + "\n")
+    return out_path

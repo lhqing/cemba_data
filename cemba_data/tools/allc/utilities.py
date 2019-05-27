@@ -11,7 +11,7 @@ import os
 import pathlib
 from typing import Union
 from glob import glob
-from .open import open_allc
+from ._open import open_allc
 
 
 def _split_to_chrom_bed(allc_path, context_pattern, genome_size_path,
@@ -224,6 +224,7 @@ def extract_allc_context(allc_path: str,
                          out_prefix: str,
                          merge_strand_cg: bool = True,
                          mc_contexts: Union[str, list] = 'CGN') -> None:
+    # TODO add parallel to this
     out_prefix = out_prefix.rstrip('.')
     if isinstance(mc_contexts, str):
         mc_contexts = mc_contexts.split(' ')
@@ -261,7 +262,7 @@ def extract_allc_context(allc_path: str,
             _merge_cg_strand(in_path, out_path)
             run(['rm', '-f', in_path], check=True)
 
-    for path in glob(out_prefix+'.extract*.tsv.gz'):
+    for path in glob(out_prefix+'.extract*tsv.gz'):
         tabix_allc(path)
     return
 

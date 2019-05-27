@@ -15,7 +15,7 @@ import resource
 import psutil
 from ..utilities import parse_chrom_size, genome_region_chunks, parse_file_paths
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from .open import open_allc
+from ._open import open_allc
 import logging
 import gc
 
