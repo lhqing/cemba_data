@@ -71,7 +71,7 @@ def _bedtools_map(region_bed, site_bed, out_bed, save_zero_cov=True):
                 out_handle.write(line)
             else:
                 # the last item is cov
-                if not line.endswith('\t0\n'):
+                if not line.endswith('\t.\n'):
                     out_handle.write(line)
     return
 
@@ -87,7 +87,7 @@ def _chrom_dict_to_id_index(chrom_dict, bin_size):
     return index_dict
 
 
-def _get_bin_id(chrom, chrom_index_dict, bin_start, bin_size):
+def _get_bin_id(chrom, chrom_index_dict, bin_start, bin_size) -> int:
     chrom_index_start = chrom_index_dict[chrom]
     n_bin = bin_start // bin_size
     return chrom_index_start + n_bin
@@ -96,17 +96,8 @@ def _get_bin_id(chrom, chrom_index_dict, bin_start, bin_size):
 def _map_to_sparse_chrom_bin(input_path, output_path, chrom_size_file,
                              bin_size=500):
     """
-    Parameters
-    ----------
-    allc_path
-    out_prefix
-    chrom_size_file
-    remove_additional_chrom
-    bin_size
-
-    Returns
-    -------
-
+    Calculate chromosome bins regional count, output is sparse,
+    bin_id constructed from chrom_size_file and can be reproduce.
     """
     chrom_dict = parse_chrom_size(chrom_size_file)
     chrom_index_dict = _chrom_dict_to_id_index(chrom_dict, bin_size)
@@ -177,12 +168,45 @@ def allc_to_region_count(allc_path,
                          max_cov_cutoff=9999,
                          save_zero_cov=True,
                          remove_tmp=True):
-    # 1. bgzip
-    # 2. order of chrom should be the same as order of chrom_size_path
+    """
+    Calculate mC and cov at regional level. Region accepted in 2 forms:
+    1. BED file, provided by region_bed_paths, containing arbitrary regions and use bedtools map to calculate
+    2. Fix-size non-overlap genome bins, provided by bin_sizes, this is much faster to calculate than 1.
+    The output is in 6-column bed-like format:
+    chrom   start   end region_uid  mc  cov
+
+    Parameters
+    ----------
+    allc_path
+        Path to the ALLC file
+    out_prefix
+        Path to output prefix
+    chrom_size_path
+        Path to UCSC chrom size file
+    mc_contexts
+        mC context list to calculate
+    region_bed_paths
+        Path to BED files
+    region_bed_names
+        Matched name for each BED file provided in region_bed_paths
+    bin_sizes
+        Sizes of genome bins to calculate
+    max_cov_cutoff
+        Max cov filter for a single site in ALLC
+    save_zero_cov
+        Whether to save the regions that have 0 cov, only apply to region count but not the chromosome count
+    remove_tmp
+        Whether to remove the temporary file
+    Returns
+    -------
+    """
     genome_dict = parse_chrom_size(chrom_size_path)
     if bin_sizes is None and region_bed_paths is None:
         raise ValueError('Either bin_sizes or region_bed_paths should be provided.')
 
+    # check bed file
+    # 1. bgzip and tabix
+    # 2. order of chrom should be the same as order of chrom_size_path
     if len(region_bed_names) != len(region_bed_paths):
         raise ValueError('Different number of bed names and paths')
     for region_name, region_bed_path in zip(region_bed_names, region_bed_paths):
