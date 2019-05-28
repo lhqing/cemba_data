@@ -171,7 +171,7 @@ class PipedGzipReader(Closing):
                                  stderr=PIPE,
                                  encoding=encoding)
         else:
-            self.process = Popen(['tabix', path, region],
+            self.process = Popen(['tabix', path] + region.split(' '),
                                  stdout=PIPE,
                                  stderr=PIPE,
                                  encoding=encoding)
@@ -261,7 +261,7 @@ class PipedBamReader(Closing):
                                  stderr=PIPE,
                                  encoding=encoding)
         else:
-            self.process = Popen(command_list + [path, region],
+            self.process = Popen(command_list + [path] + region.split(' '),
                                  stdout=PIPE,
                                  stderr=PIPE,
                                  encoding=encoding)
