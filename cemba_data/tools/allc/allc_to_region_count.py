@@ -251,3 +251,10 @@ def allc_to_region_count(allc_path,
         for site_bed_path in site_bed_paths:
             subprocess.run(['rm', '-f', site_bed_path])
     return
+
+
+def aggregate_region_count_matrix(region_count_table, region_count_tables, region_name, region_bed_path, bin_size):
+    # TODO
+    # this should only deal with a simple case, aggregate 2 sample*feature 2-D matrix, one for mc, one for cov,
+    # output to full or sparse format
+    return

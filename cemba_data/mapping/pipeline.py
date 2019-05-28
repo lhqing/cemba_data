@@ -1,7 +1,7 @@
 import collections
 from .fastq import demultiplex, fastq_qc
 from .bismark import bismark
-from .allc import batch_call_methylated_sites
+from ..tools.allc import batch_call_methylated_sites
 from .bam import bam_qc
 from .utilities import *
 import logging

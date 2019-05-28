@@ -26,9 +26,13 @@ def get_configuration(config_path=None):
 
 def test_cmd(tool_name, cmd_list):
     try:
-        subprocess.run(cmd_list, check=True)
+        subprocess.run(cmd_list,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       encoding='utf8',
+                       check=True)
     except subprocess.CalledProcessError as e:
-        log.error(f'Test {tool_name} got returncode {e.returncode}')
+        log.error(f'Test {tool_name} got non-zero return code {e.returncode}')
         log.error(e.stderr)
         raise
     return
@@ -36,7 +40,7 @@ def test_cmd(tool_name, cmd_list):
 
 def valid_environments(config):
     log.info('Test mapping environments')
-
+    
     # test cutadapt
     test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '--version'])
     # test samtools
