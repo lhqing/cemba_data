@@ -76,18 +76,115 @@ def _bedtools_map(region_bed, site_bed, out_bed, save_zero_cov=True):
     return
 
 
+def _chrom_dict_to_id_index(chrom_dict, bin_size):
+    sum = 0
+    index_dict = []
+    for chrom, chrom_length in chrom_dict.items():
+        index_dict[chrom] = sum
+        sum += chrom_length + 1 // bin_size
+        add_mode = 1 if (chrom_length % bin_size == 0) else 0
+        sum += add_mode
+    return index_dict
+
+
+def _get_bin_id(chrom, chrom_index_dict, bin_start, bin_size):
+    chrom_index_start = chrom_index_dict[chrom]
+    n_bin = bin_start // bin_size
+    return chrom_index_start + n_bin
+
+
+def _map_to_sparse_chrom_bin(input_path, output_path, chrom_size_file,
+                             bin_size=500):
+    """
+    Parameters
+    ----------
+    allc_path
+    out_prefix
+    chrom_size_file
+    remove_additional_chrom
+    bin_size
+
+    Returns
+    -------
+
+    """
+    chrom_dict = parse_chrom_size(chrom_size_file)
+    chrom_index_dict = _chrom_dict_to_id_index(chrom_dict, bin_size)
+    cur_chrom = 'TOTALLY_NOT_A_CHROM'
+    cur_chrom_end = 0
+    bin_end = min(cur_chrom_end, bin_size)
+    bin_start = 0
+    bin_id = -1
+    temp_mc, temp_cov = -1, -1
+
+    with open_gz(input_path) as in_handle, \
+            open_gz(output_path, 'w') as out_handle:
+        # add header to indicate chromosome order
+        for line in in_handle:
+            # site-bed format
+            chrom, pos, _, _, mc, cov, *_ = line.split("\t")
+            pos = int(pos)
+            mc = int(mc)
+            cov = int(cov)
+            if pos >= bin_end or cur_chrom != chrom:
+                # write line
+                if temp_cov > 0:
+                    out_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end,
+                                                         bin_id, temp_mc, temp_cov])) + "\n")
+
+                # reset_chrom
+                if cur_chrom != chrom:
+                    cur_chrom = chrom
+                    cur_chrom_end = chrom_dict[chrom]
+
+                # reset bin
+                temp_mc, temp_cov = mc, cov
+                bin_start = int(pos // bin_size * bin_size)
+                bin_end = min(cur_chrom_end, bin_start + bin_size)
+                bin_id = _get_bin_id(cur_chrom, chrom_index_dict, bin_start, bin_size)
+            else:
+                temp_mc += mc
+                temp_cov += cov
+        # write last piece
+        if temp_cov > 0:
+            out_handle.write("\t".join(map(str, [cur_chrom, bin_start, bin_end,
+                                                 bin_id, temp_mc, temp_cov])) + "\n")
+    return output_path
+
+
+def _transfer_bin_size(bin_size: int) -> str:
+    """Get proper str for a large bin_size"""
+    if bin_size > 1000000:
+        bin_size_mode = bin_size % 1000000
+        bin_size_mode = f'{bin_size_mode/1000000:.1f}'[1:] if bin_size_mode >= 100000 else ''
+        bin_size_str = f'{bin_size//1000000}{bin_size_mode}m'
+    elif bin_size > 1000:
+        bin_size_mode = bin_size % 1000
+        bin_size_mode = f'{bin_size_mode/1000:.1f}'[1:] if bin_size_mode >= 100 else ''
+        bin_size_str = f'{bin_size//1000}{bin_size_mode}k'
+    else:
+        bin_size_str = f'{bin_size}'
+    return bin_size_str
+
+
 def allc_to_region_count(allc_path,
                          out_prefix,
-                         region_bed_paths,
-                         region_bed_names,
-                         mc_contexts,
                          chrom_size_path,
-                         max_cov_cutoff,
+                         mc_contexts,
+                         region_bed_paths=None,
+                         region_bed_names=None,
+                         bin_sizes=None,
+                         max_cov_cutoff=9999,
                          save_zero_cov=True,
                          remove_tmp=True):
     # 1. bgzip
     # 2. order of chrom should be the same as order of chrom_size_path
     genome_dict = parse_chrom_size(chrom_size_path)
+    if bin_sizes is None and region_bed_paths is None:
+        raise ValueError('Either bin_sizes or region_bed_paths should be provided.')
+
+    if len(region_bed_names) != len(region_bed_paths):
+        raise ValueError('Different number of bed names and paths')
     for region_name, region_bed_path in zip(region_bed_names, region_bed_paths):
         if not check_tbi_chroms(region_bed_path, genome_dict):
             raise ValueError(f'The bed file {region_bed_path} chromosome order is different '
@@ -100,6 +197,7 @@ def allc_to_region_count(allc_path,
                                                     chrom_size_path=chrom_size_path,
                                                     mc_contexts=mc_contexts,
                                                     max_cov_cutoff=max_cov_cutoff)
+
     print('Map to regions')
     save_flag = 'full' if save_zero_cov else 'sparse'
     for region_name, region_bed_path in zip(region_bed_names, region_bed_paths):
@@ -107,11 +205,20 @@ def allc_to_region_count(allc_path,
             try:
                 _bedtools_map(region_bed=region_bed_path,
                               site_bed=site_bed_path,
-                              out_bed=out_prefix+f'.{region_name}_{mc_context}.{save_flag}.bed.gz',
+                              out_bed=out_prefix + f'.{region_name}_{mc_context}.{save_flag}.bed.gz',
                               save_zero_cov=save_zero_cov)
             except subprocess.CalledProcessError as e:
                 print(e.stderr)
                 raise e
+
+    print('Map to chromosome bins')
+    for bin_size in bin_sizes:
+        for mc_context, site_bed_path in zip(mc_contexts, site_bed_paths):
+            _map_to_sparse_chrom_bin(input_path=site_bed_path,
+                                     output_path=out_prefix + f'.chrom{_transfer_bin_size(bin_size)}'
+                                                              f'_{mc_context}.{save_flag}.bed.gz',
+                                     chrom_size_file=chrom_size_path,
+                                     bin_size=bin_size)
 
     if remove_tmp:
         for site_bed_path in site_bed_paths:
