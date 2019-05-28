@@ -77,13 +77,13 @@ def _bedtools_map(region_bed, site_bed, out_bed, save_zero_cov=True):
 
 
 def _chrom_dict_to_id_index(chrom_dict, bin_size):
-    sum = 0
-    index_dict = []
+    sum_id = 0
+    index_dict = {}
     for chrom, chrom_length in chrom_dict.items():
-        index_dict[chrom] = sum
-        sum += chrom_length + 1 // bin_size
-        add_mode = 1 if (chrom_length % bin_size == 0) else 0
-        sum += add_mode
+        index_dict[chrom] = sum_id
+        sum_id += chrom_length // bin_size + 1
+        if chrom_length % bin_size == 0:
+            sum_id += 1
     return index_dict
 
 
@@ -122,7 +122,7 @@ def _map_to_sparse_chrom_bin(input_path, output_path, chrom_size_file,
         # add header to indicate chromosome order
         for line in in_handle:
             # site-bed format
-            chrom, pos, _, _, mc, cov, *_ = line.split("\t")
+            chrom, pos, _, mc, cov = line.split("\t")
             pos = int(pos)
             mc = int(mc)
             cov = int(cov)
@@ -198,7 +198,8 @@ def allc_to_region_count(allc_path,
                                                     mc_contexts=mc_contexts,
                                                     max_cov_cutoff=max_cov_cutoff)
 
-    print('Map to regions')
+    if region_bed_paths is not None:
+        print('Map to regions.')
     save_flag = 'full' if save_zero_cov else 'sparse'
     for region_name, region_bed_path in zip(region_bed_names, region_bed_paths):
         for mc_context, site_bed_path in zip(mc_contexts, site_bed_paths):
@@ -211,16 +212,18 @@ def allc_to_region_count(allc_path,
                 print(e.stderr)
                 raise e
 
-    print('Map to chromosome bins')
+    if bin_sizes is not None:
+        print('Map to chromosome bins.')
     for bin_size in bin_sizes:
         for mc_context, site_bed_path in zip(mc_contexts, site_bed_paths):
             _map_to_sparse_chrom_bin(input_path=site_bed_path,
                                      output_path=out_prefix + f'.chrom{_transfer_bin_size(bin_size)}'
-                                                              f'_{mc_context}.{save_flag}.bed.gz',
+                                                              f'_{mc_context}.sparse.bed.gz',
                                      chrom_size_file=chrom_size_path,
                                      bin_size=bin_size)
 
     if remove_tmp:
+        print('Remove temporal files.')
         for site_bed_path in site_bed_paths:
             subprocess.run(['rm', '-f', site_bed_path])
     return
