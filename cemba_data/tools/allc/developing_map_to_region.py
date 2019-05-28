@@ -1,5 +1,7 @@
 from heapq import heappop, heappush
 import numpy as np
+from .utilities import extract_allc_context
+import subprocess
 from ._open import open_gz, open_allc
 from ..utilities import parse_mc_pattern, parse_chrom_size
 
@@ -276,9 +278,21 @@ def _transfer_bin_size(bin_size: int) -> str:
     return bin_size_str
 
 
+"""
+Sparse Table Format
+#chr1   length_of_chr1
+#chr2   length_of_chr2
+#chr3   length_of_chr3
+#chr4   length_of_chr4
+bin_id  bin_mc  bin_cov
+...
+Used to save small chromosome bins with very small bin size
+"""
+
+
 # TODO: Compare this to the OOP function
-def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
-                            remove_additional_chrom=False, bin_size=50):
+def _map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
+                             remove_additional_chrom=False, bin_size=50):
     """
     Parameters
     ----------
@@ -305,6 +319,7 @@ def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
     with open_allc(allc_path) as allc, \
             open_gz(out_path, 'w') as out_handle:
         # add header to indicate chromosome order
+        out_handle.write(f'#bin_size\t{bin_size}')
         for chrom, chrom_size in chrom_dict.items():
             out_handle.write(f'#{chrom}\t{chrom_size}\n')
 
@@ -341,3 +356,36 @@ def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
         if temp_cov > 0:
             out_handle.write("\t".join(map(str, [bin_id, temp_mc, temp_cov])) + "\n")
     return out_path
+
+
+def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
+                            bin_size=500, mc_contexts=None,
+                            remove_additional_chrom=False):
+    if mc_contexts is not None:
+        extract_allc_context(allc_path=allc_path,
+                             out_prefix=out_prefix,
+                             mc_contexts=mc_contexts)
+        allc_list = []
+        for mc_context in mc_contexts:
+            extracted_path = out_prefix.rstrip('.') + f'.extract_{mc_context}.tsv.gz'
+            allc_list.append(extracted_path)
+    else:
+        allc_list = [allc_path]
+
+    for _allc_path in allc_list:
+        _map_to_sparse_chrom_bin(allc_path=_allc_path,
+                                 out_prefix=_allc_path.rstrip('.tsv.gz'),
+                                 chrom_size_file=chrom_size_file,
+                                 remove_additional_chrom=remove_additional_chrom,
+                                 bin_size=bin_size)
+        if mc_contexts is not None:
+            # this will only remove extracted ALLC, but not the input ALLC
+            subprocess.run(['rm', 'f', _allc_path, _allc_path + '.tbi'])
+    return
+
+
+def aggregate_sparse_tables():
+    genome_bin_bed = None
+    sparse_matrix = None
+    pass
+    return genome_bin_bed, sparse_matrix

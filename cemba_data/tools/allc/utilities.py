@@ -262,7 +262,7 @@ def extract_allc_context(allc_path: str,
             _merge_cg_strand(in_path, out_path)
             run(['rm', '-f', in_path], check=True)
 
-    for path in glob(out_prefix+'.extract*tsv.gz'):
+    for path in glob(out_prefix + '.extract*tsv.gz'):
         tabix_allc(path)
     return
 
@@ -370,24 +370,34 @@ def get_md5(file_path):
     return file_md5
 
 
-def _check_allc_chroms(allc_path, genome_dict):
-    allc_tabix_path = pathlib.Path(str(allc_path) + '.tbi')
-    if not allc_tabix_path.exists():
+def check_tbi_chroms(file_path, genome_dict, same_order=False):
+    file_tabix_path = pathlib.Path(str(file_path) + '.tbi')
+    if not file_tabix_path.exists():
         return False
 
-    tbi_time = os.path.getmtime(allc_tabix_path)
-    allc_time = os.path.getmtime(allc_path)
-    if allc_time > tbi_time:
+    tbi_time = os.path.getmtime(file_tabix_path)
+    file_time = os.path.getmtime(file_path)
+    if file_time > tbi_time:
         # tabix file create earlier than ALLC, something may changed for ALLC.
         return False
 
     try:
-        chroms = run(['tabix', '-l', allc_path],
+        chroms = run(['tabix', '-l', file_path],
                      stdout=PIPE,
                      encoding='utf8',
                      check=True).stdout.strip().split('\n')
         if len(set(chroms) - genome_dict.keys()) != 0:
             return False
+
+        if same_order:
+            ref_order = list(genome_dict.keys())
+            cur_pos = -1
+            for chrom in chroms:
+                chrom_pos = ref_order.index(chrom)
+                if chrom_pos < cur_pos:
+                    return False
+                else:
+                    cur_pos = chrom_pos
     except CalledProcessError:
         return False
     return True
@@ -421,7 +431,7 @@ def standardize_allc(allc_path, chrom_size_path, compress_level=5,
     """
 
     genome_dict = parse_chrom_size(chrom_size_path)
-    if _check_allc_chroms(allc_path, genome_dict):
+    if check_tbi_chroms(allc_path, genome_dict):
         # means ALLC is already standard
         return
 
