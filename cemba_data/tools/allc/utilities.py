@@ -1,4 +1,4 @@
-from ..utilities import *
+from ..utilities import parse_mc_pattern, parse_chrom_size
 import gzip
 from functools import partial
 from pybedtools import BedTool, cleanup
