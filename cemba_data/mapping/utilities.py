@@ -40,7 +40,7 @@ def test_cmd(tool_name, cmd_list):
 
 def valid_environments(config):
     log.info('Test mapping environments')
-    
+
     # test cutadapt
     test_cmd(tool_name='cutadapt', cmd_list=['cutadapt', '--version'])
     # test samtools

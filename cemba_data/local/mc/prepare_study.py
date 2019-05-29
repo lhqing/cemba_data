@@ -25,6 +25,7 @@ import pathlib
 import functools
 import logging
 from ...tools.hdf5.netndf import MCDS
+
 log = logging.getLogger()
 
 
@@ -37,12 +38,22 @@ def _get_ds_indexes(ds_path):
         return ds.indexes
 
 
-def _process_one_path(ds_path,
-                      cell_list,
-                      region_select_dict,
-                      dataarray_select,
-                      mc_type,
-                      count_type):
+def _process_one_path_rna(ds_path,
+                          cell_list,
+                          region_select_dict,
+                          dataarray_select,
+                          mc_type,
+                          count_type):
+        # TODO write function for RNA da
+        return
+
+
+def _process_one_path_mc(ds_path,
+                         cell_list,
+                         region_select_dict,
+                         dataarray_select,
+                         mc_type,
+                         count_type):
     """
     query one dataset with a list of cell_id.
     if no cell in this dataset, return None,
@@ -74,7 +85,7 @@ def _process_one_path(ds_path,
         ds_count_type_index = ds_indexes['count_type']
         for _count_type in count_type:
             if _count_type not in ds_count_type_index:
-                raise ValueError(_count_type, 'not in dataset mc_type coords.')
+                raise ValueError(_count_type, 'not in dataset count_type coords.')
         selection_dict['count_type'] = count_type
 
     # regions
@@ -110,12 +121,13 @@ def _process_cell_list(netcdf_files,
     """
     datasets = []
     for file_path in netcdf_files:
-        dataset = _process_one_path(file_path,
-                                    cell_list,
-                                    region_select_dict,
-                                    dataarray_select,
-                                    mc_type,
-                                    count_type)
+        # TODO add functions for different data type
+        dataset = _process_one_path_mc(file_path,
+                                       cell_list,
+                                       region_select_dict,
+                                       dataarray_select,
+                                       mc_type,
+                                       count_type)
         if dataset is not None:
             datasets.append(dataset)
 

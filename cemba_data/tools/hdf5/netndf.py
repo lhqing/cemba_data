@@ -202,10 +202,6 @@ class MCDS(xr.Dataset):
             return rate
 
     def to_ann(self, da, var_dim, obs_dim='cell', **sel_kwargs):
-        if len(self[da].dims) < 2:
-            raise ValueError(f'to_ann only apply to dataarray with >= 2 dims, '
-                             f'{da} have only {len(self[da].dims)} dim')
-
         _data = self[da].sel(**sel_kwargs).squeeze().values
 
         if len(_data.shape) != 2:
@@ -220,11 +216,11 @@ class MCDS(xr.Dataset):
         index_dict = self[da].indexes
         obs_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
-                               if v.name == obs_dim and k != obs_dim},
+                               if (v.name == obs_dim) and (k != obs_dim)},
                               index=index_dict[obs_dim])
         var_df = pd.DataFrame({k: pd.Series(v.tolist())
                                for k, v in index_dict.items()
-                               if v.name == var_dim and k != var_dim},
+                               if (v.name == var_dim) and (k != var_dim)},
                               index=index_dict[var_dim])
 
         return AnnData(X=_data.copy(),
