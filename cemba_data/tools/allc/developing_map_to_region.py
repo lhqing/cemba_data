@@ -1,6 +1,6 @@
 from heapq import heappop, heappush
 import numpy as np
-from .utilities import extract_allc_context
+from .utilities import extract_allc
 import subprocess
 from ._open import open_gz, open_allc
 from ..utilities import parse_mc_pattern, parse_chrom_size
@@ -362,9 +362,9 @@ def map_to_sparse_chrom_bin(allc_path, out_prefix, chrom_size_file,
                             bin_size=500, mc_contexts=None,
                             remove_additional_chrom=False):
     if mc_contexts is not None:
-        extract_allc_context(allc_path=allc_path,
-                             out_prefix=out_prefix,
-                             mc_contexts=mc_contexts)
+        extract_allc(allc_path=allc_path,
+                     out_prefix=out_prefix,
+                     mc_contexts=mc_contexts)
         allc_list = []
         for mc_context in mc_contexts:
             extracted_path = out_prefix.rstrip('.') + f'.extract_{mc_context}.tsv.gz'

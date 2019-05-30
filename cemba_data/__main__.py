@@ -720,21 +720,45 @@ def extract_context_allc_register_subparser(subparser):
         help="Path prefix of the output ALLC file."
     )
 
-    parser_opt.add_argument(
-        "--merge_strand_cg",
-        type=bool,
-        required=False,
-        default=True,
-        help="Whether to merge the continuous +/- strand mC and cov, only valid for mCG (normal CG, HCG, GCG etc.)"
+    parser_req.add_argument(
+        "--mc_contexts",
+        type=str,
+        required=True,
+        nargs='+',
+        help="Space separated mC contexts to extract."
     )
 
     parser_opt.add_argument(
-        "--mc_contexts",
+        "--strandness",
         type=str,
         required=False,
-        default=['CGN'],
-        nargs='+',
-        help="space separated mC contexts to extract"
+        default='both',
+        help="What to do with strand information, possible values are: "
+             "1. both: save +/- strand together in one file; "
+             "2. split: save +/- strand into two separate files, with suffix contain Watson (+) and Crick (-); "
+             "3. merge: This will only merge the count on adjacent CpG in +/- strands, only work for CpG like context. "
+             "For non-CG context, its the same as both."
+    )
+
+    parser_opt.add_argument(
+        "--output_format",
+        type=str,
+        required=False,
+        default='allc',
+        help="Output format of extracted information, possible values are: "
+             "1. allc: keep the allc format; "
+             "2. bed5: 5-column bed format, chrom, pos, pos, mc, cov; "
+             "3. bg-cov: bedgraph format, chrom, pos, pos, cov; "
+             "4. bg-rate: bedgraph format, chrom, pos, pos, mc/cov."
+    )
+
+    parser_opt.add_argument(
+        "--region",
+        type=str,
+        required=False,
+        default=None,
+        help="Only extract records from certain genome region(s) via tabix, "
+             "multiple region can be provided in tabix form."
     )
 
 
@@ -1070,7 +1094,7 @@ def main():
     elif cur_command == 'simulate-allc':
         from .tools.simulation import simulate_allc as func
     elif cur_command == 'allc-extract':
-        from .tools.allc.utilities import extract_allc_context as func
+        from .tools.allc.utilities import extract_allc as func
     elif cur_command == 'allc-standardize':
         from .tools.allc.utilities import standardize_allc as func
     elif cur_command == 'mapping-summary':
