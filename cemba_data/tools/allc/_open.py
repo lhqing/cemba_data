@@ -365,13 +365,14 @@ def open_allc(file_path, mode='r', compresslevel=3, threads=1,
     multi-thread only apply to writer, reader (decompression) can't be paralleled
     """
     file_path = pathlib.Path(file_path).resolve()
-    file_exist = file_path
+    file_exist = file_path.exists()
     if 'w' not in mode:
         if not file_exist:
             raise FileNotFoundError(f'{file_path} does not exist.')
     else:
         if not file_path.parent.exists():
             raise OSError(f'File directory {file_path.parent} does not exist.')
+    file_path = str(file_path)
 
     if mode in ('r', 'w', 'a'):
         mode += 't'
