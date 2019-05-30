@@ -82,9 +82,11 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
         else:
             # for cluster with only one cell (if possible), we just copy/symlink them to maintain structure
             if copy:
-                cmd = f'cp {sub_df["allc_path"].iloc[0]} {unique_file_path}'
+                cmd = f'cp {sub_df["allc_path"].iloc[0]} {unique_file_path};' \
+                      f'cp {sub_df["allc_path"].iloc[0]}.tbi {unique_file_path}.tbi'
             else:
-                cmd = f'ln -s {sub_df["allc_path"].iloc[0]} {unique_file_path}'
+                cmd = f'ln -s {sub_df["allc_path"].iloc[0]} {unique_file_path};' \
+                      f'cp {sub_df["allc_path"].iloc[0]}.tbi {unique_file_path}.tbi'
             cmd_dict = {'command': cmd, 'pe smp': 1, 'h_vmem': '1G'}
         cmd_list.append(cmd_dict)
 

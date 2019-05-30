@@ -47,7 +47,7 @@ def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=6):
     return
 
 
-def _text_anno_scatter(data, ax, dodge_params, dodge_text=True, anno_col='text_anno', text_anno_kws=None):
+def _text_anno_scatter(data, ax, dodge_params, dodge_text=False, anno_col='text_anno', text_anno_kws=None):
     """Add text annotation to a scatter plot"""
     _text_anno_kws = dict(fontsize=10,
                           fontweight='black',
@@ -146,7 +146,7 @@ def _translate_coord_base(coord_base):
 def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about basic scatter
                         expand_border_scale=0.1, border_quantile=0.01,  # about xlim and ylim
                         hue=None, palette='tab10',  # about hue
-                        text_anno=None, dodge_text=True, dodge_params=None, text_anno_kws=None,  # about text anno
+                        text_anno=None, dodge_text=False, dodge_params=None, text_anno_kws=None,  # about text anno
                         show_legend=False, legend_kws=None,  # about legend
                         axis_format='tiny', max_points=5000):  # other adjustment
     data = data.copy()
