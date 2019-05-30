@@ -734,7 +734,7 @@ def extract_context_allc_register_subparser(subparser):
         required=False,
         default='both',
         help="What to do with strand information, possible values are: "
-             "1. both: save +/- strand together in one file; "
+             "1. both: save +/- strand together in one file without any modification; "
              "2. split: save +/- strand into two separate files, with suffix contain Watson (+) and Crick (-); "
              "3. merge: This will only merge the count on adjacent CpG in +/- strands, only work for CpG like context. "
              "For non-CG context, its the same as both."

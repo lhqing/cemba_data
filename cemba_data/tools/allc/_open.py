@@ -36,6 +36,7 @@ import sys
 import os
 import time
 import codecs
+import pathlib
 from subprocess import Popen, PIPE, run
 
 try:
@@ -363,12 +364,19 @@ def open_allc(file_path, mode='r', compresslevel=3, threads=1,
     threads is the number of threads for pigz. If None, then the pigz default is used.
     multi-thread only apply to writer, reader (decompression) can't be paralleled
     """
+    file_path = pathlib.Path(file_path).resolve()
+    file_exist = file_path
+    if 'w' not in mode:
+        if not file_exist:
+            raise FileNotFoundError(f'{file_path} does not exist.')
+    else:
+        if not file_path.parent.exists():
+            raise OSError(f'File directory {file_path.parent} does not exist.')
+
     if mode in ('r', 'w', 'a'):
         mode += 't'
     if mode not in ('rt', 'rb', 'wt', 'wb', 'at', 'ab'):
         raise ValueError("mode '{0}' not supported".format(mode))
-    if not isinstance(file_path, str):
-        raise ValueError("the file_path must be a string")
     if compresslevel not in range(1, 10):
         raise ValueError("compresslevel must be between 1 and 9")
     if region is not None:
