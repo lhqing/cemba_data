@@ -1086,7 +1086,7 @@ def main():
     elif cur_command == 'allc-to-bigwig':
         from .tools.allc.allc_to_bigwig import allc_to_bigwig as func
     elif cur_command == 'merge-allc':
-        from cemba_data.tools.allc.merge_allc import merge_allc_files as func
+        from .tools.allc.merge_allc import merge_allc_files as func
     elif cur_command == 'allc-profile':
         from .tools.allc.utilities import profile_allc as func
     elif cur_command == 'simulate-long-reads-coverage':
@@ -1094,7 +1094,7 @@ def main():
     elif cur_command == 'simulate-allc':
         from .tools.simulation import simulate_allc as func
     elif cur_command == 'allc-extract':
-        from .tools.allc.utilities import extract_allc as func
+        from .tools.allc.extract_allc import extract_allc as func
     elif cur_command == 'allc-standardize':
         from .tools.allc.utilities import standardize_allc as func
     elif cur_command == 'mapping-summary':

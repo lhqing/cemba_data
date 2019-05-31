@@ -1,6 +1,6 @@
 from heapq import heappop, heappush
 import numpy as np
-from .utilities import extract_allc
+from cemba_data.tools.allc import extract_allc
 import subprocess
 from ._open import open_gz, open_allc
 from ..utilities import parse_mc_pattern, parse_chrom_size
