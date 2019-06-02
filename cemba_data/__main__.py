@@ -920,6 +920,98 @@ def cluster_merge_register_subparser(subparser):
     )
 
 
+def allc_to_region_count_register_subparser(subparser):
+    parser = subparser.add_parser('allc-to-region-count',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Calculate mC and cov at regional level. Region accepted in 2 forms: "
+                                       "1. BED file, provided by region_bed_paths, "
+                                       "containing arbitrary regions and use bedtools map to calculate; "
+                                       "2. Fix-size non-overlap genome bins, provided by bin_sizes, "
+                                       "this is much faster to calculate than 1. "
+                                       "The output is in 6-column bed-like format: "
+                                       "chrom start end region_uid mc cov")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_path",
+        type=str,
+        required=True,
+        help="Path to the ALLC file"
+    )
+
+    parser_req.add_argument(
+        "--out_prefix",
+        type=str,
+        required=True,
+        help="Path to output prefix"
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="Path to UCSC chrom size file"
+    )
+
+    parser_req.add_argument(
+        "--mc_contexts",
+        type=str,
+        nargs='+',
+        required=True,
+        help="Space separated mC context list to calculate"
+    )
+
+    parser_opt.add_argument(
+        "--region_bed_paths",
+        type=str,
+        nargs='+',
+        required=False,
+        help="Space separated path list to BED files."
+    )
+
+    parser_opt.add_argument(
+        "--region_bed_names",
+        type=str,
+        nargs='+',
+        required=False,
+        help="Matched name for each BED file provided in region_bed_paths."
+    )
+
+    parser_opt.add_argument(
+        "--bin_sizes",
+        type=int,
+        nargs='+',
+        required=False,
+        help="Space separated genome size bins to calculate."
+    )
+
+    parser_opt.add_argument(
+        "--max_cov_cutoff",
+        type=int,
+        required=False,
+        default=9999,
+        help="Max cov filter for a single site in ALLC"
+    )
+
+    parser_opt.add_argument(
+        "--save_zero_cov",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to save the regions that have 0 cov, only apply to region count but not the chromosome count"
+    )
+
+    parser_opt.add_argument(
+        "--remove_tmp",
+        type=bool,
+        required=False,
+        default=True,
+        help="Whether to remove the temporary file"
+    )
+
+
 def bam_to_allc_register_subparser(subparser):
     parser = subparser.add_parser('bam-to-allc',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1103,6 +1195,8 @@ def main():
         from .local.mc.prepare_cluster_profile import cluster_merge_pipeline as func
     elif cur_command == 'bam-to-allc':
         from .tools.allc.bam_to_allc import call_methylated_sites as func
+    elif cur_command == 'allc-to-region-count':
+        from .tools.allc.allc_to_region_count import allc_to_region_count as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

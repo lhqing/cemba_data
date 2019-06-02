@@ -44,6 +44,8 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
     -------
 
     """
+    cpu = min(cpu, 20)
+
     if single_mode.lower() in ['copy', 'cp']:
         copy = True
     elif single_mode.lower() in ['ln', 'symlink']:
@@ -78,7 +80,7 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
         if n_cell > 1:
             cmd = f'yap merge-allc --allc_paths {unique_cell_list_path} ' \
                   f'--out_path {unique_file_path} --chrom_size_file {chrom_size_file} --cpu {cpu}'
-            cmd_dict = {'command': cmd, 'pe smp': cpu, 'l h_vmem': h_vmem}
+            cmd_dict = {'command': cmd, 'pe smp': int(cpu * 1.5), 'l h_vmem': h_vmem}
         else:
             # for cluster with only one cell (if possible), we just copy/symlink them to maintain structure
             if copy:
