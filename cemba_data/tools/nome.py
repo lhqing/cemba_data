@@ -23,9 +23,9 @@ def call_cell_peak(mc_paths, cov_paths, output_paths,
 
         n_feature = mc_data.shape[1]
         records = []
-        for chunk in range(0, n_feature, chunk_size):
-            mc_chunk = mc_data[:, chunk:chunk + chunk_size].todense()
-            cov_chunk = cov_data[:, chunk:chunk + chunk_size].todense()
+        for sub_chunk in range(0, n_feature, chunk_size):
+            mc_chunk = mc_data[:, sub_chunk:sub_chunk + chunk_size].todense()
+            cov_chunk = cov_data[:, sub_chunk:sub_chunk + chunk_size].todense()
             judge = ss.csc_matrix(np.all([(cov_chunk >= cov_cutoff),
                                           (mc_chunk / cov_chunk > mc_rate_cutoff)],
                                          axis=0))
