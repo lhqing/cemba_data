@@ -1,6 +1,3 @@
-import numpy as np
-
-
 def filter_atac_cell(adata,
                      fragment_num_upper=2000,
                      mito_ratio_lower=0.1,

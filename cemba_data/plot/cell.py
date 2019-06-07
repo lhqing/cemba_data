@@ -288,7 +288,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         else:
             _data['size'] = size.astype(float)
             size = 'size'
-        # make sure size >= 1
+        # make sure size >= 1  why?
         _data[size] = _data[size] - _data[size].min() + 1
 
         if size_norm is None:
