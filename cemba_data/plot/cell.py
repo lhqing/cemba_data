@@ -240,7 +240,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
         _legend_kws['handles'] = handles
         _legend_kws['labels'] = labels
         ax.legend(**_legend_kws)
-    return ax
+    return ax, _data
 
 
 def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
