@@ -380,7 +380,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         sax.yaxis.set(ticks=[0, 1], ticklabels=ticklabels)
         sax.set_ylabel(**_sizebar_label_kws)
 
-    return tuple(return_axes)
+    return tuple(return_axes), _data
 
 
 def scatter_density(ax, data, groupby, coord_base='umap', contour_levels=(-0.5,),
@@ -416,5 +416,5 @@ def scatter_density(ax, data, groupby, coord_base='umap', contour_levels=(-0.5,)
             _color = palette[group]
 
         # plot contour line(s)
-        ax.contour(xx, yy, z, colors=_color, **contour_kws)
+        ax.contour(xx, yy, z, colors=_color, **_contour_kws)
     return ax
