@@ -1,13 +1,14 @@
+import matplotlib as mpl
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import numpy as np
-import matplotlib as mpl
-from sklearn.neighbors import LocalOutlierFactor
+from adjustText import adjust_text
 from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize, LogNorm
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.lines import Line2D
-from adjustText import adjust_text
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from sklearn.neighbors import LocalOutlierFactor
+
 from .color import level_one_palette
 from .utilities import tight_hue_range, plot_colorbar
 
@@ -47,7 +48,8 @@ def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=6):
     return
 
 
-def _text_anno_scatter(data, ax, dodge_params, dodge_text=False, anno_col='text_anno', text_anno_kws=None):
+def _text_anno_scatter(data, ax, edge_color=(0.5, 0.5, 0.5, 0.2), face_color=(0.8, 0.8, 0.8, 0.2), palette=None,
+                       dodge_text=False, anno_col='text_anno', text_anno_kws=None, dodge_kws=None):
     """Add text annotation to a scatter plot"""
     _text_anno_kws = dict(fontsize=10,
                           fontweight='black',
@@ -61,22 +63,27 @@ def _text_anno_scatter(data, ax, dodge_params, dodge_text=False, anno_col='text_
         if text in ['', 'nan']:
             continue
         x, y, *_ = sub_df.median()
+
+        if palette is not None:
+            _fc = palette[text]
+        else:
+            _fc = face_color
         text = ax.text(x, y, text,
                        fontdict=_text_anno_kws,
                        bbox=dict(boxstyle="round",
-                                 ec=(0.5, 0.5, 0.5, 0.2),
-                                 fc=(0.8, 0.8, 0.8, 0.2)))
+                                 ec=edge_color,
+                                 fc=_fc))
         text_list.append(text)
 
     if dodge_text:
         _dodge_parms = dict(force_points=(0.02, 0.05),
                             arrowprops=dict(arrowstyle="fancy",
-                                            fc=(0.8, 0.8, 0.8, 0.7),
+                                            fc=edge_color,
                                             ec="none",
                                             connectionstyle="angle3,angleA=0,angleB=-90"),
                             autoalign='xy')
-        if dodge_params is not None:
-            _dodge_parms.update(dodge_params)
+        if dodge_kws is not None:
+            _dodge_parms.update(dodge_kws)
         adjust_text(text_list, x=data['x'], y=data['y'], **_dodge_parms)
     return
 
@@ -146,7 +153,8 @@ def _translate_coord_base(coord_base):
 def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about basic scatter
                         expand_border_scale=0.1, border_quantile=0.01,  # about xlim and ylim
                         hue=None, palette='tab10',  # about hue
-                        text_anno=None, dodge_text=False, dodge_params=None, text_anno_kws=None,  # about text anno
+                        text_anno=None, dodge_text=False, dodge_kws=None,  # about text anno
+                        text_anno_kws=None,  text_anno_palette=None,  # about text anno
                         show_legend=False, legend_kws=None,  # about legend
                         axis_format='tiny', max_points=5000):  # other adjustment
     data = data.copy()
@@ -208,7 +216,8 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
         raise ValueError('axis_format need to be one of these: tiny, despine, empty.')
 
     if text_anno:
-        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge_text=dodge_text, dodge_params=dodge_params,
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax,
+                           dodge_text=dodge_text, dodge_kws=dodge_kws, palette=text_anno_palette,
                            anno_col=text_anno, text_anno_kws=text_anno_kws)
 
     if show_legend and (hue is not None):
@@ -240,7 +249,8 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                        colorbar=True, colorbar_label_kws=None,
                        size=None, size_norm=None, size_portion=0.8, sizes=None,
                        sizebar=True, sizebar_label_kws=None,
-                       text_anno=None, dodge_params=None, text_anno_kws=None,
+                       text_anno=None, dodge_text=False, dodge_params=None,
+                       text_anno_kws=None, text_anno_palette=None,
                        axis_format='tiny', max_points=5000):
     data = data.copy()
     # down sample plot data if needed.
@@ -320,8 +330,8 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                     ax=ax, **_scatter_kws)
 
     if text_anno is not None:
-        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge_params=dodge_params,
-                           anno_col=text_anno, text_anno_kws=text_anno_kws)
+        _text_anno_scatter(_data[['x', 'y', text_anno]], ax=ax, dodge_kws=dodge_params, palette=text_anno_palette,
+                           anno_col=text_anno, text_anno_kws=text_anno_kws, dodge_text=dodge_text)
 
     # clean axis
     if axis_format == 'tiny':
@@ -371,3 +381,40 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
         sax.set_ylabel(**_sizebar_label_kws)
 
     return tuple(return_axes)
+
+
+def scatter_density(ax, data, groupby, coord_base='umap', contour_levels=(-0.5,),
+                    color=None, palette=None, contour_kws=None, lof_kws=None):
+    data = data.copy()
+
+    if isinstance(groupby, str):
+        groupby = data[groupby]
+    else:
+        data['groupby'] = groupby
+        groupby = data['groupby']
+
+    _contour_kws = dict(linewidths=1, levels=contour_levels, linestyles='dashed')
+    if contour_kws is not None:
+        _contour_kws.update(contour_kws)
+    _lof_kws = dict(n_neighbors=20, novelty=True, contamination='auto')
+    if lof_kws is not None:
+        _lof_kws.update(lof_kws)
+
+    for group, sub_data in data[[f'{coord_base}_0', f'{coord_base}_1']].groupby(groupby):
+        xx, yy = np.meshgrid(np.linspace(*ax.get_xlim(), 500), np.linspace(*ax.get_ylim(), 500))
+        clf = LocalOutlierFactor(**_lof_kws)
+        clf.fit(sub_data)
+        z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
+        z = z.reshape(xx.shape)
+
+        if palette is None:
+            if color is None:
+                _color = 'lightgray'
+            else:
+                _color = color
+        else:
+            _color = palette[group]
+
+        # plot contour line(s)
+        ax.contour(xx, yy, z, colors=_color, **contour_kws)
+    return ax

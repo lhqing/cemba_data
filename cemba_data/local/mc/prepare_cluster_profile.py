@@ -27,6 +27,8 @@ def prepare_merge_allc(output_dir, group_table, chrom_size_file, skip_n_cell_cut
 
     Parameters
     ----------
+    single_mode
+        copy for copy the file, ln for create soft link
     output_dir
         Path to put output files, merged ALLC file will also save in this directory. Will create one if not exist.
     group_table

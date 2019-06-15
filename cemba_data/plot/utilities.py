@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import numpy as np
 from matplotlib.colorbar import ColorbarBase
 
@@ -24,6 +25,9 @@ def tight_hue_range(hue_data, portion):
 
 
 def plot_colorbar(cax, cmap, cnorm, hue_norm, label_kws=None):
+    if isinstance(cmap, str):
+        cmap = mpl.cm.get_cmap(cmap)
+
     _label_kws = {'fontsize': 3, 'label': ''}
     if label_kws is not None:
         _label_kws.update(label_kws)
