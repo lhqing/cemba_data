@@ -185,6 +185,7 @@ def pipeline_register_subparser(subparser):
                                   help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
 
     parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
 
     parser_req.add_argument(
         "--fastq_dataframe",
@@ -208,6 +209,15 @@ def pipeline_register_subparser(subparser):
         help="Pipeline configuration (.ini) file path. "
              "You can use 'yap default-mapping-config' to print out default config can modify it."
     )
+
+    parser_opt.add_argument(
+        "--demultiplex_only",
+        dest='demultiplex_only',
+        action='store_true',
+        help="(Not for mapping) Only demultiplex 8-cell FASTQ into single cell FASTQ by AD index and then quit"
+    )
+    parser.set_defaults(demultiplex_only=False)
+
     return
 
 

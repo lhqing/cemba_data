@@ -168,7 +168,7 @@ def summary_pipeline_stat(out_dir):
     return total_meta
 
 
-def pipeline(fastq_dataframe, out_dir, config_path=None):
+def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False):
     """
     Run full pipeline: demultiplex, fastq QC, bismark mapping, bam QC, ALLC calling
 
@@ -181,6 +181,8 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
         pipeline universal out_dir
     config_path
         pipeline universal config
+    demultiplex_only
+        (Not for mapping) Only demultiplex 8-cell FASTQ into single cell FASTQ by AD index and then quit
     Returns
     -------
     0 if succeed
@@ -205,12 +207,15 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     demultiplex_df.to_csv(stat_dir / 'demultiplex_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
+    if demultiplex_only:
+        return 0
+
     # fastq qc
     log.info('Trim fastq file and merge lanes.')
     fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
     if fastq_final_df.shape[0] == 0:
         log.warning('no sample remained after fastq qc step')
-        return
+        return 0
     else:
         fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
                               sep='\t', compression='gzip', index=None)
@@ -220,7 +225,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None):
     bismark_df = bismark(fastq_final_df, out_dir, config)
     if bismark_df.shape[0] == 0:
         log.warning('no sample remained after bismark step')
-        return
+        return 0
     else:
         bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
