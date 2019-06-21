@@ -207,9 +207,6 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
     demultiplex_df.to_csv(stat_dir / 'demultiplex_result.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
-    if demultiplex_only:
-        return 0
-
     # fastq qc
     log.info('Trim fastq file and merge lanes.')
     fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
@@ -219,6 +216,9 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
     else:
         fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
                               sep='\t', compression='gzip', index=None)
+
+    if demultiplex_only:
+        return 0
 
     # bismark
     log.info('Use bismark and bowtie2 to do mapping.')
