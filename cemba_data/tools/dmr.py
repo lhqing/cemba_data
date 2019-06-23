@@ -12,19 +12,19 @@ def calc_robust_mean(data, low=1, high=1):
     if clipped.size == 0:
         portion = 0.68
         skip_n = int(min(data.size / 2, np.round(data.size * (1 - portion) / 2)))
-        return np.sort(data)[skip_n:-skip_n].mean()
+        if skip_n != 0:
+            return np.sort(data)[skip_n:-skip_n].mean()
+        else:
+            return data.mean()
     return clipped.mean()
 
 
 def filter_mc_rate_table(dms_table, frac_cols, out_path, low_delta, high_delta, low_sd, high_sd):
-    mc_rate = dms_table.loc[:, frac_cols]
-    mc_rate_robust_mean = mc_rate.apply(lambda i: calc_robust_mean(i[i > -1].astype(float),
+    mc_rate = dms_table.loc[:, frac_cols].astype(float)
+    mc_rate_robust_mean = mc_rate.apply(lambda i: calc_robust_mean(i[i > -1],
                                                                    low=low_sd,
                                                                    high=high_sd),
                                         axis=1)
-    if mc_rate_robust_mean.isna().sum() != 0:
-        print(dms_table.loc[mc_rate_robust_mean.isna(), :])
-        raise
     judge_df = (mc_rate.values > (mc_rate_robust_mean + high_delta).values[:, None]) | \
                (mc_rate.values < (mc_rate_robust_mean - low_delta).values[:, None])
     judge_df = ~mc_rate.where(judge_df).isna() & (mc_rate.values != -1)
