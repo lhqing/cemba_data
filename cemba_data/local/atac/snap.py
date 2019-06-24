@@ -254,29 +254,42 @@ def _dump_frags_single_snap(snap_path, out_f, barcodes):
     return total_frags
 
 
-def dump_frags(snap_path_dict, barcode_dict, out_prefix, chrom_size_path, scale=1,
-               sort_mem='10%', sort_cpu=1, path_to_bedgraphtobigwig=''):
+def dump_frags(snap_path_dict, barcode_dict, out_prefix):
     """Extract cluster bigwig from SNAP file"""
     with open(out_prefix + '.frags', 'w') as out_f:
         for snap, barcodes in barcode_dict.items():
             print(f'extract fragments from {snap}...')
             snap_path = snap_path_dict[snap]
             _dump_frags_single_snap(snap_path, out_f, barcodes)
-    scale = f'{scale:.5f}'
-    print(f'Calculate genome coverage, scale {scale}')
-    with open(out_prefix + '.genome_cov', 'w') as out_f:
-        sort_p = subprocess.Popen(['sort', '-k1,1', '-k2,2n',
-                                   '-S', sort_mem, '--parallel', str(sort_cpu), out_prefix + '.frags'],
-                                  stdout=subprocess.PIPE)
-        genome_cov_p = subprocess.Popen(['bedtools', 'genomecov', '-bg', '-i', '-',
-                                         '-g', chrom_size_path, '-scale', scale],
-                                        stdin=sort_p.stdout,
-                                        stdout=out_f)
-        genome_cov_p.wait()
-    print('bedGraph to BigWig')
-    subprocess.run([path_to_bedgraphtobigwig + 'bedGraphToBigWig',
-                    out_prefix + '.genome_cov', chrom_size_path, out_prefix + '.bg'], check=True)
-
-    print('Clean up')
-    subprocess.run(['rm', '-f', out_prefix + '.frags', out_prefix + '.genome_cov'], check=True)
     return
+
+
+def fragment_to_bigwig(fragment_bed_path, chrom_size_path, output_prefix, scale_factor=1e6, remove_bg=True,
+                       sort_mem='10%', sort_cpu=1):
+    output_prefix = str(output_prefix).rstrip('.')
+    """Cluster fragment bed file to bigwig file"""
+    frag_bed_df = pd.read_csv(fragment_bed_path, sep='\t', header=None,
+                              names=['chrom', 'start', 'end', 'fragment'])
+    frag_bed = pybedtools.BedTool.from_dataframe(frag_bed_df)
+    frag_sorted_bed = frag_bed.sort(g=chrom_size_path)
+    scale = scale_factor / frag_bed_df.shape[0]
+
+    print('Calculate COV')
+    cov_bed = frag_sorted_bed.genome_coverage(scale=scale, bg=True, g=chrom_size_path)
+    out_path = output_prefix + '.bg'
+    cov_bed.saveas(str(out_path))
+
+    print('Generate bigwig')
+    out_sort_path = str(out_path) + '.sort'
+    with open(str(out_path) + '.sort', 'wb') as f:
+        p = subprocess.run(['sort', '-k1,1', '-k2,2n',
+                            '-S', sort_mem, '--parallel', str(sort_cpu), out_path],
+                           stdout=subprocess.PIPE)
+        f.write(p.stdout)
+    out_bw_path = output_prefix + '.bw'
+    subprocess.run(['bedGraphToBigWig', out_sort_path, chrom_size_path, out_bw_path], check=True)
+    if remove_bg:
+        subprocess.run(['rm', '-f', out_path, out_sort_path], check=True)
+    else:
+        subprocess.run(['mv', '-f', out_sort_path, out_path], check=True)
+    return out_bw_path
