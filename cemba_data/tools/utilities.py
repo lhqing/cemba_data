@@ -3,6 +3,7 @@ import functools
 import collections
 import pathlib
 import numpy as np
+import pandas as pd
 from typing import Union, List
 
 IUPAC_TABLE = {
@@ -161,3 +162,12 @@ def parse_file_paths(input_file_paths: Union[str, list]) -> list:
             raise FileNotFoundError(f'{path} provided do not exist.')
         final_file_list.append(str(real_path))
     return _file_list
+
+
+def read_msg_bed(file_path):
+    from pybedtools import BedTool
+
+    df = pd.read_msgpack(file_path)
+    bed = BedTool.from_dataframe(df)
+    
+    return bed
