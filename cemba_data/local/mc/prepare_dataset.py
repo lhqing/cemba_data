@@ -1,10 +1,11 @@
+import glob
 import json
 import pathlib
-import glob
-import xarray as xr
-import pandas as pd
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pandas as pd
+import xarray as xr
 
 
 # TODO: require id in generate dataset
@@ -58,12 +59,12 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
         out_path_prefix = str(out_dir / f.stem)
         _context_pattern = ' '.join(context_pattern)
         cmd = f'yap map-to-region --allc_path {f} ' \
-              f'--out_path_prefix {out_path_prefix} ' \
-              f'--region_bed_path {region_paths} ' \
-              f'--region_name {region_names} ' \
-              f'--genome_size_path {genome_size_path} ' \
-              f'--context_pattern {_context_pattern} ' \
-              f'--max_cov_cutoff {max_cov_cutoff}'
+            f'--out_path_prefix {out_path_prefix} ' \
+            f'--region_bed_path {region_paths} ' \
+            f'--region_name {region_names} ' \
+            f'--genome_size_path {genome_size_path} ' \
+            f'--context_pattern {_context_pattern} ' \
+            f'--max_cov_cutoff {max_cov_cutoff}'
         command_dict = {
             'command': cmd,
             'pe smp': 1,  # cpu for each command,
@@ -76,10 +77,10 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
         json.dump(cmd_list, f)
 
     assemble_command = f'yap assemble-dataset --out_dir {out_dir} ' \
-                       f'--region_bed_path {region_paths} ' \
-                       f'--region_name {region_names} ' \
-                       f'--dataset_name {dataset_name} ' \
-                       f'--thread 5'
+        f'--region_bed_path {region_paths} ' \
+        f'--region_name {region_names} ' \
+        f'--dataset_name {dataset_name} ' \
+        f'--thread 5'
     assemble_json_path = out_dir / 'assemble.command.json'
     with open(assemble_json_path, 'w') as f:
         json.dump([{
@@ -91,9 +92,9 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     # submit master
     command_paths = ' '.join([str(cmd_json_path), str(assemble_json_path)])
     qsub_command = f'yap qsub --working_dir {out_dir} ' \
-                   f'--project_name mcds ' \
-                   f'--command_file_path {command_paths} ' \
-                   f'--total_cpu 10'
+        f'--project_name mcds ' \
+        f'--command_file_path {command_paths} ' \
+        f'--total_cpu 10'
 
     print(f"""
             The command file for generate-dataset is prepared
@@ -112,8 +113,8 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
 
 
 def read_count_table(path):
-    count_table = pd.read_table(path, index_col=3, header=None, na_values='.',
-                                names=['chrom', 'start', 'end', 'id', 'mc', 'cov']).fillna(0)
+    count_table = pd.read_csv(path, index_col=3, header=None, na_values='.', sep='\t',
+                              names=['chrom', 'start', 'end', 'id', 'mc', 'cov']).fillna(0)
     return count_table['mc'].astype(np.uint16).values, count_table['cov'].astype(np.uint16).values
 
 
@@ -121,8 +122,8 @@ def assemble_dataset(out_dir, region_bed_path, region_name, dataset_name,
                      thread=5):
     out_dir = pathlib.Path(out_dir).absolute()
     bed_paths = list(out_dir.glob('*count_table.bed.gz'))
-    region_meta_dfs = {region_name: pd.read_table(region_bed, header=None, index_col=3,
-                                                  names=['chrom', 'start', 'end', region_name])
+    region_meta_dfs = {region_name: pd.read_csv(region_bed, header=None, index_col=3, sep='\t',
+                                                names=['chrom', 'start', 'end', region_name])
                        for region_name, region_bed in zip(region_name, region_bed_path)}
 
     # Note: this part subject to the name pattern in generate_dataset

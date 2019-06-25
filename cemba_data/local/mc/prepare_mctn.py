@@ -42,7 +42,8 @@ def _assemble_feature_count_output(records):
     return total_summary, total_count
 
 
-def batch_feature_count(bam_dict, out_prefix, count_type, id_type, gtf_path,
+def batch_feature_count(bam_dict, out_prefix, gtf_path,
+                        count_type='gene', id_type='gene_id',
                         cpu=2, chunksize=50):
     parent_dir = pathlib.Path(out_prefix).parent
     if not parent_dir.exists():

@@ -169,5 +169,5 @@ def read_msg_bed(file_path):
 
     df = pd.read_msgpack(file_path)
     bed = BedTool.from_dataframe(df)
-    
+
     return bed
