@@ -164,10 +164,11 @@ def parse_file_paths(input_file_paths: Union[str, list]) -> list:
     return _file_list
 
 
-def read_msg_bed(file_path):
+def read_msg_dmr_bed(file_path, min_dms=None):
     from pybedtools import BedTool
 
     df = pd.read_msgpack(file_path)
+    if min_dms is not None:
+        df = df[df['n_dms'] >= min_dms]
     bed = BedTool.from_dataframe(df)
-
     return bed
