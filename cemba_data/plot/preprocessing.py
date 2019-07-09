@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
+import seaborn as sns
 from matplotlib import ticker
 
 
@@ -43,10 +43,19 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
             if aggregation_func is None:
                 raise ValueError('Row after groupby is not unique, aggregation_func can not be None')
             heatmap_data = sub_df.groupby([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
-                .apply(aggregation_func).unstack().fillna(-999)
+                .apply(aggregation_func).unstack()
         else:
             heatmap_data = sub_df.set_index([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
-                .unstack().fillna(-999)
+                .unstack()
+        # reindex to make sure heatmap data in the shape of plate
+        heatmap_data.index = range(heatmap_data.shape[0])
+        heatmap_data.columns = range(heatmap_data.shape[1])
+        if plate_base == 384:
+            heatmap_data = heatmap_data.reindex(index=range(16),
+                                                columns=range(24))
+        elif plate_base == 96:
+            heatmap_data = heatmap_data.reindex(index=range(8),
+                                                columns=range(12))
         heatmap_data_list.append(heatmap_data)
         if isinstance(plate, str):
             heatmap_names.append(plate)
@@ -121,8 +130,6 @@ def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
 def plot_dispersion(data, hue='gene_subset',
                     zlab='dispersion', data_quantile=(0.01, 0.99),
                     save_animate_path=None, fig_kws=None):
-    from mpl_toolkits.mplot3d import Axes3D
-
     @ticker.FuncFormatter
     def mean_formatter(x, pos):
         return f"{x:.1f}"
