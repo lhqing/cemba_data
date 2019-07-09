@@ -6,6 +6,7 @@ from matplotlib import ticker
 
 def plot_on_plate(data, value_col, groupby, ncols=4,
                   plate_base=384, figsize=(5, 3.5),
+                  row_base='Row384', col_base='Col384',
                   vmin=0, vmax=1, heatmap_kws=None, aggregation_func=None):
     """
     Plot metadata into 384 or 96 plate view (heatmap)
@@ -38,14 +39,14 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
     heatmap_names = []
     for plate, sub_df in data.groupby(groupby):
         # check if plate base are duplicated
-        duplicated = sub_df[[f'Col{plate_base}', f'Row{plate_base}']].duplicated().sum() != 0
+        duplicated = sub_df[[row_base, col_base]].duplicated().sum() != 0
         if duplicated:
             if aggregation_func is None:
                 raise ValueError('Row after groupby is not unique, aggregation_func can not be None')
-            heatmap_data = sub_df.groupby([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
+            heatmap_data = sub_df.groupby([row_base, col_base])[value_col] \
                 .apply(aggregation_func).unstack()
         else:
-            heatmap_data = sub_df.set_index([f'Col{plate_base}', f'Row{plate_base}'])[value_col] \
+            heatmap_data = sub_df.set_index([row_base, col_base])[value_col] \
                 .unstack()
         # reindex to make sure heatmap data in the shape of plate
         heatmap_data.index = range(heatmap_data.shape[0])
