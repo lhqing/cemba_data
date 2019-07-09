@@ -79,7 +79,8 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
     for heatmap_data, heatmap_name, ax in zip(heatmap_data_list, heatmap_names, np.ravel(axes)):
         sns.heatmap(heatmap_data, vmin=vmin, vmax=vmax,
                     cmap=cmap, ax=ax, **heatmap_kws)
-        ax.set_title(heatmap_name)
+
+        ax.set(title=heatmap_name, ylim=(-0.5,))
     fig.tight_layout(rect=[0, 0.05, 1, 0.95])
     return fig, axes
 
@@ -131,6 +132,11 @@ def success_vs_fail(data, filter_col, filter_cutoff, x, y, ax):
 def plot_dispersion(data, hue='gene_subset',
                     zlab='dispersion', data_quantile=(0.01, 0.99),
                     save_animate_path=None, fig_kws=None):
+    from mpl_toolkits.mplot3d import Axes3D
+    if Axes3D.__doc__:
+        # touch the Axes3D to prevent ide remove it...
+        pass
+
     @ticker.FuncFormatter
     def mean_formatter(x, pos):
         return f"{x:.1f}"
