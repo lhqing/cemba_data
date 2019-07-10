@@ -32,7 +32,15 @@ def plot_colorbar(cax, cmap, cnorm, hue_norm, label_kws=None):
     if label_kws is not None:
         _label_kws.update(label_kws)
 
-    colorbar = ColorbarBase(cax, cmap=cmap, norm=cnorm,
+    def fmt(x, pos):
+        if x > 0.1 or x < 100:
+            return x
+        a, b = '{:.2e}'.format(x).split('e')
+        b = int(b)
+        return r'${} \times 10^{{{}}}$'.format(a, b)
+
+    import matplotlib.ticker as ticker
+    colorbar = ColorbarBase(cax, cmap=cmap, norm=cnorm, format=ticker.FuncFormatter(fmt),
                             orientation='vertical', extend='both')
     colorbar.set_label(**_label_kws)
     colorbar_ticks = [hue_norm[0], sum(hue_norm) / 2, hue_norm[1]]
