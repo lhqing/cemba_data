@@ -237,6 +237,46 @@ def print_default_config_register_subparser(subparser):
     return
 
 
+def print_plate_info_register_subparser(subparser):
+    parser = subparser.add_parser('default-plate-info',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Print out default plate info template.")
+    return
+
+
+def make_sample_sheet_register_subparser(subparser):
+    parser = subparser.add_parser('make-sample-sheet',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Print out default plate info template.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--plate_info_paths",
+        type=str,
+        required=True,
+        nargs='+',
+        help="Space separated paths of plate infos, at least one file should be provided. "
+             "If multiple files provided, will check barcode compatibility."
+    )
+
+    parser_req.add_argument(
+        "--output_prefix",
+        type=str,
+        required=True,
+        help="Output prefix, will generate 2 sample sheets, 1 for miseq, 1 for novaseq"
+    )
+
+    parser_opt.add_argument(
+        "--header_path",
+        type=str,
+        help="Path to the sample sheet header that contains sequencer info. Will use default if not provided."
+    )
+
+    return
+
+
 def batch_pipeline_register_subparser(subparser):
     parser = subparser.add_parser('mapping-qsub',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -1207,6 +1247,10 @@ def main():
         from .tools.allc.bam_to_allc import call_methylated_sites as func
     elif cur_command == 'allc-to-region-count':
         from .tools.allc.allc_to_region_count import allc_to_region_count as func
+    elif cur_command == 'default-plate-info':
+        from .mapping.prepare_sample_sheet import print_plate_info as func
+    elif cur_command == 'make-sample-sheet':
+        from .mapping.prepare_sample_sheet import make_sample_sheet as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

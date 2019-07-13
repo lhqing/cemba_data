@@ -208,3 +208,7 @@ def make_sample_sheet(plate_info_paths, output_prefix, header_path=None):
                 output_f.write(hf.read())
         output_f.write(nova_sample_sheet.to_csv(index=None))
     return
+
+
+def print_plate_info():
+    print(PLATE_INFO_TEMPLATE)
