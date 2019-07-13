@@ -7,10 +7,10 @@ import cemba_data
 
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
-with open(PACKAGE_DIR / 'local/mapping/single_cell_info/plate_info_template.txt') as f:
+with open(PACKAGE_DIR / 'mapping/single_cell_info/plate_info_template.txt') as f:
     PLATE_INFO_TEMPLATE = f.read()
 
-with open(PACKAGE_DIR / 'local/mapping/single_cell_info/sample_sheet_header.txt') as f:
+with open(PACKAGE_DIR / 'mapping/single_cell_info/sample_sheet_header.txt') as f:
     SAMPLESHEET_DEFAULT_HEADER = f.read()
 SECTIONS = ['[CriticalInfo]', '[LibraryInfo]', '[PlateInfo]']
 LIMITED_CHOICES = {
@@ -20,7 +20,7 @@ CRITICAL_INFO_KEYS = ['n_random_index', 'input_plate_size',
                       'pool_id', 'tube_label', 'email']
 # key (n_random_index, input_plate_size)
 BARCODE_TABLE = {
-    ('8', '384'): '/gale/netapp/home/hanliu/ref/inhouse/IMPORTANT_cemba_i7_i5_index.tsv'
+    ('8', '384'): PACKAGE_DIR / 'mapping/single_cell_info/CEMBA_i7_i5_index.tsv'
 }
 
 
