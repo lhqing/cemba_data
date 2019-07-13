@@ -14,6 +14,9 @@ setup(
     install_requires=['pandas>=0.24', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
                       'matplotlib', 'seaborn', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
                       'six', 'xarray', 'statsmodels', 'natsort', 'netcdf4', 'adjustText'],
+    package_data={
+        '': ['*.txt', '*.tsv', '*.csv']
+    },
     entry_points={
         'console_scripts': ['yap=cemba_data.__main__:main'],
     }
