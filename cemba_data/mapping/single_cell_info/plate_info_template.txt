@@ -1,0 +1,123 @@
+#                               .__
+#   ___________    _____ ______ |  |   ____
+#  /  ___/\__  \  /     \\____ \|  | _/ __ \
+#  \___ \  / __ \|  Y Y  \  |_> >  |_\  ___/
+# /____  >(____  /__|_|  /   __/|____/\___  >
+#      \/      \/      \/|__|             \/
+#        .__                   __  ._.
+#   _____|  |__   ____   _____/  |_| |
+#  /  ___/  |  \_/ __ \_/ __ \   __\ |
+#  \___ \|   Y  \  ___/\  ___/|  |  \|
+# /____  >___|  /\___  >\___  >__|  __
+#      \/     \/     \/     \/      \/
+#
+# PlateInfo template of single cell sequencing
+#
+# This file template contain 3 sections.
+#
+# [CriticalInfo]
+# [LibraryInfo]
+# [PlateInfo]
+#
+# The final sample id will be values of each part concatenated by "-" in the following order
+# [Values in LibraryInfo] + [Additional values in PlateInfo] + [Sample UID determined by library strategy]
+#
+# Empty lines and line start with "#" will be ignored. You can remove these if you understand the template.
+#
+
+
+# =====================================================================================================
+
+[CriticalInfo]
+
+# =====================================================================================================
+
+# Explain:
+# Every key=value paires are required. key name can not be change.
+# Some values have limited options, they are:
+# n_random_index chioces: 8, 384
+# input_plate_size choices: 384, 1536
+#
+#
+# Example:
+# n_random_index=8
+# input_plate_size=384
+# pool_id=Pool_73
+# tube_label=Pool_72_73_9A_10C
+# email=your-email@salk.edu
+#
+
+n_random_index=8
+input_plate_size=384
+pool_id=
+tube_label=
+email=
+
+
+
+
+
+# =====================================================================================================
+
+[LibraryInfo]
+
+# =====================================================================================================
+#
+# Explain:
+# library metadata that applies to all plates
+# this whole part is optional, may contain any "key=value" paires necessary to describe the library.
+# All the values will be concatenate by "-" into the sample id and present in file name.
+# So better not to include "-" in value and use UNIX path safe characters.
+# Here are the typical information to include, you can define your own:
+#
+# Example:
+# lib_comp_date=180101
+# project=CEMBA
+# organism=mm
+# dev_stage_age=P56
+# tissue_cell_type=1A
+# exp_cond=1
+# bio_rep=1
+# tech_rep=1
+# lib_type=snmC-seq2
+# sequencer=NovaSeq
+# se_pe=pe
+# read_length=150
+# requested_by=HL
+#
+# these keys are just recommeded, not required, but better be consistant throughout the project.
+
+
+
+
+
+# =====================================================================================================
+
+[PlateInfo]
+
+# =====================================================================================================
+
+# Explain:
+# Plate metadata that specific to certain plates, a tab separated table
+# First row must be header start with: plate_id	primer_quarter
+# First 2 columns are required and must be in the order of: plate_id	primer_quarter
+# You can add more plate specific info into additional columns, those info will be appened to LibraryInfo as part of sample_id.
+# All the values will be concatenate by "-" into the sample id and present in file name.
+# So better not to include "-" in value and use UNIX path safe characters.
+#
+# Example:
+# plate_id	primer_quarter
+# CEMBA190530_9C_1	SetB_Q1
+# CEMBA190530_9C_2	SetB_Q1
+# CEMBA190530_9C_3	SetB_Q2
+# CEMBA190530_9C_4	SetB_Q2
+# CEMBA190620_9C_1	SetB_Q3
+# CEMBA190620_9C_2	SetB_Q3
+# CEMBA190620_9C_3	SetB_Q4
+# CEMBA190620_9C_4	SetB_Q4
+
+
+plate_id	primer_quarter
+
+
+
