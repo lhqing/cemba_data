@@ -35,6 +35,13 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
         apply to reduce rows after groupby if the row is not unique
     """
 
+    if plate_base == 384:
+        nrows, ncols = 16, 24
+    elif plate_base == 96:
+        nrows, ncols = 8, 12
+    else:
+        raise ValueError(f'Plate base {plate_base} unknown')
+
     heatmap_data_list = []
     heatmap_names = []
     for plate, sub_df in data.groupby(groupby):
@@ -51,12 +58,7 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
         # reindex to make sure heatmap data in the shape of plate
         heatmap_data.index = range(heatmap_data.shape[0])
         heatmap_data.columns = range(heatmap_data.shape[1])
-        if plate_base == 384:
-            heatmap_data = heatmap_data.reindex(index=range(16),
-                                                columns=range(24))
-        elif plate_base == 96:
-            heatmap_data = heatmap_data.reindex(index=range(8),
-                                                columns=range(12))
+        heatmap_data = heatmap_data.reindex(index=nrows, columns=ncols)
         heatmap_data_list.append(heatmap_data)
         if isinstance(plate, str):
             heatmap_names.append(plate)
@@ -79,8 +81,7 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
     for heatmap_data, heatmap_name, ax in zip(heatmap_data_list, heatmap_names, np.ravel(axes)):
         sns.heatmap(heatmap_data, vmin=vmin, vmax=vmax,
                     cmap=cmap, ax=ax, **heatmap_kws)
-
-        ax.set(title=heatmap_name, ylim=(-0.5,))
+        ax.set(title=heatmap_name, ylim=(-0.5, nrows + 0.5))
     fig.tight_layout(rect=[0, 0.05, 1, 0.95])
     return fig, axes
 
