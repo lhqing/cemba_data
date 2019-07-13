@@ -58,7 +58,7 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
         # reindex to make sure heatmap data in the shape of plate
         heatmap_data.index = range(heatmap_data.shape[0])
         heatmap_data.columns = range(heatmap_data.shape[1])
-        heatmap_data = heatmap_data.reindex(index=nrows, columns=ncols)
+        heatmap_data = heatmap_data.reindex(index=list(range(nrows)), columns=list(range(ncols)))
         heatmap_data_list.append(heatmap_data)
         if isinstance(plate, str):
             heatmap_names.append(plate)
