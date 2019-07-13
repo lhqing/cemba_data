@@ -1257,9 +1257,9 @@ def main():
         return
 
     # run the command
-    log.info(f"Executing {cur_command}...")
+    log.info(f"# Executing {cur_command}...")
     func(**args_vars)
-    log.info(f"{cur_command} finished.")
+    log.info(f"# {cur_command} finished.")
     return
 
 

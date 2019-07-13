@@ -192,6 +192,18 @@ def make_sample_sheet(plate_info_paths, output_prefix, header_path=None):
     miseq_sample_sheet = pd.concat(miseq_sample_sheets)
     nova_sample_sheet = pd.concat(nova_sample_sheets)
 
+    # before write out, check plate info compatibility:
+    total_plate_info = pd.concat(plate_infos)
+    # check plate_info primer compatibility
+    for primer_quarter, n_plate in total_plate_info['primer_quarter'].value_counts().iteritems():
+        if n_plate < 2:
+            raise ValueError(f'{primer_quarter} only have 1 plate in the table, are you really sure?')
+        elif n_plate == 2:
+            pass
+        else:
+            raise ValueError(f'{primer_quarter} have {n_plate} plates in the table, that is impossible.')
+
+    # write miseq sample sheet
     with open(output_prefix + '.miseq.sample_sheet.csv', 'w') as output_f:
         if header_path is None:
             output_f.write(SAMPLESHEET_DEFAULT_HEADER)
@@ -200,6 +212,7 @@ def make_sample_sheet(plate_info_paths, output_prefix, header_path=None):
                 output_f.write(hf.read())
         output_f.write(miseq_sample_sheet.to_csv(index=None))
 
+    # write novaseq sample sheet
     with open(output_prefix + '.novaseq.sample_sheet.csv', 'w') as output_f:
         if header_path is None:
             output_f.write(SAMPLESHEET_DEFAULT_HEADER)
