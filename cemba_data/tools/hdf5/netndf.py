@@ -293,9 +293,19 @@ class MCDS(xr.Dataset):
         # - other cell metadata
 
         cell_coord_da = self.coords['cell'].coords
-        records = [coord.to_series() for coord in cell_coord_da.values()]
-        data = pd.DataFrame(records).T
+        records = []
+        single_values = {}
+        for coord in cell_coord_da.values():
+            if len(coord.shape) == 0:
+                # 0-d array will raise error in coord.to_series()
+                single_values[coord.name] = coord.values.tolist()  # this will not give a list, but a value...
+            else:
+                records.append(coord.to_series())
+        data = pd.DataFrame(records)
+        for col_name, value in single_values.items():
+            data[col_name] = value
 
+        data = data.T
         all_dfs = [data]
         if tsne:
             if 'tsne_coord' not in self.data_vars:
