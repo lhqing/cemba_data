@@ -302,10 +302,11 @@ class MCDS(xr.Dataset):
             else:
                 records.append(coord.to_series())
         data = pd.DataFrame(records)
+        data = data.T
+
         for col_name, value in single_values.items():
             data[col_name] = value
 
-        data = data.T
         all_dfs = [data]
         if tsne:
             if 'tsne_coord' not in self.data_vars:
