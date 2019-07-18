@@ -135,8 +135,8 @@ def plate_384_random_index_8(plate_info, barcode_table):
 
                 # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
                 records.append({'Sample_ID': sample_id,
-                                'index': i5_barcode,
-                                'index2': i7_barcode,
+                                'index': i7_barcode,  # the index must be i7
+                                'index2': i5_barcode,  # the index2 must be i5
                                 'Sample_Project': plate_pair['tube_label'].iloc[0],
                                 'Description': plate_pair['email'].iloc[0]})
     # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS

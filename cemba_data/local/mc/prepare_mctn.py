@@ -45,6 +45,25 @@ def _assemble_feature_count_output(records):
 def batch_feature_count(bam_dict, out_prefix, gtf_path,
                         count_type='gene', id_type='gene_id',
                         cpu=2, chunksize=50):
+    """
+    Count RNA read using featureCount, return a pandas msgpack file
+
+    Parameters
+    ----------
+    bam_dict
+        key is cell id, value is file path
+    out_prefix
+    gtf_path
+    count_type
+    id_type
+    cpu
+    chunksize
+
+    Returns
+    -------
+
+    """
+
     parent_dir = pathlib.Path(out_prefix).parent
     if not parent_dir.exists():
         raise FileNotFoundError('Parent directory of out_prefix do not exist.')
