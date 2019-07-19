@@ -400,6 +400,7 @@ def nn(ds1, ds2, knn=KNN, metric_p=2):
 # Approximate nearest neighbors using locality sensitive hashing.
 def nn_approx(ds1, ds2, knn=KNN, metric='manhattan', n_trees=10):
     # Build index.
+    print(f'AnnoyIndex using {metric} metric')
     a = AnnoyIndex(ds2.shape[1], metric=metric)
     for i in range(ds2.shape[0]):
         a.add_item(i, ds2[i, :])
