@@ -207,8 +207,8 @@ class Scrublet():
         # initialize counts matrices
         self._M_obs = mc
         self._T_obs = cov
-        rateb = calculate_posterior_mc_rate(mc, tc)
-        disp = highly_variable_methylation_feature(rateb, np.mean(tc, axis=0), bins)
+        rateb = calculate_posterior_mc_rate(mc, cov)
+        disp = highly_variable_methylation_feature(rateb, np.mean(cov, axis=0), bins)
         idx = np.argsort(disp)[::-1]
         self._hvg_filter = idx[:2000]
         self._E_obs = rateb[:, self._hvg_filter]
