@@ -529,7 +529,7 @@ def rank_features_groups(
 
 
 def batch_correct_pc(adata, batch_series, correct=False,
-                     n_components=30, sigma=25, alpha=0, knn=30,
+                     n_components=30, sigma=25, alpha=0, knn=30, metric='mahattan',
                      **scanorama_kws):
     """
     Batch correction PCA based on scanorama
@@ -556,17 +556,13 @@ def batch_correct_pc(adata, batch_series, correct=False,
     -------
     adata
     """
-    try:
-        import scanorama
-    except ModuleNotFoundError as e:
-        print('In order to use batch_correct_pc, you need to install scanorama, '
-              'https://github.com/brianhie/scanorama')
-        raise e
+    from ..scanorama import scanorama
 
     scanorama_kws['dimred'] = n_components
     scanorama_kws['sigma'] = sigma
     scanorama_kws['alpha'] = alpha
     scanorama_kws['knn'] = knn
+    scanorama_kws['metric'] = metric
 
     adata.obs['batch'] = batch_series
     adata_list = []

@@ -350,10 +350,10 @@ class Scrublet():
         n_sim = int(n_obs * sim_doublet_ratio)
         pair_ix = np.random.randint(0, n_obs, size=(n_sim, 2))
 
-        M1 = self._M_obs[pair_ix[:,0],:]
-        M2 = self._M_obs[pair_ix[:,1],:]
-        T1 = self._T_obs[pair_ix[:,0],:]
-        T2 = self._T_obs[pair_ix[:,1],:]
+        M1 = self._M_obs[pair_ix[:, 0], :]
+        M2 = self._M_obs[pair_ix[:, 1], :]
+        T1 = self._T_obs[pair_ix[:, 0], :]
+        T2 = self._T_obs[pair_ix[:, 1], :]
 
         self._E_sim = calculate_posterior_mc_rate(M1+M2, T1+T2)[:, self._hvg_filter]
         self.doublet_parents_ = pair_ix
@@ -421,7 +421,8 @@ class Scrublet():
         k_adj = int(round(k * (1+n_sim/float(n_obs))))
 
         # Find k_adj nearest neighbors
-        neighbors = get_knn_graph(manifold, k=k_adj, dist_metric=distance_metric, approx=use_approx_nn, return_edges=False)
+        neighbors = get_knn_graph(manifold, k=k_adj, dist_metric=distance_metric,
+                                  approx=use_approx_nn, return_edges=False)
 
         # Calculate doublet score based on ratio of simulated cell neighbors vs. observed cell neighbors
         doub_neigh_mask = doub_labels[neighbors] == 1
@@ -435,7 +436,7 @@ class Scrublet():
         N = float(k_adj)
 
         # Bayesian
-        q=(nd+1)/(N+2)
+        q = (nd+1)/(N+2)
         Ld = q*rho/r/(1-rho-q*(1-rho-rho/r))
 
         se_q = np.sqrt(q*(1-q)/(N+3))
@@ -445,11 +446,10 @@ class Scrublet():
 
         self.doublet_scores_obs_ = Ld[doub_labels == 0]
         self.doublet_scores_sim_ = Ld[doub_labels == 1]
-        self.doublet_errors_obs_ = se_Ld[doub_labels==0]
-        self.doublet_errors_sim_ = se_Ld[doub_labels==1]
+        self.doublet_errors_obs_ = se_Ld[doub_labels == 0]
+        self.doublet_errors_sim_ = se_Ld[doub_labels == 1]
 
         # get parents of doublet neighbors, if requested
-        neighbor_parents = None
         if get_neighbor_parents:
             parent_cells = self.doublet_parents_
             neighbors = neighbors - n_obs
