@@ -346,7 +346,7 @@ def dimensionality_reduce(datasets, dimred=DIMRED):
 
 
 # Normalize and reduce dimensionality.
-def process_data(datasets, genes, hvg=HVG, dimred=DIMRED, verbose=False):
+def process_data(datasets, genes, hvg=HVG, dimred=DIMRED, verbose=True):
     # Only keep highly variable genes
     if not hvg is None and hvg > 0 and hvg < len(genes):
         if verbose:
