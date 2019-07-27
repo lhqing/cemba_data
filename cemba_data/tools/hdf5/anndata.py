@@ -532,7 +532,7 @@ def batch_correct_pc(adata, batch_series, correct=False,
                      n_components=30, sigma=25, alpha=0, knn=30, metric='mahattan',
                      **scanorama_kws):
     """
-    Batch correction PCA based on scanorama
+    Batch correction PCA based on integration
 
     Parameters
     ----------
@@ -551,12 +551,12 @@ def batch_correct_pc(adata, batch_series, correct=False,
     knn
         Number of nearest neighbors to use for matching.
     scanorama_kws
-        Other Parameters passed to scanorama function
+        Other Parameters passed to integration function
     Returns
     -------
     adata
     """
-    from ..scanorama import scanorama
+    from ..integration import scanorama
 
     scanorama_kws['dimred'] = n_components
     scanorama_kws['sigma'] = sigma
