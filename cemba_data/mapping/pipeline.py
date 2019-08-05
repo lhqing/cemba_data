@@ -156,15 +156,8 @@ def summary_pipeline_stat(out_dir):
         if 'stats' in f.parent.name:
             continue
         _, uid, index_name = (f.name.split('.')[0].split('_'))
-        allc_dict[(uid, index_name)] = str(f.absolute())
+        allc_dict[(uid, index_name)] = str(f.absolute().name)
     total_meta['AllcPath'] = pd.Series(allc_dict)
-    bam_dict = {}
-    for f in out_dir.glob('**/*bam'):
-        if 'stats' in f.parent.name:
-            continue
-        uid, index_name = f.name.split('.')[0].split('_')
-        bam_dict[(uid, index_name)] = str(f)
-    total_meta['BamPath'] = pd.Series(allc_dict)
     return total_meta
 
 
