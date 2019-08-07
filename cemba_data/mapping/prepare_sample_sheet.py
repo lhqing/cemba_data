@@ -118,12 +118,20 @@ def plate_384_random_index_8(plate_info, barcode_table):
 
     for primer_quarter, plate_pair in plate_info.groupby('primer_quarter'):
         plate1, plate2 = plate_pair['plate_id']
+
         # check plate pair info consistance
         for col_name, col in plate_pair.iteritems():
             if col.unique().size != 1:
                 if col_name != 'plate_id':
                     print(f'{col_name} contains different information between {plate1} and {plate2}, '
                           f'Will put {plate1} prefix into sample_id. This should not happen normally.')
+
+        # remove all the '-' and '_' from plate names
+        plate1 = plate1.replace('_', '')
+        plate1 = plate1.replace('-', '')
+        plate2 = plate2.replace('_', '')
+        plate2 = plate2.replace('-', '')
+
         for col in 'ABCDEFGH':
             for row in range(1, 13):
                 plate_pos = f'{col}{row}'
