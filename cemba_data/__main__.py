@@ -1172,7 +1172,7 @@ def bam_to_allc_register_subparser(subparser):
 
 
 def prepare_fastq_dataframe_register_subparser(subparser):
-    parser = subparser.add_parser('fastq-dataframe',
+    parser = subparser.add_parser('make-fastq-dataframe',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Prepare fastq_dataframe after prepare_sample_sheet. "
                                        "Only take the fastq files prepared by sample sheet "
@@ -1287,7 +1287,7 @@ def main():
         from .mapping.prepare_sample_sheet import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
         from .mapping.prepare_sample_sheet import make_sample_sheet as func
-    elif cur_command == 'fastq-dataframe':
+    elif cur_command == 'make-fastq-dataframe':
         from .local.mc.prepare_allc import get_fastq_dataframe as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
