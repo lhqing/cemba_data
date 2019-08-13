@@ -10,30 +10,18 @@ import logging
 log = logging.getLogger()
 
 
-def get_fastq_dataframe(file_path, name_pattern,
-                        uid_field='uid', lane_field='lane', read_type_field='read-type',
-                        out_dir=None):
+def get_fastq_dataframe(file_path, output_path=None, raise_broken_name=True):
     """
     Generate fastq_dataframe for pipeline input.
 
     Parameters
     ----------
     file_path
-        Accept 1. path pattern, 2. path list, 3. path of one file contain all the paths.
-    name_pattern
-        Name pattern of file paths, format example: "Field1_Field2_Field3_..._Fieldn".
-        Both file name (after remove suffix part after frist '.') and
-        name pattern are split by '_' and match together.
-        If the length after split is not the same, error will be raised.
-    uid_field
-        field(s) in name pattern that can combine to uid for multiplexed fileset. will be linked by '-'
-    lane_field
-        field in name pattern that stand for lane
-    read_type_field
-        field in name pattern that stand for read type (R1, R2)
-    out_dir
-        output dir path for fastq dataframe
-
+        Accept 1. path pattern contain wildcard, 2. path list, 3. path of one file contain all the paths.
+    output_path
+        output path of the fastq dataframe
+    raise_broken_name
+        If true, not allow any unrecognized file names in file_path
     Returns
     -------
         fastq_dataframe for pipeline input.
@@ -45,25 +33,34 @@ def get_fastq_dataframe(file_path, name_pattern,
     else:
         with open(file_path) as f:
             file_path = [l.strip() for l in f]
-
-    name_patterns = name_pattern.lower().split('_')
-
-    uid_fields = uid_field.lower().split('_')
-    lane_fields = lane_field.lower().split('_')
-    read_type_fields = read_type_field.lower().split('_')
-    for field in (uid_fields + lane_fields + read_type_fields):
-        if field not in name_pattern:
-            raise ValueError(f'field name {field} not in name pattern {name_pattern}')
+    log.info(f'{len(file_path)} fastq file paths in input')
 
     fastq_data = []
     broken_names = []
-    for fastq in file_path:
-        fastq_name_list = fastq.split('/')[-1].split('.')[0].split('_')
-        if len(fastq_name_list) != len(name_patterns):
-            broken_names.append(fastq)
+    for path in file_path:
+        path = pathlib.Path(path)
+        try:
+            *_, plate1, plate2, multi_field = path.name.split('-')
+            plate_pos, _, lane, read_type, _ = multi_field.split('_')
+            try:
+                assert plate_pos[0] in 'ABCDEFGH'
+                assert int(plate_pos[1:]) in list(range(1, 13))
+                assert lane in {'L001', 'L002', 'L003', 'L004'}
+                assert read_type in {'R1', 'R2'}
+                assert plate1 != plate2
+            except AssertionError:
+                raise ValueError
+        except ValueError:
+            broken_names.append(path)
+            if raise_broken_name:
+                raise ValueError(f'Found unknown name pattern in path {path}')
             continue
-        name_dict = {p: v for p, v in zip(name_patterns, fastq_name_list)}
-        name_dict['fastq_path'] = fastq
+        name_dict = dict(plate1=plate1,
+                         plate2=plate2,
+                         plate_pos=plate_pos,
+                         lane=lane,
+                         read_type=read_type,
+                         fastq_path=path)
         name_series = pd.Series(name_dict)
         fastq_data.append(name_series)
 
@@ -74,25 +71,15 @@ def get_fastq_dataframe(file_path, name_pattern,
         log.info('No fastq name remained, check if the name pattern is correct.')
         return None
 
-    fastq_df['uid'] = fastq_df[uid_fields].apply(lambda i: '-'.join(i.tolist()), axis=1)
-    fastq_df['lane'] = fastq_df[lane_fields].apply(lambda i: '-'.join(i.tolist()), axis=1)
-    fastq_df['read_type'] = fastq_df[read_type_fields].apply(lambda i: '-'.join(i.tolist()), axis=1)
     # make sure UID is unique
     for _, df in fastq_df.groupby(['lane', 'read_type']):
         if df['uid'].unique().size != df['uid'].size:
-            raise ValueError(f'UID based on definition "{uid_field}" are not unique.')
-
-    for remove_col in ['*', 'read-type']:
-        if remove_col in fastq_df.columns:
-            del fastq_df[remove_col]
-
-    if out_dir is not None:
-        fastq_df.to_csv(pathlib.Path(out_dir) / 'fastq_dataframe.tsv.gz',
-                        index=None, sep='\t', compression='gzip')
-        if len(broken_names) != 0:
-            with open(pathlib.Path(out_dir) / 'fastq_dataframe.broken_names.txt', 'w') as f:
-                f.write('\n'.join(broken_names))
-    return fastq_df
+            raise ValueError(f'UID column is not unique.')
+    if output_path is not None:
+        fastq_df.to_csv(output_path, index=None, sep='\t', compression='gzip')
+        return
+    else:
+        return fastq_df
 
 
 def batch_pipeline(fastq_dataframe, out_dir, config_path):
