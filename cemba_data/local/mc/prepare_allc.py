@@ -66,8 +66,8 @@ def get_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
         fastq_data.append(name_series)
 
     fastq_df = pd.DataFrame(fastq_data)
-    log.info(len(broken_names), 'broken names.')
-    log.info(fastq_df.shape[0], 'valid fastq names.')
+    log.info(f'{len(broken_names)} broken names.')
+    log.info(f'{fastq_df.shape[0]} valid fastq names.')
     if fastq_df.shape[0] == 0:
         log.info('No fastq name remained, check if the name pattern is correct.')
         return None
