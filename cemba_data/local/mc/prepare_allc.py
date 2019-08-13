@@ -60,7 +60,8 @@ def get_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
                          plate_pos=plate_pos,
                          lane=lane,
                          read_type=read_type,
-                         fastq_path=path)
+                         fastq_path=path,
+                         uid=f'{plate1}-{plate2}-{plate_pos}')
         name_series = pd.Series(name_dict)
         fastq_data.append(name_series)
 
