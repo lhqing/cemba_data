@@ -5,10 +5,11 @@ When adding new function:
 """
 
 import argparse
-import sys
 import inspect
-import cemba_data
 import logging
+import sys
+
+import cemba_data
 
 log = logging.getLogger()
 
@@ -1168,6 +1169,41 @@ def bam_to_allc_register_subparser(subparser):
         help="Number of cores to parallel, NEVER use this if you "
              "run bam-to-allc for things like single cell (generate thousands of ALLCs together)."
     )
+
+
+def prepare_fastq_dataframe_register_subparser(subparser):
+    parser = subparser.add_parser('fastq_dataframe',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Prepare fastq_dataframe after prepare_sample_sheet. "
+                                       "Only take the fastq files prepared by sample sheet "
+                                       "from prepare_sample_sheet function. "
+                                       "Otherwise the function may fail or generate wrong file.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--file_path",
+        type=str,
+        required=True,
+        help="Path to input fastq files, either a path pattern contain wildcard "
+             "or a path to a file where each row is a fastq path."
+    )
+
+    parser_req.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="output path of the fastq dataframe"
+    )
+
+    parser_opt.add_argument(
+        "--skip_broken_name",
+        dest='skip_broken_name',
+        action='store_true',
+        help='If present, ignore any unrecognized file names in file_path.'
+    )
+    parser.set_defaults(skip_broken_name=False)
 
 
 def main():

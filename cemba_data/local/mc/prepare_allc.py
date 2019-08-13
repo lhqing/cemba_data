@@ -10,7 +10,7 @@ import logging
 log = logging.getLogger()
 
 
-def get_fastq_dataframe(file_path, output_path=None, raise_broken_name=True):
+def get_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
     """
     Generate fastq_dataframe for pipeline input.
 
@@ -20,8 +20,8 @@ def get_fastq_dataframe(file_path, output_path=None, raise_broken_name=True):
         Accept 1. path pattern contain wildcard, 2. path list, 3. path of one file contain all the paths.
     output_path
         output path of the fastq dataframe
-    raise_broken_name
-        If true, not allow any unrecognized file names in file_path
+    skip_broken_name
+        If true, ignore any unrecognized file names in file_path
     Returns
     -------
         fastq_dataframe for pipeline input.
@@ -52,9 +52,9 @@ def get_fastq_dataframe(file_path, output_path=None, raise_broken_name=True):
                 raise ValueError
         except ValueError:
             broken_names.append(path)
-            if raise_broken_name:
-                raise ValueError(f'Found unknown name pattern in path {path}')
-            continue
+            if skip_broken_name:
+                continue
+            raise ValueError(f'Found unknown name pattern in path {path}')
         name_dict = dict(plate1=plate1,
                          plate2=plate2,
                          plate_pos=plate_pos,
