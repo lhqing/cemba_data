@@ -126,11 +126,9 @@ def plate_384_random_index_8(plate_info, barcode_table):
                     print(f'{col_name} contains different information between {plate1} and {plate2}, '
                           f'Will put {plate1} prefix into sample_id. This should not happen normally.')
 
-        # remove all the '-' and '_' from plate names
-        plate1 = plate1.replace('_', '')
-        plate1 = plate1.replace('-', '')
-        plate2 = plate2.replace('_', '')
-        plate2 = plate2.replace('-', '')
+        # remove all the '-' with '_' in plate names
+        plate1 = plate1.replace('-', '_')
+        plate2 = plate2.replace('-', '_')
 
         for col in 'ABCDEFGH':
             for row in range(1, 13):
