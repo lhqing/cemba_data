@@ -393,7 +393,6 @@ def assemble_dataset_register_subparser(subparser):
     parser_req = parser.add_argument_group("Required inputs")
     parser_opt = parser.add_argument_group("Optional inputs")
 
-    # out_dir, dataset_name, cpu
     parser_req.add_argument(
         "--out_dir",
         type=str,
