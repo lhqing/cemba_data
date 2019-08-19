@@ -529,7 +529,7 @@ def rank_features_groups(
 
 
 def batch_correct_pc(adata, batch_series, correct=False,
-                     n_components=30, sigma=25, alpha=0, knn=30, metric='mahattan',
+                     n_components=30, sigma=25, alpha=0.1, knn=30, metric='angular',
                      **scanorama_kws):
     """
     Batch correction PCA based on integration
@@ -542,7 +542,7 @@ def batch_correct_pc(adata, batch_series, correct=False,
         batch_series used for splitting adata
     correct
         if True, adata.X will be corrected inplace, otherwise only corrected PCs are added to adata.obsm['X_pca']
-    dimred
+    n_components
         number of components in PCA
     sigma
         Correction smoothing parameter on Gaussian kernel.
@@ -550,13 +550,15 @@ def batch_correct_pc(adata, batch_series, correct=False,
         Alignment score minimum cutoff.
     knn
         Number of nearest neighbors to use for matching.
+    metric
+        Metric to use in calculating KNN
     scanorama_kws
         Other Parameters passed to integration function
     Returns
     -------
     adata
     """
-    from ..integration import scanorama
+    import scanorama
 
     scanorama_kws['dimred'] = n_components
     scanorama_kws['sigma'] = sigma
