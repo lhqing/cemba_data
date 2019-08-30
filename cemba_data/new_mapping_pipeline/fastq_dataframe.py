@@ -102,13 +102,4 @@ def validate_fastq_dataframe(fastq_dataframe):
     for _, df in fastq_dataframe.groupby(['lane', 'read_type']):
         if df['uid'].unique().size != df['uid'].size:
             raise ValueError('uid column are not unique for each lane and read-type combination.')
-
-    # modify fastq dataframe column names
-    fastq_dataframe.columns = [column.replace('-', '_') for column in fastq_dataframe.columns]
-
-    # modify fastq columns, because '_' is used in file name and we split by '_'
-    # I know this is stupid...
-    fastq_dataframe['uid'] = fastq_dataframe['uid'].apply(lambda i: i.replace('_', '-'))
-    fastq_dataframe['lane'] = fastq_dataframe['lane'].apply(lambda i: i.replace('_', '-'))
-    fastq_dataframe['read_type'] = fastq_dataframe['read_type'].apply(lambda i: i.replace('_', '-'))
     return fastq_dataframe

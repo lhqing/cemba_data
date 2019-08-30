@@ -37,7 +37,7 @@ def bam_qc(bismark_result, out_dir, config):
     bismark_result
         dataframe from bismark mapping step
     out_dir
-        universal pipeline out_dir
+        universal pipeline output_dir
     config
         universal pipeline config
     Returns

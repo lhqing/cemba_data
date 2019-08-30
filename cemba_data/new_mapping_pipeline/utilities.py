@@ -1,11 +1,10 @@
 import configparser
-import os
-import subprocess
 import logging
+import os
 import pathlib
+import subprocess
 
 # logger
-import pandas as pd
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -72,4 +71,3 @@ def valid_environments(config):
                                 f"Path of fadix should be {allc_ref_fai}. "
                                 f"You can use 'samtools fadix {allc_ref_fasta}' to generate.")
     return
-

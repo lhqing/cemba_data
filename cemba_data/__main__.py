@@ -196,7 +196,7 @@ def pipeline_register_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
         help="Pipeline output directory, if not exist, will create recursively."
@@ -294,7 +294,7 @@ def batch_pipeline_register_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
         help="Pipeline output directory, if not exist, will create recursively."
@@ -326,7 +326,7 @@ def generate_dataset_register_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
         help="Pipeline output directory, if not exist, will create recursively."
@@ -394,10 +394,10 @@ def assemble_dataset_register_subparser(subparser):
     parser_opt = parser.add_argument_group("Optional inputs")
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
-        help="out_dir path that contains all region count bed files, same as map-to-region step"
+        help="output_dir path that contains all region count bed files, same as map-to-region step"
     )
 
     parser_req.add_argument(
@@ -873,7 +873,7 @@ def mapping_summary_register_subparser(subparser):
     parser_req = parser.add_argument_group("Required inputs")
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
         help="Path of mapping output dir."
@@ -905,7 +905,7 @@ def cluster_merge_register_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--out_dir",
+        "--output_dir",
         type=str,
         required=True,
         help="Output directory, must not exist."

@@ -76,7 +76,7 @@ def bismark(fastq_final_result, out_dir, config):
     fastq_final_result
         dataframe from fastq QC step
     out_dir
-        universal pipeline out_dir
+        universal pipeline output_dir
     config
         universal pipeline config
 

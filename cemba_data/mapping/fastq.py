@@ -101,7 +101,7 @@ def demultiplex(fastq_dataframe, out_dir, config):
     fastq_dataframe
         pipeline input fastq_dataframe
     out_dir
-        pipeline universal out_dir
+        pipeline universal output_dir
     config
         pipeline universal config
 
@@ -159,7 +159,7 @@ def fastq_qc(demultiplex_result, out_dir, config):
     demultiplex_result
         dataframe from demultiplex step
     out_dir
-        pipeline universal out_dir
+        pipeline universal output_dir
     config
         pipeline universal config
     Returns

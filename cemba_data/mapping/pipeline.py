@@ -52,7 +52,7 @@ def summary_pipeline_stat(out_dir):
     result_dfs = {}
     for k, v in stat_dict.items():
         result_dfs[k] = pd.concat(v, ignore_index=True, sort=True)
-    # save all concatenated stats into out_dir level stats folder
+    # save all concatenated stats into output_dir level stats folder
     total_stats = out_dir / 'stats'
     total_stats.mkdir(exist_ok=True)
     for k, v in result_dfs.items():
@@ -60,7 +60,7 @@ def summary_pipeline_stat(out_dir):
         v.to_csv(str(k_path), sep='\t', compression='gzip')
 
     # demultiplex stat, from cutadapt demultiplex step
-    demultiplex_result = result_dfs['demultiplex_result'].groupby(['uid', 'index_name']) \
+    demultiplex_result = result_dfs['demultiplex_records'].groupby(['uid', 'index_name']) \
         .sum()[['TotalPair', 'Trimmed']]
     demultiplex_result.rename(columns={'TotalPair': 'MultiplexReadsTotal',
                                        'Trimmed': 'IndexReadsTotal'},
@@ -171,7 +171,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
         Input dataframe for all fastq file path and metadata.
         Must include columns: uid, read_type, index_name, lane
     out_dir
-        pipeline universal out_dir
+        pipeline universal output_dir
     config_path
         pipeline universal config
     demultiplex_only
@@ -187,7 +187,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
     # get and validate fastq dataframe
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
 
-    # setup out_dir
+    # setup output_dir
     out_dir = pathlib.Path(out_dir)
     if not out_dir.exists():
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -197,7 +197,7 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
     # fastq demultiplex
     log.info('Demultiplex fastq file.')
     demultiplex_df = demultiplex(fastq_dataframe, out_dir, config)
-    demultiplex_df.to_csv(stat_dir / 'demultiplex_result.tsv.gz',
+    demultiplex_df.to_csv(stat_dir / 'demultiplex_records.tsv.gz',
                           sep='\t', compression='gzip', index=None)
 
     # fastq qc
