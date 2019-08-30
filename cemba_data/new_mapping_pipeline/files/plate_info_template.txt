@@ -1,0 +1,133 @@
+#                               .__
+#   ___________    _____ ______ |  |   ____
+#  /  ___/\__  \  /     \\____ \|  | _/ __ \
+#  \___ \  / __ \|  Y Y  \  |_> >  |_\  ___/
+# /____  >(____  /__|_|  /   __/|____/\___  >
+#      \/      \/      \/|__|             \/
+#        .__                   __  ._.
+#   _____|  |__   ____   _____/  |_| |
+#  /  ___/  |  \_/ __ \_/ __ \   __\ |
+#  \___ \|   Y  \  ___/\  ___/|  |  \|
+# /____  >___|  /\___  >\___  >__|  __
+#      \/     \/     \/     \/      \/
+#
+# PlateInfo template of single cell sequencing demultiplex
+#
+# This file template contain 3 sections.
+#
+# [CriticalInfo]
+# [LibraryInfo]
+# [PlateInfo]
+#
+# The final sample id will be values of each part concatenated by "-" in the following order
+# [Values in LibraryInfo] + [Additional values in PlateInfo] + [Sample UID determined by library strategy]
+#
+# Empty lines and line start with "#" will be ignored. You can remove these if you understand the template.
+#
+
+
+# =====================================================================================================
+
+[CriticalInfo]
+
+# =====================================================================================================
+
+# Explain:
+# Every key=value pairs are required. key name can not be change.
+# Some values have limited options, they are:
+# n_random_index choice: 8 (V1), 384 (V2)
+# input_plate_size choice: 384
+#
+#
+# Example:
+# n_random_index=8
+# input_plate_size=384
+# pool_id=Pool_73
+# tube_label=Pool_72_73_9A_10C  # often times 2 library are pooled together on Nova-Seq
+# email=your-email@salk.edu
+#
+
+n_random_index=8
+input_plate_size=384
+pool_id=
+tube_label=
+email=
+
+
+# =====================================================================================================
+
+[LibraryInfo]
+
+# =====================================================================================================
+#
+# Explain:
+# library metadata that applies to all plates
+# this whole part is optional, may contain any "key=value" pairs necessary to describe the library.
+# All the values will be concatenate by "-" into the sample id and present in file name. Use UNIX path safe characters.
+# Any "-" in value will be replaced by "_"
+# Here are the recommended information to include, you can define your own based on your needs,
+# non of these information is actually used in demultiplex or mapping:
+# these keys are ALL optional, but better be consistent throughout the project.
+#
+# Example:
+# lib_comp_date=180101
+# project=CEMBA
+# organism=mm
+# dev_stage_age=P56
+# tissue_cell_type=1A
+# exp_cond=1
+# bio_rep=1
+# tech_rep=1
+# lib_type=snmC-seq2
+# sequencer=NovaSeq
+# se_pe=pe
+# read_length=150
+# requested_by=HL
+#
+#
+
+
+
+
+
+# =====================================================================================================
+
+[PlateInfo]
+
+# =====================================================================================================
+
+# Explain:
+# Plate metadata that specific to certain plates, a tab separated table
+# First row must be header start with: plate_id	primer_quarter
+# First 2 columns are required and must be in the order of: plate_id	primer_quarter
+# You can add more plate specific info into additional columns, those info will be appended to LibraryInfo as part of sample_id.
+# All the values will be concatenate by "-" into the sample id and present in file name.
+# So better not to include "-" in value and use UNIX path safe characters.
+#
+# If your experiment design contain sup-plate difference (e.g. some rows come from 1 sample, some rows come from another),
+# you should maintain your own metadata about this and added into the mapping summary table later after mapping by yourself
+# Because here the plate info is just for barcode demultiplexing, so that we can get single cell data AND the plate position of each cell
+# with the plate position, it should be very convenient for you to add any custom information you designed in your experiment.
+#
+# primer_quarter valid values are:
+# Set1_Q1, Set1_Q2, Set1_Q3, Set1_Q4
+# SetB_Q1, SetB_Q2, SetB_Q3, SetB_Q4
+#
+# Example:
+# plate_id	primer_quarter
+# CEMBA190530_9C_1	SetB_Q1
+# CEMBA190530_9C_2	SetB_Q1
+# CEMBA190530_9C_3	SetB_Q2
+# CEMBA190530_9C_4	SetB_Q2
+# CEMBA190620_9C_1	SetB_Q3
+# CEMBA190620_9C_2	SetB_Q3
+# CEMBA190620_9C_3	SetB_Q4
+# CEMBA190620_9C_4	SetB_Q4
+#
+# Remember the columns MUST be separate by tab not space
+#
+
+plate_id	primer_quarter
+
+
+
