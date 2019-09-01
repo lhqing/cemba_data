@@ -13,11 +13,10 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def merge_lane(demultiplex_records: str, output_dir: str, config: str):
-    demultiplex_records_df = pd.read_csv(demultiplex_records)
-
+def merge_lane(output_dir: str, config: str):
     output_dir = pathlib.Path(output_dir)
     config = get_configuration(config)
+    demultiplex_records_df = pd.read_csv(output_dir / 'demultiplex.records.csv')
     cutadapt_cores = config['fastqTrim']['cutadapt_cores']
 
     # make file sets dict, each kv pair will have a command and corresponding to one fastq file
@@ -37,7 +36,7 @@ def merge_lane(demultiplex_records: str, output_dir: str, config: str):
     records = []
     command_list = []
     for (uid, index_name, read_type), file_path_list in file_set_dict.items():
-        output_path = f'{output_dir}/{uid}_{index_name}_{read_type}.raw.fq.gz'
+        output_path = f'{output_dir}/{uid}-{index_name}-{read_type}.raw.fq.gz'
         path_str = ' '.join(file_path_list)
         merge_cmd = f'pigz -cd -p {cutadapt_cores} {path_str} | pigz -c > {output_path} && rm -f {path_str}'
         records.append([uid, index_name, read_type, output_path])

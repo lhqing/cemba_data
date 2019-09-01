@@ -84,7 +84,7 @@ def summary_pipeline_stat(out_dir):
     fastq_trim_result['IndexTrimedReadsRatio'] = fastq_trim_result['IndexTrimedReadsTotal'] / demultiplex_result[
         'IndexReadsTotal']
 
-    # bismark stat
+    # bismark_mapping stat
     bismark_r1 = result_dfs['bismark_result'][result_dfs['bismark_result']['read_type'].apply(lambda i: '1' in i)] \
         .set_index(['uid', 'index_name'])[['CTOB', 'CTOT', 'mapping_rate', 'total_c',
                                            'total_reads', 'unique_map', 'unmap', 'ununique_map']]
@@ -163,7 +163,7 @@ def summary_pipeline_stat(out_dir):
 
 def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False):
     """
-    Run full pipeline: demultiplex, fastq QC, bismark mapping, bam QC, ALLC calling
+    Run full pipeline: demultiplex, fastq QC, bismark_mapping mapping, bam QC, ALLC calling
 
     Parameters
     ----------
@@ -213,11 +213,11 @@ def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False)
     if demultiplex_only:
         return 0
 
-    # bismark
-    log.info('Use bismark and bowtie2 to do mapping.')
+    # bismark_mapping
+    log.info('Use bismark_mapping and bowtie2 to do mapping.')
     bismark_df = bismark(fastq_final_df, out_dir, config)
     if bismark_df.shape[0] == 0:
-        log.warning('no sample remained after bismark step')
+        log.warning('no sample remained after bismark_mapping step')
         return 0
     else:
         bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
