@@ -34,12 +34,8 @@ def single_read_mch_level(read):
     cov = 0
     other_snp = 0
     if read.is_reverse:  # read in reverse strand
-        for read_pos, ref_pos in read.aligned_pairs:
-            if (read_pos is None) or (ref_pos is None):
-                # one of the pos is None, means indel or skip region, do not count
-                continue
+        for read_pos, ref_pos, ref_base in read.get_aligned_pairs(matches_only=True, with_seq=True):
             read_base = read_seq[read_pos]
-            ref_base = ref_seq_dict[ref_pos]
             ref_read_pair = ref_base + read_base
             try:
                 ref_context = ref_seq_dict[ref_pos] + ref_seq_dict[ref_pos + 1]
@@ -58,15 +54,11 @@ def single_read_mch_level(read):
                 other_snp += 1
                 pass
     else:  # read in forward strand
-        for read_pos, ref_pos in read.aligned_pairs:
-            if (read_pos is None) or (ref_pos is None):
-                # one of the pos is None, means indel or skip region, do not count
-                continue
+        for read_pos, ref_pos, ref_base in read.get_aligned_pairs(matches_only=True, with_seq=True):
             read_base = read_seq[read_pos]
-            ref_base = ref_seq_dict[ref_pos]
             ref_read_pair = ref_base + read_base
             try:
-                ref_context = ref_seq_dict[ref_pos] + ref_seq_dict[ref_pos - 1]
+                ref_context = ref_seq_dict[ref_pos - 1] + ref_seq_dict[ref_pos]
                 if ref_context not in FORWARD_READ_MCH_CONTEXT:
                     continue
             except KeyError:
