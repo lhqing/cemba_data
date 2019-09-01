@@ -93,7 +93,7 @@ def filter_star_reads_mc_level(input_bam,
             # split reads
             if (read_mch_rate < mc_rate_min_threshold) or (cov < cov_min_threshold):
                 continue
-            out_bam.write(read)
+            out_bam.write(read.to_string() + '\n')
 
     read_profile = pd.Series(read_profile_dict)
     read_profile.index.name = ['mc_rate', 'cov']

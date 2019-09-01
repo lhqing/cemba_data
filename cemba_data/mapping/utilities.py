@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import subprocess
+from ALLCools._open import open_bam
 
 # logger
 
@@ -73,6 +74,21 @@ def valid_environments(config):
     return
 
 
+def parse_index_fasta(fasta_path):
+    records = {}
+    with open(fasta_path) as f:
+        key_line = True
+        for line in f:
+            if key_line:
+                key = line.lstrip('>').rstrip('\n')
+                key_line = False
+            else:
+                value = line.lstrip('^').rstrip('\n')
+                records[key] = value
+                key_line = True
+    return records
+
+
 def command_runner(command):
     try:
         subprocess.run(command,
@@ -87,3 +103,14 @@ def command_runner(command):
         log.error(e.stdout)
         log.error(e.stderr)
         raise e
+
+
+def get_bam_header_str(bam_path):
+    bam_header = ''
+    with open_bam(bam_path, include_header=True) as f:
+        for line in f:
+            if line.startswith('@'):
+                bam_header += line
+            else:
+                break
+    return bam_header

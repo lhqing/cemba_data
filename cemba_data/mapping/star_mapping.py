@@ -1,6 +1,7 @@
 import logging
 import operator
 import pathlib
+import subprocess
 
 import pandas as pd
 
@@ -86,3 +87,45 @@ def star_mapping(input_dir, output_dir, config):
                              columns=['uid', 'index_name', 'bam_path'])
     record_df.to_csv(output_dir / 'star_mapping.records.csv', index=None)
     return
+
+
+def _parse_star_log(log_path):
+    with open(log_path) as f:
+        record = {}
+        for line in f:
+            if '|' not in line:
+                continue
+            name, value = line.split('|')
+            name = name.strip(' ')
+            value = value.strip(' \t\n')
+            record[name] = value
+    return pd.Series(record)
+
+
+def summarize_star_mapping(bam_dir):
+    bam_dir = pathlib.Path(bam_dir)
+    output_path = bam_dir / 'star_mapping.stats.csv'
+    if output_path.exists():
+        return str(output_path)
+
+    records = []
+    star_stat_list = list(bam_dir.glob('*.Log.final.out'))
+    for path in star_stat_list:
+        report_series = _parse_star_log(path)
+
+        *uid, index_name, suffix = path.name.split('-')
+        uid = '-'.join(uid)
+        read_type = suffix.split('.')[0]
+        report_series['uid'] = uid
+        report_series['index_name'] = index_name
+        report_series['read_type'] = read_type
+        records.append(report_series)
+        path = str(path)
+        subprocess.run(['rm', '-f',
+                        path,
+                        path[:-10] + '.out',
+                        path[:-10] + '.progress.out',
+                        path[:-14] + '.SJ.out.tab'])
+    total_stats_df = pd.DataFrame(records)
+    total_stats_df.to_csv(output_path)
+    return str(output_path)
