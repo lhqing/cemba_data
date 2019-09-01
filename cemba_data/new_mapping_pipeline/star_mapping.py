@@ -54,7 +54,8 @@ def star_mapping(input_dir, output_dir, config):
 
         # for RNA part, only map R1
         r1_fastq = fastq_qc_records[(uid, index_name, 'R1')]
-        output_prefix = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR')
+        output_prefix = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.')
+        output_path = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.Aligned.out.bam')  # STAR convention
         star_cmd = f'STAR --runThreadN {threads} ' \
                    f'--genomeDir {star_reference} ' \
                    f'--genomeLoad LoadAndKeep ' \
@@ -76,7 +77,7 @@ def star_mapping(input_dir, output_dir, config):
                    f'--outFileNamePrefix {output_prefix} ' \
                    f'--readFilesIn {r1_fastq} ' \
                    f'--readFilesCommand gzip -cd'
-        records.append([uid, index_name, output_prefix])
+        records.append([uid, index_name, output_path])
         command_list.append(star_cmd)
 
     with open(output_dir / 'star_mapping.command.txt', 'w') as f:
