@@ -4,19 +4,10 @@ from collections import defaultdict
 import pandas as pd
 from ALLCools._open import open_bam
 
+from .utilities import get_bam_header_str
+
 METHYLATED_CHAR = 'H'
 UNMETHYLATED_CHAR = 'h'
-
-
-def get_bam_header_str(bam_path):
-    bam_header = ''
-    with open_bam(bam_path, include_header=True) as f:
-        for line in f:
-            if line.startswith('@'):
-                bam_header += line
-            else:
-                break
-    return bam_header
 
 
 def read_mc_level(bismark_tag):
@@ -25,8 +16,8 @@ def read_mc_level(bismark_tag):
     total_c = m_c + normal_c
     if total_c == 0:
         return 0, 0
-    read_m_c_rate = int(100 * (m_c / total_c))
-    return read_m_c_rate, total_c
+    read_mc_rate = int(100 * (m_c / total_c))
+    return read_mc_rate, total_c
 
 
 def filter_bismark_reads_mc_level(input_bam,
@@ -52,4 +43,4 @@ def filter_bismark_reads_mc_level(input_bam,
     read_profile.to_csv(str(output_bam) + '.reads_profile.csv', header=True)
     if remove_input:
         subprocess.run(['rm', '-f', input_bam])
-    return read_profile
+    return

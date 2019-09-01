@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import subprocess
+from ALLCools._open import open_bam
 
 # logger
 
@@ -102,3 +103,14 @@ def command_runner(command):
         log.error(e.stdout)
         log.error(e.stderr)
         raise e
+
+
+def get_bam_header_str(bam_path):
+    bam_header = ''
+    with open_bam(bam_path, include_header=True) as f:
+        for line in f:
+            if line.startswith('@'):
+                bam_header += line
+            else:
+                break
+    return bam_header

@@ -1,4 +1,11 @@
+import subprocess
+from collections import defaultdict
+
+import pandas as pd
 import pysam
+from ALLCools._open import open_bam
+
+from .utilities import get_bam_header_str
 
 REVERSE_READ_MCH_CONTEXT = {'CA', 'CC', 'CT'}
 FORWARD_READ_MCH_CONTEXT = {'AG', 'TG', 'GG'}
@@ -63,7 +70,7 @@ def single_read_mch_level(read):
                 if ref_context not in FORWARD_READ_MCH_CONTEXT:
                     continue
             except KeyError:
-                # ref_seq_dict KeyError means position is on border or not continous, skip that
+                # ref_seq_dict KeyError means position is on border or not continuous, skip that
                 continue
             if ref_read_pair == 'GG':  # G to G means unconverted and methylated
                 cov += 1
@@ -83,12 +90,22 @@ def filter_star_reads_mc_level(input_bam,
                                mc_rate_min_threshold=0.9,
                                cov_min_threshold=5,
                                remove_input=True):
-    read_count = 0
-    read_records = []
-    with pysam.AlignmentFile(input_bam) as bam, pysam.AlignmentFile(output_bam, 'w') as out_bam:
+    bam_header = get_bam_header_str(input_bam)
+    read_profile_dict = defaultdict(int)
+    with pysam.AlignmentFile(input_bam) as bam, open_bam(output_bam, 'w') as out_bam:
+        out_bam.write(bam_header)
         for read in bam:
-            read_count += 1
             read_mch_rate, cov, other_snp = single_read_mch_level(read)
+            read_profile_dict[(read_mch_rate, cov)] += 1
+
+            # split reads
             if (read_mch_rate < mc_rate_min_threshold) or (cov < cov_min_threshold):
                 continue
             out_bam.write(read)
+
+    read_profile = pd.Series(read_profile_dict)
+    read_profile.index.name = ['mc_rate', 'cov']
+    read_profile.to_csv(str(output_bam) + '.reads_profile.csv', header=True)
+    if remove_input:
+        subprocess.run(['rm', '-f', input_bam])
+    return
