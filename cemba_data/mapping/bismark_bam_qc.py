@@ -57,7 +57,13 @@ def summarize_bismark_bam_qc(output_dir):
     records = []
     bismark_stat_list = list(bam_dir.glob('*.dedup.matrix.txt'))
     for path in bismark_stat_list:
-        report_series = pd.read_csv(path, sep='\t', comment='#').T[0]
+        try:
+            report_series = pd.read_csv(path, sep='\t', comment='#').T[0]
+        except pd.errors.EmptyDataError:
+            # means the bam file is empty
+            subprocess.run(['rm', '-f', path])
+            continue
+
         *uid, index_name, suffix = path.name.split('-')
         uid = '-'.join(uid)
         read_type = suffix.split('.')[0]

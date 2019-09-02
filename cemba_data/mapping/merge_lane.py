@@ -45,4 +45,4 @@ def merge_lane(output_dir: str, config: str):
         f.write('\n'.join(command_list))
     record_df = pd.DataFrame(records, columns=['uid', 'index_name', 'read_type', 'fastq_path'])
     record_df.to_csv(output_dir / 'merge_lane.records.csv', index=None)
-    return
+    return record_df, command_list

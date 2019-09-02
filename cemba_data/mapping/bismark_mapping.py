@@ -64,7 +64,7 @@ def bismark_mapping(input_dir, output_dir, config):
     input_dir = pathlib.Path(input_dir)
     fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
                                    index_col=['uid', 'index_name', 'read_type'], squeeze=True)
-    fastq_qc_stats_path = pd.read_csv(input_dir / 'fastq_qc.stats.csv')
+    fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
     fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
 
     if isinstance(config, str):

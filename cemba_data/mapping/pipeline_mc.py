@@ -5,10 +5,12 @@ from cemba_data.mapping import \
     command_runner, \
     summarize_bismark_mapping, \
     bismark_bam_qc, \
-    summarize_bismark_bam_qc, merge_bam, generate_allc
+    summarize_bismark_bam_qc, \
+    merge_bam, \
+    generate_allc, summarize_generate_allc
 
 
-def pipeline_mc_info(output_dir, config_path, qsub=True):
+def pipeline_mc(output_dir, config_path, mct=False, qsub=True):
     # create directory
     output_dir = pathlib.Path(output_dir)
     fastq_dir = output_dir / 'fastq'
@@ -45,11 +47,20 @@ def pipeline_mc_info(output_dir, config_path, qsub=True):
     # summarize bismark bam qc
     summarize_bismark_bam_qc(output_dir=bam_dir)
 
-    # merge bam
-    # final_bam_record ['uid', 'index_name', 'bam_path']
-    final_bam_record, final_bam_commands = merge_bam(output_dir=bam_dir, record_name='bismark_bam_qc.records.csv')
-
-    # runner
+    if mct:
+        # TODO
+        # prepare select DNA
+        # run select DNA
+        # summarize select DNA
+        # merge the R1 R2 dna bam
+        final_bam_record, final_bam_commands = merge_bam(output_dir=bam_dir,
+                                                         record_name='dna_bam.records.csv')
+    else:
+        # merge R1 R2 bam
+        # final_bam_record ['uid', 'index_name', 'bam_path']
+        final_bam_record, final_bam_commands = merge_bam(output_dir=bam_dir,
+                                                         record_name='bismark_bam_qc.records.csv')
+    # runner merge bam
     if qsub:
         raise NotImplementedError
     else:
@@ -57,7 +68,21 @@ def pipeline_mc_info(output_dir, config_path, qsub=True):
             command_runner(cmd)
 
     # generate ALLC file
-    generate_allc(output_dir=bam_dir, config=config_path)
+    allc_dir = output_dir / 'allc'
+    allc_dir.mkdir(exist_ok=True, parents=True)
+    allc_record, allc_commands = generate_allc(input_dir=bam_dir,
+                                               output_dir=allc_dir,
+                                               config=config_path)
+
+    # runner merge bam
+    if qsub:
+        raise NotImplementedError
+    else:
+        for cmd in allc_commands:
+            command_runner(cmd)
 
     # summarize generate ALLC
-    pass
+    summarize_generate_allc(allc_dir)
+
+    # final summary
+

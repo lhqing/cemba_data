@@ -7,5 +7,5 @@ from .utilities import command_runner
 from .bismark_mapping import bismark_mapping, summarize_bismark_mapping
 from .bismark_bam_qc import bismark_bam_qc, summarize_bismark_bam_qc
 from .merge_bam import merge_bam
-from .generate_allc import generate_allc
+from .generate_allc import generate_allc, summarize_generate_allc
 

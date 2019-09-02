@@ -11,10 +11,10 @@ import cemba_data
 
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
-with open(PACKAGE_DIR / 'new_mapping_pipeline/files/plate_info_template.txt') as _f:
+with open(PACKAGE_DIR / 'mapping/files/plate_info_template.txt') as _f:
     PLATE_INFO_TEMPLATE = _f.read()
 
-with open(PACKAGE_DIR / 'new_mapping_pipeline/files/sample_sheet_header.txt') as _f:
+with open(PACKAGE_DIR / 'mapping/files/sample_sheet_header.txt') as _f:
     SAMPLESHEET_DEFAULT_HEADER = _f.read()
 
 SECTIONS = ['[CriticalInfo]', '[LibraryInfo]', '[PlateInfo]']

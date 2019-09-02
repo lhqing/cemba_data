@@ -5,7 +5,7 @@ import subprocess
 import pandas as pd
 
 import cemba_data
-from .utilities import get_configuration, parse_index_fasta
+from .utilities import get_configuration
 
 # logger
 log = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def fastq_qc(output_dir, config):
     record_df = pd.DataFrame(records,
                              columns=['uid', 'index_name', 'read_type', 'fastq_path'])
     record_df.to_csv(output_dir / 'fastq_qc.records.csv', index=None)
-    return
+    return record_df, command_list
 
 
 def fastq_qc_runner(command):
@@ -126,7 +126,7 @@ def summarize_fastq_qc(output_dir):
         fastq_qc_stat['index_name'] = index_name
         fastq_qc_stat['read_type'] = read_type
         records.append(fastq_qc_stat)
-        subprocess.run(['rm', '-f', path])
+        subprocess.run(['rm', '-f', path], check=True)
     total_stats_df = pd.DataFrame(records)
     total_stats_df.to_csv(output_path)
     return str(output_path)

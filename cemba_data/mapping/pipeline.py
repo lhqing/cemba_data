@@ -1,10 +1,9 @@
 import collections
-from .fastq import demultiplex, fastq_qc
-from .bismark import bismark
-from ..tools.allc import batch_call_methylated_sites
-from .bam import bam_qc
-from .utilities import *
 import logging
+import os
+import pathlib
+
+import pandas as pd
 
 # logger
 log = logging.getLogger(__name__)
@@ -161,78 +160,15 @@ def summary_pipeline_stat(out_dir):
     return total_meta
 
 
-def pipeline(fastq_dataframe, out_dir, config_path=None, demultiplex_only=False):
-    """
-    Run full pipeline: demultiplex, fastq QC, bismark_mapping mapping, bam QC, ALLC calling
+def pipeline(input_fastq_pattern, output_dir, config_path):
+    # test environment
 
-    Parameters
-    ----------
-    fastq_dataframe
-        Input dataframe for all fastq file path and metadata.
-        Must include columns: uid, read_type, index_name, lane
-    out_dir
-        pipeline universal output_dir
-    config_path
-        pipeline universal config
-    demultiplex_only
-        (Not for mapping) Only demultiplex 8-cell FASTQ into single cell FASTQ by AD index and then quit
-    Returns
-    -------
-    0 if succeed
-    """
-    # get config
-    config = get_configuration(config_path)
-    valid_environments(config)
+    # pipeline_fastq
 
-    # get and validate fastq dataframe
-    fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
+    # pipeline_mc
 
-    # setup output_dir
-    out_dir = pathlib.Path(out_dir)
-    if not out_dir.exists():
-        out_dir.mkdir(parents=True, exist_ok=True)
-    stat_dir = out_dir / 'stats'
-    stat_dir.mkdir(exist_ok=True)
+    # if mct: pipeline_rna
 
-    # fastq demultiplex
-    log.info('Demultiplex fastq file.')
-    demultiplex_df = demultiplex(fastq_dataframe, out_dir, config)
-    demultiplex_df.to_csv(stat_dir / 'demultiplex_records.tsv.gz',
-                          sep='\t', compression='gzip', index=None)
+    # pipeline mcds
 
-    # fastq qc
-    log.info('Trim fastq file and merge lanes.')
-    fastq_final_df = fastq_qc(demultiplex_df, out_dir, config)
-    if fastq_final_df.shape[0] == 0:
-        log.warning('no sample remained after fastq qc step')
-        return 0
-    else:
-        fastq_final_df.to_csv(stat_dir / 'fastq_trim_result.tsv.gz',
-                              sep='\t', compression='gzip', index=None)
-
-    if demultiplex_only:
-        return 0
-
-    # bismark_mapping
-    log.info('Use bismark_mapping and bowtie2 to do mapping.')
-    bismark_df = bismark(fastq_final_df, out_dir, config)
-    if bismark_df.shape[0] == 0:
-        log.warning('no sample remained after bismark_mapping step')
-        return 0
-    else:
-        bismark_df.to_csv(stat_dir / 'bismark_result.tsv.gz',
-                          sep='\t', compression='gzip', index=None)
-
-    # bam
-    log.info('Deduplicate and filter bam files.')
-    bam_df = bam_qc(bismark_df, out_dir, config)
-    bam_df.to_csv(stat_dir / 'bam_process_result.tsv.gz',
-                  sep='\t', compression='gzip', index=None)
-
-    # allc
-    log.info('Calculate mC sites.')
-    allc_df = batch_call_methylated_sites(bam_df, out_dir, config)
-    allc_df.to_csv(stat_dir / 'stat_allc_total_result.tsv.gz',
-                   sep='\t', compression='gzip', index=None)
-    log.info('Mapping finished.')
     return 0

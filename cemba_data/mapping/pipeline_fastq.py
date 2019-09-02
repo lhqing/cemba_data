@@ -61,3 +61,4 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True):
 
     # summarize fastq qc
     summarize_fastq_qc(output_dir=fastq_dir)
+    return

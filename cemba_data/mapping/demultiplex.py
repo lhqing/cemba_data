@@ -37,13 +37,14 @@ def demultiplex(output_dir: str, config: str):
     config = get_configuration(config)
 
     # read and validate fastq_dataframe
-    fastq_dataframe = validate_fastq_dataframe(output_dir / 'fastq_dataframe.csv')
+    fastq_dataframe = pd.read_csv(output_dir / 'fastq_dataframe.csv')
+    fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
 
     random_index_version = config['multiplexIndex']['version']
     if random_index_version.upper() == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v1.fa')
+        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
     elif random_index_version.upper() == 'V2':
-        # random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v2.fa')
+        # random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2.fa')
         # TODO add v2 func and make sure it works
         raise NotImplementedError
     else:
@@ -139,9 +140,9 @@ def summarize_demultiplex(output_dir, config):
     # get index info
     random_index_version = config['multiplexIndex']['version']
     if random_index_version.upper() == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v1.fa')
+        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
     elif random_index_version.upper() == 'V2':
-        # random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v2.fa')
+        # random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2.fa')
         # TODO add v2 func and make sure it works
         raise NotImplementedError
     else:
@@ -163,6 +164,6 @@ def summarize_demultiplex(output_dir, config):
         assert single_df['index_name'].isna().sum() == 0
         stat_list.append(single_df)
     total_demultiplex_stats = pd.concat(stat_list)
-    total_demultiplex_stats.to_csv(output_dir / 'demultiplex.stat.total.csv', index=None)
+    total_demultiplex_stats.to_csv(output_dir / 'demultiplex.stats.csv', index=None)
     subprocess.run(['rm', '-f'] + list(map(str, stat_path_list)))
     return total_demultiplex_stats

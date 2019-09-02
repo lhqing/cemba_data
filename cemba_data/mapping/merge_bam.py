@@ -23,7 +23,8 @@ def merge_bam(output_dir, record_name):
         r1_r2_bam_path_str = ' '.join(sub_df['bam_path'].tolist())
         output_bam = output_dir / f'{uid}_{index_name}.final.bam'
         # command
-        command = f'samtools merge -f {output_bam} {r1_r2_bam_path_str}'
+        command = f'samtools merge -f {output_bam} {r1_r2_bam_path_str} ' \
+                  f'&& rm -f {r1_r2_bam_path_str}'
         records.append([uid, index_name, output_bam])
         command_list.append(command)
 

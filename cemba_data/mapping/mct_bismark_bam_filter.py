@@ -44,3 +44,7 @@ def filter_bismark_reads_mc_level(input_bam,
     if remove_input:
         subprocess.run(['rm', '-f', input_bam])
     return
+
+
+def prepare_select_dna_reads(output_dir, config):
+    return
