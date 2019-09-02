@@ -3,6 +3,8 @@ import logging
 import os
 import pathlib
 import subprocess
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 from ALLCools._open import open_bam
 
 # logger
@@ -89,20 +91,24 @@ def parse_index_fasta(fasta_path):
     return records
 
 
-def command_runner(command):
-    try:
-        subprocess.run(command,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       encoding='utf8',
-                       shell=True,
-                       check=True)
-    except subprocess.CalledProcessError as e:
-        log.error("Got error, command was:")
-        log.error(command)
-        log.error(e.stdout)
-        log.error(e.stderr)
-        raise e
+def command_runner(commands, runner=None, cpu=1):
+    if runner is None:
+        from functools import partial
+        runner = partial(subprocess.run,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         encoding='utf8',
+                         shell=True,
+                         check=True)
+    with ProcessPoolExecutor(cpu) as pool:
+        futures = []
+        for command in commands:
+            future = pool.submit(runner, command)
+            futures.append(future)
+
+        for future in as_completed(futures):
+            future.result()
+    return
 
 
 def get_bam_header_str(bam_path):

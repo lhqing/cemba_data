@@ -1,3 +1,4 @@
+import pathlib
 import subprocess
 from collections import defaultdict
 
@@ -5,7 +6,7 @@ import pandas as pd
 import pysam
 from ALLCools._open import open_bam
 
-from .utilities import get_bam_header_str
+from .utilities import get_bam_header_str, get_configuration
 
 REVERSE_READ_MCH_CONTEXT = {'CA', 'CC', 'CT'}
 FORWARD_READ_MCH_CONTEXT = {'AG', 'TG', 'GG'}
@@ -73,22 +74,22 @@ def single_read_mch_level(read):
                 # other kinds of SNPs, do not count to cov
                 other_snp += 1
                 pass
-    read_mch_rate = int(100 * (mch / cov)) if cov > 0 else 0
+    read_mch_rate = (mch / cov) if cov > 0 else 0
     return read_mch_rate, cov, other_snp
 
 
-def filter_star_reads_mc_level(input_bam,
-                               output_bam,
-                               mc_rate_min_threshold=0.9,
-                               cov_min_threshold=5,
-                               remove_input=True):
+def select_rna_reads(input_bam,
+                     output_bam,
+                     mc_rate_min_threshold=0.9,
+                     cov_min_threshold=5,
+                     remove_input=True):
     bam_header = get_bam_header_str(input_bam)
     read_profile_dict = defaultdict(int)
     with pysam.AlignmentFile(input_bam) as bam, open_bam(output_bam, 'w') as out_bam:
         out_bam.write(bam_header)
         for read in bam:
             read_mch_rate, cov, other_snp = single_read_mch_level(read)
-            read_profile_dict[(read_mch_rate, cov)] += 1
+            read_profile_dict[(int(100 * read_mch_rate), cov)] += 1
 
             # split reads
             if (read_mch_rate < mc_rate_min_threshold) or (cov < cov_min_threshold):
@@ -101,3 +102,76 @@ def filter_star_reads_mc_level(input_bam,
     if remove_input:
         subprocess.run(['rm', '-f', input_bam])
     return
+
+
+def prepare_select_rna_reads(output_dir, config):
+    output_dir = pathlib.Path(output_dir)
+    if isinstance(config, str):
+        config = get_configuration(config)
+
+    bismark_records = pd.read_csv(output_dir / 'bismark_bam_qc.records.csv',
+                                  index_col=['uid', 'index_name', 'read_type'],
+                                  squeeze=True)
+    mc_rate_min_threshold = config['RNAReadsFilter']['mc_rate_min_threshold']
+    cov_min_threshold = config['RNAReadsFilter']['cov_min_threshold']
+    remove_input = config['RNAReadsFilter']['remove_input']
+
+    # process bam
+    records = []
+    command_list = []
+    for (uid, index_name, read_type), bismark_bam_path in bismark_records.iteritems():
+        # file path
+        output_bam = bismark_bam_path[:-3] + 'rna_reads.bam'
+        # command
+        # TODO change this to PE mapping, right now only map R1
+        if read_type == 'R2':
+            continue
+
+        keep_input_str = '--remove_input' if remove_input else ''
+        command = f'yap-internal select-rna-reads ' \
+                  f'--input_bam {bismark_bam_path} ' \
+                  f'--output_bam {output_bam} ' \
+                  f'--mc_rate_min_threshold {mc_rate_min_threshold} ' \
+                  f'--cov_min_threshold {cov_min_threshold} ' \
+                  f'{keep_input_str}'
+        records.append([uid, index_name, read_type, output_bam])
+        command_list.append(command)
+
+    with open(output_dir / 'select_rna_reads.command.txt', 'w') as f:
+        f.write('\n'.join(command_list))
+    record_df = pd.DataFrame(records,
+                             columns=['uid', 'index_name', 'read_type', 'bam_path'])
+    record_df.to_csv(output_dir / 'select_rna_reads.records.csv', index=None)
+    return record_df, command_list
+
+
+def summarize_select_rna_reads(output_dir):
+    bam_dir = pathlib.Path(output_dir)
+    output_path = bam_dir / 'select_rna_reads.stats.csv'
+    if output_path.exists():
+        return str(output_path)
+
+    records = []
+    select_rna_reads_stat_list = list(bam_dir.glob('*.reads_profile.csv'))
+    for path in select_rna_reads_stat_list:
+        try:
+            report_df = pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            # means the bam file is empty
+            subprocess.run(['rm', '-f', path])
+            continue
+        if report_df.shape[0] == 0:
+            subprocess.run(['rm', '-f', path])
+            continue
+
+        *uid, index_name, suffix = path.name.split('-')
+        uid = '-'.join(uid)
+        read_type = suffix.split('.')[0]
+        report_df['uid'] = uid
+        report_df['index_name'] = index_name
+        report_df['read_type'] = read_type
+        records.append(report_df)
+        subprocess.run(['rm', '-f', path])
+    total_stats_df = pd.concat(records)
+    total_stats_df.to_csv(output_path, index=None)
+    return str(output_path)

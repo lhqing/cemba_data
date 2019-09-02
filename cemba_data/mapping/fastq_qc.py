@@ -37,7 +37,7 @@ def fastq_qc(output_dir, config):
     total_reads_threshold = int(config['fastqTrim']['total_reads_threshold'])
 
     # determine whether proceed based on number of trimmed reads
-    total_demultiplex_stats = pd.read_csv(output_dir / 'demultiplex.stat.total.csv')
+    total_demultiplex_stats = pd.read_csv(output_dir / 'demultiplex.stats.csv')
     use_pairs = set()
     for (uid, index_name), sub_df in total_demultiplex_stats.groupby(['uid', 'index_name']):
         sample_demultiplex_total = sub_df['Trimmed'].sum()

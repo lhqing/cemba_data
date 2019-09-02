@@ -10,7 +10,7 @@ from cemba_data.mapping import \
     summarize_fastq_qc
 
 
-def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True):
+def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True, cpu=10):
     # create directory
     output_dir = pathlib.Path(output_dir)
     fastq_dir = output_dir / 'fastq'
@@ -30,8 +30,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True):
         raise NotImplementedError
     else:
         from cemba_data.mapping.demultiplex import demultiplex_runner
-        for cmd in demultiplex_commands:
-            demultiplex_runner(cmd)
+        command_runner(demultiplex_commands, demultiplex_runner, cpu=cpu)
 
     # summarize demultiplex
     summarize_demultiplex(output_dir=fastq_dir, config=config_path)
@@ -44,8 +43,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True):
     if qsub:
         raise NotImplementedError
     else:
-        for cmd in merge_lane_commands:
-            command_runner(cmd)
+        command_runner(merge_lane_commands, None, cpu=cpu)
 
     # prepare fastq qc
     # fastq_qc_records ['uid', 'index_name', 'read_type', 'fastq_path']
@@ -56,8 +54,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, qsub=True):
         raise NotImplementedError
     else:
         from cemba_data.mapping.fastq_qc import fastq_qc_runner
-        for cmd in fastq_qc_commands:
-            fastq_qc_runner(cmd)
+        command_runner(fastq_qc_commands, fastq_qc_runner, cpu=cpu)
 
     # summarize fastq qc
     summarize_fastq_qc(output_dir=fastq_dir)

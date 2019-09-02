@@ -35,4 +35,5 @@ def star_bam_qc(output_dir, config):
     record_df = pd.DataFrame(records,
                              columns=['uid', 'index_name', 'bam_path'])
     record_df.to_csv(output_dir / 'star_bam_qc.records.csv', index=None)
-    return
+    return record_df, command_list
+
