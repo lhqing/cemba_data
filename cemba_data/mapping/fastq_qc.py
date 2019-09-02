@@ -36,37 +36,8 @@ def fastq_qc(output_dir, config):
     overlap = config['fastqTrim']['overlap']
     total_reads_threshold = int(config['fastqTrim']['total_reads_threshold'])
 
-    # get index info
-    random_index_version = config['multiplexIndex']['version']
-    if random_index_version.upper() == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v1.fa')
-    elif random_index_version.upper() == 'V2':
-        # random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v2.fa')
-        # TODO add v2 func and make sure it works
-        raise NotImplementedError
-    else:
-        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
-    index_seq_dict = parse_index_fasta(random_index_fasta_path)
-    index_name_dict = {v: k for k, v in index_seq_dict.items()}
-
-    # read the demultiplex stats, its per lane, so need to sum up lane together of each uid and index name
-    # but R1 R2 is demultiplexed together, so this table don't separate R1 R2
-    stat_list = []
-    stat_path_list = list(output_dir.glob('*demultiplex.stat.csv'))
-    for path in stat_path_list:
-        single_df = pd.read_csv(path, index_col=0)
-        *uid, lane, _ = path.name.split('-')
-        uid = '-'.join(uid)
-        single_df['uid'] = uid
-        single_df['lane'] = lane
-        single_df['index_name'] = single_df['Sequence'].map(index_name_dict)
-        assert single_df['index_name'].isna().sum() == 0
-        stat_list.append(single_df)
-    total_demultiplex_stats = pd.concat(stat_list)
-    total_demultiplex_stats.to_csv(output_dir / 'demultiplex.stat.total.csv')
-    subprocess.run(['rm', '-f'] + list(map(str, stat_path_list)))
-
     # determine whether proceed based on number of trimmed reads
+    total_demultiplex_stats = pd.read_csv(output_dir / 'demultiplex.stat.total.csv')
     use_pairs = set()
     for (uid, index_name), sub_df in total_demultiplex_stats.groupby(['uid', 'index_name']):
         sample_demultiplex_total = sub_df['Trimmed'].sum()
@@ -138,8 +109,8 @@ def fastq_qc_runner(command):
         raise e
 
 
-def summarize_fastq_qc(fastq_dir):
-    fastq_dir = pathlib.Path(fastq_dir)
+def summarize_fastq_qc(output_dir):
+    fastq_dir = pathlib.Path(output_dir)
     output_path = fastq_dir / 'fastq_qc.stats.csv'
     if output_path.exists():
         return str(output_path)

@@ -18,7 +18,8 @@ setup(
         '': ['*.txt', '*.tsv', '*.csv', '*.fa']
     },
     entry_points={
-        'console_scripts': ['yap=cemba_data.__main__:main'],
+        'console_scripts': ['yap=cemba_data.__main__:main',
+                            'yap-internal=cemba_data.__main__:internal_main'],
     }
 )
 

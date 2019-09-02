@@ -8,7 +8,7 @@ import pandas as pd
 log = logging.getLogger()
 
 
-def get_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
+def make_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
     """
     Generate fastq_dataframe for pipeline input.
 
@@ -75,12 +75,8 @@ def get_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
         if df['uid'].unique().size != df['uid'].size:
             raise ValueError(f'UID column is not unique.')
     if output_path is not None:
-        if not output_path.endswith('tsv.gz'):
-            output_path += 'tsv.gz'
-        fastq_df.to_csv(output_path, index=None, sep='\t', compression='gzip')
-        return
-    else:
-        return fastq_df
+        fastq_df.to_csv(output_path, index=None)
+    return fastq_df
 
 
 def validate_fastq_dataframe(fastq_dataframe):

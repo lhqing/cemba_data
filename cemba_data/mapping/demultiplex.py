@@ -20,7 +20,7 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import validate_fastq_dataframe
-from .utilities import get_configuration
+from .utilities import get_configuration, parse_index_fasta
 
 # logger
 log = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ log.addHandler(logging.NullHandler())
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
-def demultiplex(fastq_dataframe: str, output_dir: str, config: str):
+def demultiplex(output_dir: str, config: str):
     """
     make a command dataframe that contains all cutadapt demultiplex command
     """
@@ -37,7 +37,7 @@ def demultiplex(fastq_dataframe: str, output_dir: str, config: str):
     config = get_configuration(config)
 
     # read and validate fastq_dataframe
-    fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
+    fastq_dataframe = validate_fastq_dataframe(output_dir / 'fastq_dataframe.csv')
 
     random_index_version = config['multiplexIndex']['version']
     if random_index_version.upper() == 'V1':
@@ -74,7 +74,7 @@ def demultiplex(fastq_dataframe: str, output_dir: str, config: str):
         f.write('\n'.join(command_list))
     record_df = pd.DataFrame(records, columns=['uid', 'lane', 'r1_path_pattern', 'r2_path_pattern'])
     record_df.to_csv(output_dir / 'demultiplex.records.csv', index=None)
-    return
+    return record_df, command_list
 
 
 def _read_cutadapt_result(result):
@@ -130,3 +130,39 @@ def demultiplex_runner(command):
     stat_out = r1_output_path.parent / ('-'.join(r1_output_path.name.split('-')[:4]) + '-demultiplex.stat.csv')
     result_df.to_csv(stat_out)
     return
+
+
+def summarize_demultiplex(output_dir, config):
+    output_dir = pathlib.Path(output_dir)
+    config = get_configuration(config)
+
+    # get index info
+    random_index_version = config['multiplexIndex']['version']
+    if random_index_version.upper() == 'V1':
+        random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v1.fa')
+    elif random_index_version.upper() == 'V2':
+        # random_index_fasta_path = str(PACKAGE_DIR / 'new_mapping_pipeline/files/random_index_v2.fa')
+        # TODO add v2 func and make sure it works
+        raise NotImplementedError
+    else:
+        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
+    index_seq_dict = parse_index_fasta(random_index_fasta_path)
+    index_name_dict = {v: k for k, v in index_seq_dict.items()}
+
+    # read the demultiplex stats, its per lane, so need to sum up lane together of each uid and index name
+    # but R1 R2 is demultiplexed together, so this table don't separate R1 R2
+    stat_list = []
+    stat_path_list = list(output_dir.glob('*demultiplex.stat.csv'))
+    for path in stat_path_list:
+        single_df = pd.read_csv(path, index_col=0)
+        *uid, lane, _ = path.name.split('-')
+        uid = '-'.join(uid)
+        single_df['uid'] = uid
+        single_df['lane'] = lane
+        single_df['index_name'] = single_df['Sequence'].map(index_name_dict)
+        assert single_df['index_name'].isna().sum() == 0
+        stat_list.append(single_df)
+    total_demultiplex_stats = pd.concat(stat_list)
+    total_demultiplex_stats.to_csv(output_dir / 'demultiplex.stat.total.csv', index=None)
+    subprocess.run(['rm', '-f'] + list(map(str, stat_path_list)))
+    return total_demultiplex_stats

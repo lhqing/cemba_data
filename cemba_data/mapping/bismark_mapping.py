@@ -6,7 +6,6 @@ import subprocess
 import pandas as pd
 
 import cemba_data
-from .fastq_qc import summarize_fastq_qc
 from .utilities import get_configuration
 
 # logger
@@ -65,7 +64,7 @@ def bismark_mapping(input_dir, output_dir, config):
     input_dir = pathlib.Path(input_dir)
     fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
                                    index_col=['uid', 'index_name', 'read_type'], squeeze=True)
-    fastq_qc_stats_path = summarize_fastq_qc(input_dir)
+    fastq_qc_stats_path = pd.read_csv(input_dir / 'fastq_qc.stats.csv')
     fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
 
     if isinstance(config, str):
@@ -118,11 +117,11 @@ def bismark_mapping(input_dir, output_dir, config):
     record_df = pd.DataFrame(records,
                              columns=['uid', 'index_name', 'read_type', 'bam_path'])
     record_df.to_csv(output_dir / 'bismark_mapping.records.csv', index=None)
-    return
+    return record_df, command_list
 
 
-def summarize_bismark_mapping(bam_dir):
-    bam_dir = pathlib.Path(bam_dir)
+def summarize_bismark_mapping(output_dir):
+    bam_dir = pathlib.Path(output_dir)
     output_path = bam_dir / 'bismark_mapping.stats.csv'
     if output_path.exists():
         return str(output_path)
@@ -141,5 +140,5 @@ def summarize_bismark_mapping(bam_dir):
         records.append(report_series)
         subprocess.run(['rm', '-f', path])
     total_stats_df = pd.DataFrame(records)
-    total_stats_df.to_csv(output_path)
+    total_stats_df.to_csv(output_path, index=None)
     return str(output_path)

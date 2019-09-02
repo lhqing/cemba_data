@@ -1,7 +1,6 @@
 import glob
 import logging
 import pathlib
-import subprocess
 from collections import defaultdict
 
 import pandas as pd
@@ -46,24 +45,4 @@ def merge_lane(output_dir: str, config: str):
         f.write('\n'.join(command_list))
     record_df = pd.DataFrame(records, columns=['uid', 'index_name', 'read_type', 'fastq_path'])
     record_df.to_csv(output_dir / 'merge_lane.records.csv', index=None)
-    return
-
-
-def merge_lane_runner(command):
-    """
-    merge fastq command wrapper, run command and parse results
-    """
-    try:
-        subprocess.run(command,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       encoding='utf8',
-                       shell=True,
-                       check=True)
-    except subprocess.CalledProcessError as e:
-        log.error("Pipeline break, FASTQ merge lane ERROR! Command was:")
-        log.error(command)
-        log.error(e.stdout)
-        log.error(e.stderr)
-        raise e
     return
