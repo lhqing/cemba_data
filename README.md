@@ -21,7 +21,7 @@
 - **Stage 3** Cluster level analysis. Merge single cell data into cluster and identify characteristic of clusters.
 
 ## Documentation
-[Mapping Tutorial] [Here](https://github.com/lhqing/cemba_data/blob/master/doc/files/mapping_tutorial.ipynb)
+[Mapping Tutorial](https://github.com/lhqing/cemba_data/blob/master/doc/files/mapping_tutorial.ipynb)
 Right now I can only provide minimum documentation for our inhouse Sun Grid Engine server.
 
 ## Install
@@ -44,8 +44,6 @@ yap -h
 # to use cemba_data as a python module
 import cemba_data as cd
 ```
-
-For more information, see the [documentation](https://cemba-data.readthedocs.io/en/latest).
 
 ## Important Reference
 ### Single cell:
