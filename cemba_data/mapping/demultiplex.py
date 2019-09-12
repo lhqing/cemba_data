@@ -67,13 +67,27 @@ def demultiplex(output_dir: str, config: str):
         # {name} is not format string, its for cutadapt and cutadapt will replace {name} to random index name.
         r1_out = output_dir / (f"{uid}-{lane}" + "-{name}-R1.fq.gz")
         r2_out = output_dir / (f"{uid}-{lane}" + "-{name}-R2.fq.gz")
+        stat_out = output_dir / (f"{uid}-{lane}" + ".demultiplex.stats.txt")
         cmd = f"cutadapt -e 0.01 --no-indels {adapter_parms} " \
-              f"-o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in}"
-        records.append([uid, lane, str(r1_out).replace('{name}', '*'), str(r2_out).replace('{name}', '*')])
+              f"-o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in} > {stat_out.absolute()}"
+        records.append([uid, lane, str(r1_out), str(r2_out)])
         command_list.append(cmd)
     with open(output_dir / 'demultiplex.command.txt', 'w') as f:
         f.write('\n'.join(command_list))
-    record_df = pd.DataFrame(records, columns=['uid', 'lane', 'r1_path_pattern', 'r2_path_pattern'])
+
+    # expend records by random index
+    # get index names
+    index_names = []
+    with open(random_index_fasta_path) as f:
+        for line in f:
+            if line.startswith('>'):
+                index_names.append(line.lstrip('>').rstrip())
+    expend_records = []
+    for record in records:
+        for index_name in index_names:
+            uid, lane, r1_out, r2_out = record
+            expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
+    record_df = pd.DataFrame(expend_records, columns=['uid', 'lane', 'r1_path', 'r2_path'])
     record_df.to_csv(output_dir / 'demultiplex.records.csv', index=None)
     return record_df, command_list
 
@@ -106,31 +120,6 @@ def _read_cutadapt_result(result):
     total_df['TotalPair'] = total_pairs
     total_df['Ratio'] = total_df['Trimmed'] / total_pairs
     return total_df
-
-
-def demultiplex_runner(command):
-    """
-    cutadapt command wrapper, run command and parse results
-    """
-    try:
-        cutadapt_run = subprocess.run(shlex.split(command),
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      encoding='utf8',
-                                      check=True)
-        result_df = _read_cutadapt_result(cutadapt_run.stdout)
-    except subprocess.CalledProcessError as e:
-        log.error("Pipeline break, FASTQ demultiplex ERROR! command was:")
-        log.error(command)
-        log.error(e.stdout)
-        log.error(e.stderr)
-        raise e
-
-    p = re.compile(r'-o (?P<r1_output_path>.+-R1.fq.gz)')
-    r1_output_path = pathlib.Path(p.search(command)['r1_output_path'])
-    stat_out = r1_output_path.parent / ('-'.join(r1_output_path.name.split('-')[:4]) + '-demultiplex.stat.csv')
-    result_df.to_csv(stat_out)
-    return
 
 
 def summarize_demultiplex(output_dir, config):

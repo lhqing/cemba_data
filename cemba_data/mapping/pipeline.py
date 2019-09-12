@@ -162,8 +162,11 @@ def summary_pipeline_stat(out_dir):
 
 def pipeline(input_fastq_pattern, output_dir, config_path):
     # test environment
+    from .test_environment import testing_mapping_installation
+    testing_mapping_installation()
 
     # pipeline_fastq
+
 
     # pipeline_mc
 

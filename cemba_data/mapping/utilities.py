@@ -107,7 +107,14 @@ def command_runner(commands, runner=None, cpu=1):
             futures.append(future)
 
         for future in as_completed(futures):
-            future.result()
+            try:
+                future.result()
+            except subprocess.CalledProcessError as e:
+                print("Got error in fastq_qc, command was:")
+                print(command)
+                print(e.stdout)
+                print(e.stderr)
+                raise e
     return
 
 

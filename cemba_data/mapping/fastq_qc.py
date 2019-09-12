@@ -15,6 +15,7 @@ PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
 def fastq_qc(output_dir, config):
+    # TODO add pair end fastq_qc for STAR pair end mapping
     """
     reads level QC and trimming. R1 R2 separately.
     """
@@ -37,18 +38,24 @@ def fastq_qc(output_dir, config):
     total_reads_threshold = int(config['fastqTrim']['total_reads_threshold'])
 
     # determine whether proceed based on number of trimmed reads
-    total_demultiplex_stats = pd.read_csv(output_dir / 'demultiplex.stats.csv')
     use_pairs = set()
-    for (uid, index_name), sub_df in total_demultiplex_stats.groupby(['uid', 'index_name']):
-        sample_demultiplex_total = sub_df['Trimmed'].sum()
-        if sample_demultiplex_total < 1:
-            print(f'In  uid {uid}: index {index_name} is empty.')
-            continue
-        if sample_demultiplex_total < total_reads_threshold:
-            print(f'In  uid {uid}: index {index_name} skipped '
-                  f'due to too less reads: {sample_demultiplex_total}')
-            continue
-        use_pairs.add((uid, index_name))
+    try:
+        total_demultiplex_stats = pd.read_csv(output_dir / 'demultiplex.stats.csv')
+        for (uid, index_name), sub_df in total_demultiplex_stats.groupby(['uid', 'index_name']):
+            sample_demultiplex_total = sub_df['Trimmed'].sum()
+            if sample_demultiplex_total < 1:
+                print(f'In  uid {uid}: index {index_name} is empty.')
+                continue
+            if sample_demultiplex_total < total_reads_threshold:
+                print(f'In  uid {uid}: index {index_name} skipped '
+                      f'due to too less reads: {sample_demultiplex_total}')
+                continue
+            use_pairs.add((uid, index_name))
+    except FileNotFoundError:
+        # stats file not found, could due to dry run mode.
+        # In this case, the command will be generate for every pair of cell
+        for (uid, index_name), sub_df in merge_records_df.groupby(['uid', 'index_name']):
+            use_pairs.add((uid, index_name))
 
     records = []
     command_list = []
@@ -72,7 +79,7 @@ def fastq_qc(output_dir, config):
         cmd = f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
               f'-q {quality_threshold} -u {_left_cut} ' \
               f'-u -{_right_cut} -m {length_threshold} ' \
-              f'-a {_adapter} -o {output_path} {fastq_in_path}'
+              f'-a {_adapter} -o {output_path} {fastq_in_path} > {output_path}.stats.txt'
         records.append([uid, index_name, read_type, output_path])
         command_list.append(cmd)
 
@@ -82,31 +89,6 @@ def fastq_qc(output_dir, config):
                              columns=['uid', 'index_name', 'read_type', 'fastq_path'])
     record_df.to_csv(output_dir / 'fastq_qc.records.csv', index=None)
     return record_df, command_list
-
-
-def fastq_qc_runner(command):
-    try:
-        p = subprocess.run(command,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
-                           encoding='utf8',
-                           shell=True,
-                           check=True)
-        # get R1 result stat
-        output_path = command.split(' ')[-2]
-        lines = []
-        for line in p.stdout.split('\n'):
-            ll = line.split('\t')
-            if len(ll) > 1:
-                lines.append(ll)
-        s = pd.Series({name: number for name, number in zip(*lines)})
-        s.to_csv(output_path + '.fastq_qc.stats.csv', header=True)
-    except subprocess.CalledProcessError as e:
-        log.error("Got error in fastq_qc, command was:")
-        log.error(command)
-        log.error(e.stdout)
-        log.error(e.stderr)
-        raise e
 
 
 def summarize_fastq_qc(output_dir):

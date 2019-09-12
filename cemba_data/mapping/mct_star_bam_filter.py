@@ -109,8 +109,8 @@ def prepare_select_rna_reads(output_dir, config):
     if isinstance(config, str):
         config = get_configuration(config)
 
-    bismark_records = pd.read_csv(output_dir / 'bismark_bam_qc.records.csv',
-                                  index_col=['uid', 'index_name', 'read_type'],
+    bismark_records = pd.read_csv(output_dir / 'star_bam_qc.records.csv',
+                                  index_col=['uid', 'index_name'],
                                   squeeze=True)
     mc_rate_min_threshold = config['RNAReadsFilter']['mc_rate_min_threshold']
     cov_min_threshold = config['RNAReadsFilter']['cov_min_threshold']
@@ -119,13 +119,11 @@ def prepare_select_rna_reads(output_dir, config):
     # process bam
     records = []
     command_list = []
-    for (uid, index_name, read_type), bismark_bam_path in bismark_records.iteritems():
+    for (uid, index_name), bismark_bam_path in bismark_records.iteritems():
         # file path
         output_bam = bismark_bam_path[:-3] + 'rna_reads.bam'
         # command
         # TODO change this to PE mapping, right now only map R1
-        if read_type == 'R2':
-            continue
 
         keep_input_str = '--remove_input' if remove_input else ''
         command = f'yap-internal select-rna-reads ' \
@@ -134,13 +132,13 @@ def prepare_select_rna_reads(output_dir, config):
                   f'--mc_rate_min_threshold {mc_rate_min_threshold} ' \
                   f'--cov_min_threshold {cov_min_threshold} ' \
                   f'{keep_input_str}'
-        records.append([uid, index_name, read_type, output_bam])
+        records.append([uid, index_name, output_bam])
         command_list.append(command)
 
     with open(output_dir / 'select_rna_reads.command.txt', 'w') as f:
         f.write('\n'.join(command_list))
     record_df = pd.DataFrame(records,
-                             columns=['uid', 'index_name', 'read_type', 'bam_path'])
+                             columns=['uid', 'index_name', 'bam_path'])
     record_df.to_csv(output_dir / 'select_rna_reads.records.csv', index=None)
     return record_df, command_list
 

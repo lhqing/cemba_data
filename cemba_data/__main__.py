@@ -353,7 +353,7 @@ def main():
     cur_command = args_vars.pop('command')
     # Do real import here:
     if cur_command == 'qsub':
-        from .local.qsub import qsub as func
+        from cemba_data.qsub import qsub as func
     elif cur_command == 'default-mapping-config':
         from .mapping.pipeline import print_default_configuration as func
     elif cur_command == 'default-plate-info':

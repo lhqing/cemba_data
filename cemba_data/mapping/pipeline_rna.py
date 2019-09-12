@@ -8,7 +8,7 @@ from cemba_data.mapping import \
     summarize_star_mapping, star_bam_qc
 
 
-def pipeline_mc_info(output_dir, config_path, qsub=True, cpu=10):
+def pipeline_rna(output_dir, config_path, qsub=True, cpu=10):
     # create directory
     output_dir = pathlib.Path(output_dir)
     fastq_dir = output_dir / 'fastq'
@@ -29,7 +29,7 @@ def pipeline_mc_info(output_dir, config_path, qsub=True, cpu=10):
     summarize_star_mapping(bam_dir=bam_dir)
 
     # prepare STAR BAM QC
-    star_bam_qc_records, star_bam_qc_commands = star_bam_qc(output_dir=output_dir, config=config_path)
+    star_bam_qc_records, star_bam_qc_commands = star_bam_qc(output_dir=bam_dir, config=config_path)
 
     # runner STAR BAM QC
     if qsub:
@@ -50,6 +50,5 @@ def pipeline_mc_info(output_dir, config_path, qsub=True, cpu=10):
     summarize_select_rna_reads(output_dir=bam_dir)
 
     # feature count
-    
 
     # final summary
