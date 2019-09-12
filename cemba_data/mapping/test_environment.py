@@ -29,9 +29,19 @@ COMMAND_TO_TEST = [
 ]
 
 
-def testing_mapping_installation():
+def testing_mapping_installation(mct=False):
     for command in COMMAND_TO_TEST:
         testing_cmd(command)
 
     # picard always return 1...
     testing_cmd('picard MarkDuplicates --version', 1)
+
+    if mct:
+        testing_cmd('STAR --version')
+
+    # test ALLCools
+    try:
+        testing_cmd('allcools -h')
+    except subprocess.CalledProcessError:
+        print('"allcools -h" return error, see if allcools is installed. \n'
+              'https://github.com/lhqing/ALLCools')

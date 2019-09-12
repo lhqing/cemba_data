@@ -12,8 +12,6 @@ log.addHandler(logging.NullHandler())
 
 
 def bismark_bam_qc(output_dir, config):
-    """
-    """
     output_dir = pathlib.Path(output_dir)
     if isinstance(config, str):
         config = get_configuration(config)

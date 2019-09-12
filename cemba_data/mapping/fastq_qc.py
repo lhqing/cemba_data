@@ -14,8 +14,12 @@ log.addHandler(logging.NullHandler())
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
-def fastq_qc(output_dir, config):
+def fastq_qc_pair_end(output_dir, config):
     # TODO add pair end fastq_qc for STAR pair end mapping
+    return
+
+
+def fastq_qc(output_dir, config):
     """
     reads level QC and trimming. R1 R2 separately.
     """
@@ -98,9 +102,9 @@ def summarize_fastq_qc(output_dir):
         return str(output_path)
 
     records = []
-    fastq_stat_list = list(fastq_dir.glob('*.fastq_qc.stats.csv'))
+    fastq_stat_list = list(fastq_dir.glob('*.trimmed.fq.gz.stats.txt'))
     for path in fastq_stat_list:
-        fastq_qc_stat = pd.read_csv(path, index_col=0, squeeze=True)
+        fastq_qc_stat = pd.read_csv(path, sep='\t').T[0]
         *uid, index_name, suffix = path.name.split('-')
         uid = '-'.join(uid)
         read_type = suffix.split('.')[0]
@@ -110,5 +114,5 @@ def summarize_fastq_qc(output_dir):
         records.append(fastq_qc_stat)
         subprocess.run(['rm', '-f', path], check=True)
     total_stats_df = pd.DataFrame(records)
-    total_stats_df.to_csv(output_path)
+    total_stats_df.to_csv(output_path, index=None)
     return str(output_path)

@@ -25,13 +25,49 @@ def print_default_configuration(out_path=None):
     return
 
 
-def summary_pipeline_stat(out_dir):
+def mapping_summary(output_dir, config_path, mct=False):
+    output_dir = pathlib.Path(output_dir)
+    fastq_dir = output_dir / 'fastq'
+    bismark_bam_dir = output_dir / 'bismark_bam'
+    allc_dir = output_dir / 'allc'
+
+    # summarize fastq
+    from .demultiplex import summarize_demultiplex
+    summarize_demultiplex(fastq_dir, config=config_path)
+    from .fastq_qc import summarize_fastq_qc
+    summarize_fastq_qc(fastq_dir)
+
+    # summarize mapping
+    from .bismark_mapping import summarize_bismark_mapping
+    summarize_bismark_mapping(bismark_bam_dir)
+    from .bismark_bam_qc import summarize_bismark_bam_qc
+    summarize_bismark_bam_qc(bismark_bam_dir)
+
+    # mCT specific
+    if mct:
+        from .mct_bismark_bam_filter import summarize_select_dna_reads
+        summarize_select_dna_reads(bismark_bam_dir, config_path)
+
+        from .star_mapping import summarize_star_mapping
+        star_bam_dir = output_dir / 'star_bam'
+        summarize_star_mapping(star_bam_dir)
+        from .mct_star_bam_filter import summarize_select_rna_reads
+        summarize_select_rna_reads(star_bam_dir, config_path)
+
+    # summarize allc
+    from .generate_allc import summarize_generate_allc
+    summarize_generate_allc(allc_dir)
+
+    # aggregate_all_summary(output_dir)
+
+
+def aggregate_all_summary(output_dir):
     """
     Combine all statistics and do some additional computation.
 
     Parameters
     ----------
-    out_dir
+    output_dir
         Pipeline universal directory
 
     Returns
@@ -40,11 +76,11 @@ def summary_pipeline_stat(out_dir):
         dataframe contain every parts of metadata.
         Each row is a cell, some metadata are reduced in some way, such as lanes.
     """
-    out_dir = pathlib.Path(out_dir)
+    output_dir = pathlib.Path(output_dir)
 
     # merge all stats dataframe
     stat_dict = collections.defaultdict(list)
-    for f in out_dir.glob('**/stats/*tsv.gz'):
+    for f in output_dir.glob('**/stats/*tsv.gz'):
         df = pd.read_csv(f, sep='\t')
         stat_dict[f.name.split('.')[0]].append(df)
     # result df is a dict contain 5 concat dfs for raw metadata
@@ -52,7 +88,7 @@ def summary_pipeline_stat(out_dir):
     for k, v in stat_dict.items():
         result_dfs[k] = pd.concat(v, ignore_index=True, sort=True)
     # save all concatenated stats into output_dir level stats folder
-    total_stats = out_dir / 'stats'
+    total_stats = output_dir / 'stats'
     total_stats.mkdir(exist_ok=True)
     for k, v in result_dfs.items():
         k_path = total_stats / f'{k}.tsv.gz'
@@ -151,7 +187,7 @@ def summary_pipeline_stat(out_dir):
 
     # file paths
     allc_dict = {}
-    for f in out_dir.glob('**/allc*tsv.gz'):
+    for f in output_dir.glob('**/allc*tsv.gz'):
         if 'stats' in f.parent.name:
             continue
         _, uid, index_name = (f.name.split('.')[0].split('_'))
@@ -160,18 +196,48 @@ def summary_pipeline_stat(out_dir):
     return total_meta
 
 
-def pipeline(input_fastq_pattern, output_dir, config_path):
+def pipeline(input_fastq_pattern,
+             output_dir,
+             config_path,
+             mct=False,
+             mode='command_only',
+             cpu=10):
     # test environment
-    from .test_environment import testing_mapping_installation
-    testing_mapping_installation()
+    from cemba_data.mapping.test_environment import testing_mapping_installation
+    testing_mapping_installation(mct=mct)
 
     # pipeline_fastq
-
+    from cemba_data.mapping.pipeline_fastq import pipeline_fastq
+    pipeline_fastq(input_fastq_pattern,
+                   output_dir,
+                   config_path,
+                   mode=mode,
+                   cpu=cpu)
+    # TODO add pipeline that start from post demultiplex
 
     # pipeline_mc
+    from cemba_data.mapping.pipeline_mc import pipeline_mc
+    pipeline_mc(output_dir,
+                config_path,
+                mct=mct,
+                mode=mode,
+                cpu=cpu)
 
     # if mct: pipeline_rna
+    if mct:
+        from cemba_data.mapping.pipeline_rna import pipeline_rna
+        pipeline_rna(output_dir,
+                     config_path,
+                     mode=mode,
+                     cpu=cpu)
+
+    # TODO final summary
+    # agg all files
+    # run jupyter notebook visualization
 
     # pipeline mcds
+    # TODO generate MCDS command
+
+    # TODO each individual pipeline step should be able to run separately
 
     return 0

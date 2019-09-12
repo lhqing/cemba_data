@@ -15,6 +15,80 @@ log.addHandler(logging.NullHandler())
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
+def bismark_mapping(input_dir, output_dir, config):
+    """
+    reads level QC and trimming. R1 R2 separately.
+    """
+    output_dir = pathlib.Path(output_dir)
+    input_dir = pathlib.Path(input_dir)
+    fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
+                                   index_col=['uid', 'index_name', 'read_type'], squeeze=True)
+    if isinstance(config, str):
+        config = get_configuration(config)
+
+    bismark_reference = config['bismark']['bismark_reference']
+    read_min = int(config['bismark']['read_min'])
+    read_max = int(config['bismark']['read_max'])
+    try:
+        remove_fastq_input = config['bismark']['remove_fastq_input']
+    except KeyError:
+        remove_fastq_input = 'True'
+        log.warning('remove_fastq_input not found in config.ini file, you are using the old version'
+                    'please update your config.ini use yap default-mapping-config')
+
+    fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
+    try:
+        fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
+        # sort by total reads, map large sample first
+        sample_dict = {}
+        for (uid, index_name), sub_df in fastq_qc_stats.sort_values('out_reads').groupby(['uid', 'index_name']):
+            sample_dict[(uid, index_name)] = sub_df['out_reads'].astype(int).sum()
+        sorted_sample = sorted(sample_dict.items(), key=operator.itemgetter(1), reverse=True)
+    except FileNotFoundError:
+        # not stats means in dry run mode, will generate command for every record
+        sorted_sample = []
+        for (uid, index_name), _ in fastq_qc_records.groupby(['uid', 'index_name']):
+            sorted_sample.append([(uid, index_name), -1])
+
+    records = []
+    command_list = []
+    for (uid, index_name), total_reads in sorted_sample:
+        if index_name == 'unknown':
+            continue
+        elif total_reads == -1:
+            pass
+        elif total_reads < read_min:
+            log.info(f"Drop cell due to too less reads: {uid} {index_name}, total reads {total_reads}")
+            continue
+        elif total_reads > read_max:
+            log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
+            continue
+        r1_fastq = fastq_qc_records[(uid, index_name, 'R1')]
+        remove_cmd = f' && rm -f {r1_fastq}' if (remove_fastq_input.lower() in ['y', 'yes', 't', 'true']) else ''
+        # run R1 with pbat mode
+        r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} ' \
+                 f'--pbat -o {output_dir} --temp_dir {output_dir}{remove_cmd}'
+        r1_output_path = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '_bismark_bt2.bam')  # bismark convention
+        command_list.append(r1_cmd)
+        records.append([uid, index_name, 'R1', r1_output_path])
+
+        r2_fastq = fastq_qc_records[(uid, index_name, 'R2')]
+        # run R2 with normal mode
+        remove_cmd = f' && rm -f {r2_fastq}' if (remove_fastq_input.lower() in ['y', 'yes', 't', 'true']) else ''
+        r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq} ' \
+                 f'-o {output_dir} --temp_dir {output_dir}{remove_cmd}'
+        r2_output_path = output_dir / (pathlib.Path(r2_fastq).name[:-6] + '_bismark_bt2.bam')  # bismark convention
+        command_list.append(r2_cmd)
+        records.append([uid, index_name, 'R2', r2_output_path])
+
+    with open(output_dir / 'bismark_mapping.command.txt', 'w') as f:
+        f.write('\n'.join(command_list))
+    record_df = pd.DataFrame(records,
+                             columns=['uid', 'index_name', 'read_type', 'bam_path'])
+    record_df.to_csv(output_dir / 'bismark_mapping.records.csv', index=None)
+    return record_df, command_list
+
+
 def _parse_bismark_report(report_path):
     """
     Some ugly parser for bismark_mapping report... Hope Bismark won't change...
@@ -54,70 +128,6 @@ def _parse_bismark_report(report_path):
             except KeyError:
                 pass
     return pd.Series(report_dict)
-
-
-def bismark_mapping(input_dir, output_dir, config):
-    """
-    reads level QC and trimming. R1 R2 separately.
-    """
-    output_dir = pathlib.Path(output_dir)
-    input_dir = pathlib.Path(input_dir)
-    fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
-                                   index_col=['uid', 'index_name', 'read_type'], squeeze=True)
-    fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
-    fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
-
-    if isinstance(config, str):
-        config = get_configuration(config)
-
-    bismark_reference = config['bismark']['bismark_reference']
-    read_min = int(config['bismark']['read_min'])
-    read_max = int(config['bismark']['read_max'])
-    try:
-        remove_fastq_input = config['bismark']['remove_fastq_input']
-    except KeyError:
-        remove_fastq_input = 'True'
-        log.warning('remove_fastq_input not found in config.ini file, you are using the old version'
-                    'please update your config.ini use yap default-mapping-config')
-    # sort by total reads, map large sample first
-    sample_dict = {}
-    for (uid, index_name), sub_df in fastq_qc_stats.sort_values('out_reads').groupby(['uid', 'index_name']):
-        sample_dict[(uid, index_name)] = sub_df['out_reads'].astype(int).sum()
-    sorted_sample = sorted(sample_dict.items(), key=operator.itemgetter(1), reverse=True)
-
-    records = []
-    command_list = []
-    for (uid, index_name), total_reads in sorted_sample:
-        if index_name == 'unknown':
-            continue
-        if total_reads < read_min:
-            log.info(f"Drop cell due to too less reads: {uid} {index_name}, total reads {total_reads}")
-            continue
-        if total_reads > read_max:
-            log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
-            continue
-        r1_fastq = fastq_qc_records[(uid, index_name, 'R1')]
-        remove_cmd = f' && rm -f {r1_fastq}' if (remove_fastq_input.lower() in ['y', 'yes', 't', 'true']) else ''
-        r1_cmd = f'bismark {bismark_reference} --bowtie2 {r1_fastq} ' \
-                 f'--pbat -o {output_dir} --temp_dir {output_dir}{remove_cmd}'
-        r1_output_path = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '_bismark_bt2.bam')  # bismark convention
-        command_list.append(r1_cmd)
-        records.append([uid, index_name, 'R1', r1_output_path])
-
-        r2_fastq = fastq_qc_records[(uid, index_name, 'R2')]
-        remove_cmd = f' && rm -f {r2_fastq}' if (remove_fastq_input.lower() in ['y', 'yes', 't', 'true']) else ''
-        r2_cmd = f'bismark {bismark_reference} --bowtie2 {r2_fastq} ' \
-                 f'-o {output_dir} --temp_dir {output_dir}{remove_cmd}'
-        r2_output_path = output_dir / (pathlib.Path(r2_fastq).name[:-6] + '_bismark_bt2.bam')  # bismark convention
-        command_list.append(r2_cmd)
-        records.append([uid, index_name, 'R2', r2_output_path])
-
-    with open(output_dir / 'bismark_mapping.command.txt', 'w') as f:
-        f.write('\n'.join(command_list))
-    record_df = pd.DataFrame(records,
-                             columns=['uid', 'index_name', 'read_type', 'bam_path'])
-    record_df.to_csv(output_dir / 'bismark_mapping.records.csv', index=None)
-    return record_df, command_list
 
 
 def summarize_bismark_mapping(output_dir):

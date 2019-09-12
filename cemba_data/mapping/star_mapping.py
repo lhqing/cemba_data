@@ -6,7 +6,6 @@ import subprocess
 import pandas as pd
 
 import cemba_data
-from .fastq_qc import summarize_fastq_qc
 from .utilities import get_configuration
 
 # logger
@@ -24,9 +23,6 @@ def star_mapping(input_dir, output_dir, config):
     input_dir = pathlib.Path(input_dir)
     fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
                                    index_col=['uid', 'index_name', 'read_type'], squeeze=True)
-    fastq_qc_stats_path = summarize_fastq_qc(input_dir)
-    fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
-
     if isinstance(config, str):
         config = get_configuration(config)
 
@@ -35,32 +31,43 @@ def star_mapping(input_dir, output_dir, config):
     read_max = int(config['star']['read_max'])
     threads = int(config['star']['threads'])
 
-    # sort by total reads, map large sample first
-    sample_dict = {}
-    for (uid, index_name), sub_df in fastq_qc_stats.sort_values('out_reads').groupby(['uid', 'index_name']):
-        sample_dict[(uid, index_name)] = sub_df['out_reads'].astype(int).sum()
-    sorted_sample = sorted(sample_dict.items(), key=operator.itemgetter(1), reverse=True)
+    try:
+        fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
+        fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
+        # sort by total reads, map large sample first
+        sample_dict = {}
+        for (uid, index_name), sub_df in fastq_qc_stats.sort_values('out_reads').groupby(['uid', 'index_name']):
+            sample_dict[(uid, index_name)] = sub_df['out_reads'].astype(int).sum()
+        sorted_sample = sorted(sample_dict.items(), key=operator.itemgetter(1), reverse=True)
+    except FileNotFoundError:
+        # not stats means in dry run mode, will generate command for every record
+        sorted_sample = []
+        for (uid, index_name), _ in fastq_qc_records.groupby(['uid', 'index_name']):
+            sorted_sample.append([(uid, index_name), -1])
 
     records = []
     command_list = []
     for (uid, index_name), total_reads in sorted_sample:
         if index_name == 'unknown':
             continue
-        if total_reads < read_min:
+        elif total_reads == -1:
+            pass
+        elif total_reads < read_min:
             log.info(f"Drop cell due to too less reads: {uid} {index_name}, total reads {total_reads}")
             continue
-        if total_reads > read_max:
+        elif total_reads > read_max:
             log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
             continue
 
         # for RNA part, only map R1
+        # TODO Do pair end mapping...
         r1_fastq = fastq_qc_records[(uid, index_name, 'R1')]
         output_prefix = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.')
         output_path = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.Aligned.out.bam')  # STAR convention
         star_cmd = f'STAR --runThreadN {threads} ' \
                    f'--genomeDir {star_reference} ' \
-                   f'--genomeLoad LoadAndKeep ' \
                    f'--alignEndsType EndToEnd ' \
+                   f'--genomeLoad LoadAndRemove ' \
                    f'--outSAMstrandField intronMotif ' \
                    f'--outSAMtype BAM Unsorted ' \
                    f'--outSAMunmapped Within ' \

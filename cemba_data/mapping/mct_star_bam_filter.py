@@ -143,33 +143,40 @@ def prepare_select_rna_reads(output_dir, config):
     return record_df, command_list
 
 
-def summarize_select_rna_reads(output_dir):
+def summarize_select_rna_reads(output_dir, config):
     bam_dir = pathlib.Path(output_dir)
     output_path = bam_dir / 'select_rna_reads.stats.csv'
     if output_path.exists():
         return str(output_path)
+    if isinstance(config, str):
+        config = get_configuration(config)
 
     records = []
-    select_rna_reads_stat_list = list(bam_dir.glob('*.reads_profile.csv'))
-    for path in select_rna_reads_stat_list:
+    select_dna_reads_stat_list = list(bam_dir.glob('*.reads_profile.csv'))
+    for path in select_dna_reads_stat_list:
         try:
-            report_df = pd.read_csv(path)
+            _df = pd.read_csv(path)
+            if _df.shape[0] == 0:
+                subprocess.run(['rm', '-f', path])
+                continue
+            _df.columns = ['mch_rate', 'ch_cov', 'read_count']
+            report_series = pd.Series({col_name: '|'.join(col.astype(str))
+                                       for col_name, col in _df.iteritems()})
         except pd.errors.EmptyDataError:
             # means the bam file is empty
-            subprocess.run(['rm', '-f', path])
-            continue
-        if report_df.shape[0] == 0:
             subprocess.run(['rm', '-f', path])
             continue
 
         *uid, index_name, suffix = path.name.split('-')
         uid = '-'.join(uid)
         read_type = suffix.split('.')[0]
-        report_df['uid'] = uid
-        report_df['index_name'] = index_name
-        report_df['read_type'] = read_type
-        records.append(report_df)
+        report_series['uid'] = uid
+        report_series['index_name'] = index_name
+        report_series['read_type'] = read_type
+        report_series['mc_rate_max_threshold'] = config['DNAReadsFilter']['mc_rate_max_threshold']
+        report_series['cov_min_threshold'] = config['DNAReadsFilter']['cov_min_threshold']
+        records.append(report_series)
         subprocess.run(['rm', '-f', path])
-    total_stats_df = pd.concat(records)
+    total_stats_df = pd.DataFrame(records)
     total_stats_df.to_csv(output_path, index=None)
     return str(output_path)

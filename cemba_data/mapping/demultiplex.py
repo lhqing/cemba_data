@@ -13,7 +13,6 @@ import locale
 import logging
 import pathlib
 import re
-import shlex
 import subprocess
 
 import pandas as pd
@@ -92,39 +91,42 @@ def demultiplex(output_dir: str, config: str):
     return record_df, command_list
 
 
-def _read_cutadapt_result(result):
+def _read_cutadapt_result(stat_path):
     """
     Ugly parser of cutadapt output
     TODO: make this nicer, add example output
     """
-    p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
-    series = []
-    total_pairs = -1
-    for line in result.split('\n'):
-        if line.startswith('Total read pairs processed'):
-            # some weird transform of cutadapt outputs...
-            locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-            total_pairs = locale.atoi(line.split(' ')[-1])
+    with open(stat_path) as f:
+        p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
+        series = []
+        total_pairs = -1
+        for line in f:
+            if line.startswith('Total read pairs processed'):
+                # some weird transform of cutadapt outputs...
+                locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+                total_pairs = locale.atoi(line.split(' ')[-1])
 
-        m = p.search(line)
-        if m is not None:
-            result_dict = {}
-            for i in m.group().split('; '):
-                k, v = i.split(': ')
-                result_dict[k] = v
-            result_series = pd.Series(result_dict)
-            series.append(result_series)
-
-    total_df = pd.DataFrame(series)
-    total_df['Trimmed'] = total_df['Trimmed'].apply(lambda c: c.split(' ')[0]).astype(int)
-    total_df['TotalPair'] = total_pairs
-    total_df['Ratio'] = total_df['Trimmed'] / total_pairs
+            m = p.search(line)
+            if m is not None:
+                result_dict = {}
+                for i in m.group().split('; '):
+                    k, v = i.split(': ')
+                    result_dict[k] = v
+                result_series = pd.Series(result_dict)
+                series.append(result_series)
+        total_df = pd.DataFrame(series)
+        total_df['Trimmed'] = total_df['Trimmed'].apply(lambda c: c.split(' ')[0]).astype(int)
+        total_df['TotalPair'] = total_pairs
+        total_df['Ratio'] = total_df['Trimmed'] / total_pairs
     return total_df
 
 
 def summarize_demultiplex(output_dir, config):
     output_dir = pathlib.Path(output_dir)
     config = get_configuration(config)
+    output_path = output_dir / 'demultiplex.stats.csv'
+    if output_path.exists():
+        return pd.read_csv(output_path)
 
     # get index info
     random_index_version = config['multiplexIndex']['version']
@@ -142,9 +144,9 @@ def summarize_demultiplex(output_dir, config):
     # read the demultiplex stats, its per lane, so need to sum up lane together of each uid and index name
     # but R1 R2 is demultiplexed together, so this table don't separate R1 R2
     stat_list = []
-    stat_path_list = list(output_dir.glob('*demultiplex.stat.csv'))
+    stat_path_list = list(output_dir.glob('*demultiplex.stats.txt'))
     for path in stat_path_list:
-        single_df = pd.read_csv(path, index_col=0)
+        single_df = _read_cutadapt_result(path)
         *uid, lane, _ = path.name.split('-')
         uid = '-'.join(uid)
         single_df['uid'] = uid
@@ -153,6 +155,6 @@ def summarize_demultiplex(output_dir, config):
         assert single_df['index_name'].isna().sum() == 0
         stat_list.append(single_df)
     total_demultiplex_stats = pd.concat(stat_list)
-    total_demultiplex_stats.to_csv(output_dir / 'demultiplex.stats.csv', index=None)
+    total_demultiplex_stats.to_csv(output_path, index=None)
     subprocess.run(['rm', '-f'] + list(map(str, stat_path_list)))
     return total_demultiplex_stats

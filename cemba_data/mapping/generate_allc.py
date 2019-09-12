@@ -61,7 +61,6 @@ def summarize_generate_allc(output_dir):
             subprocess.run(['rm', '-f', path])
             continue
         if report_df.shape[0] == 0:
-            subprocess.run(['rm', '-f', path])
             continue
 
         *uid, suffix = path.name.split('-')
