@@ -3,11 +3,9 @@ import pathlib
 from cemba_data.mapping import \
     bismark_mapping, \
     command_runner, \
-    summarize_bismark_mapping, \
     bismark_bam_qc, \
-    summarize_bismark_bam_qc, \
     merge_bam, \
-    generate_allc, summarize_generate_allc, prepare_select_dna_reads, summarize_select_dna_reads
+    generate_allc, prepare_select_dna_reads
 from cemba_data.qsub import qsub
 
 
@@ -39,9 +37,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 4;-l h_vmem=5G',
-             submission_gap=1,
-             qstat_gap=60)
+             qsub_global_parms='-pe smp 4;-l h_vmem=5G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -64,9 +60,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 1;-l h_vmem=5G',
-             submission_gap=1,
-             qstat_gap=60)
+             qsub_global_parms='-pe smp 2;-l h_vmem=4G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -89,9 +83,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
                  total_cpu=cpu,
                  total_mem=500,
                  force_redo=False,
-                 qsub_global_parms='-pe smp 1;-l h_vmem=5G',
-                 submission_gap=1,
-                 qstat_gap=60)
+                 qsub_global_parms='-pe smp 1;-l h_vmem=5G')
         elif mode == 'command_only':
             pass
         elif mode == 'local':
@@ -118,9 +110,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 1;-l h_vmem=5G',
-             submission_gap=1,
-             qstat_gap=60)
+             qsub_global_parms='-pe smp 1;-l h_vmem=5G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -144,26 +134,10 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 1;-l h_vmem=5G',
-             submission_gap=1,
-             qstat_gap=60)
+             qsub_global_parms='-pe smp 2;-l h_vmem=4G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
         command_runner(allc_commands, runner=None, cpu=cpu)
     else:
         raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
-
-
-def summarize_mapping(bam_dir, allc_dir):
-    # summarize bismark mapping
-    summarize_bismark_mapping(output_dir=bam_dir)
-
-    # summarize bismark bam qc
-    summarize_bismark_bam_qc(output_dir=bam_dir)
-
-    # summarize select DNA
-    summarize_select_dna_reads(output_dir=bam_dir)
-
-    # summarize generate ALLC
-    summarize_generate_allc(allc_dir)

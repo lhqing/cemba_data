@@ -17,8 +17,8 @@ import time
 import shutil
 import pandas as pd
 
-SUBMISSION_GAP = 2
-QSTAT_GAP = 30
+SUBMISSION_GAP = 1
+QSTAT_GAP_INIT = 5
 
 
 def _default_command_dict(name, error_path, output_path, working_dir,
@@ -89,9 +89,9 @@ def _get_running_job_id_qstat(user_name, id_set):
 
 class _Qsubmitter:
     def __init__(self, command_file_path, working_dir, project_name, force_redo=False, global_parm_dict=None,
-                 total_cpu=60, total_mem=500, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
+                 total_cpu=60, total_mem=500, submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP_INIT):
         # prepare working_dir
-        self.working_dir = working_dir
+        self.working_dir = str(working_dir)
         if project_name[0].isdigit():
             raise ValueError('Project name can not start with number, qsub will fail.')
         self.project_name = project_name
@@ -467,7 +467,8 @@ class _Command:
 
 def qsub(command_file_path, working_dir, project_name, wait_until=None,
          total_cpu=60, total_mem=500, force_redo=False, qsub_global_parms='',
-         submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP):
+         submission_gap=SUBMISSION_GAP, qstat_gap=QSTAT_GAP_INIT):
+    working_dir = str(working_dir)
     # deal with qsub_global_parms:
     global_parm_dict = {}
     for parm_pair in qsub_global_parms.split(';'):

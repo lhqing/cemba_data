@@ -31,6 +31,10 @@ def bismark_mapping(input_dir, output_dir, config):
     read_max = int(config['bismark']['read_max'])
     try:
         remove_fastq_input = config['bismark']['remove_fastq_input']
+        if 'mct' in config and (config['mct'].lower() in ['true', 't', 'yes', 'y']):
+            # for mCT seq, do not remove filtered fastq, cause STAR mapping use it
+            remove_fastq_input = False
+
     except KeyError:
         remove_fastq_input = 'True'
         log.warning('remove_fastq_input not found in config.ini file, you are using the old version'

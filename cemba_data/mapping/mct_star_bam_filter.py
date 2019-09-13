@@ -173,8 +173,8 @@ def summarize_select_rna_reads(output_dir, config):
         report_series['uid'] = uid
         report_series['index_name'] = index_name
         report_series['read_type'] = read_type
-        report_series['mc_rate_max_threshold'] = config['DNAReadsFilter']['mc_rate_max_threshold']
-        report_series['cov_min_threshold'] = config['DNAReadsFilter']['cov_min_threshold']
+        report_series['mc_rate_min_threshold'] = config['RNAReadsFilter']['mc_rate_min_threshold']
+        report_series['cov_min_threshold'] = config['RNAReadsFilter']['cov_min_threshold']
         records.append(report_series)
         subprocess.run(['rm', '-f', path])
     total_stats_df = pd.DataFrame(records)

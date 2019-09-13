@@ -147,7 +147,8 @@ def summarize_demultiplex(output_dir, config):
     stat_path_list = list(output_dir.glob('*demultiplex.stats.txt'))
     for path in stat_path_list:
         single_df = _read_cutadapt_result(path)
-        *uid, lane, _ = path.name.split('-')
+        *uid, suffix = path.name.split('-')
+        lane = suffix.split('.')[0]
         uid = '-'.join(uid)
         single_df['uid'] = uid
         single_df['lane'] = lane

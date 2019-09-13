@@ -180,48 +180,6 @@ def qsub_register_subparser(subparser):
     return
 
 
-def pipeline_register_subparser(subparser):
-    parser = subparser.add_parser('mapping',
-                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Mapping pipeline from multiplexed FASTQ file to ALLC file.")
-
-    parser_req = parser.add_argument_group("Required inputs")
-    parser_opt = parser.add_argument_group("Optional inputs")
-
-    parser_req.add_argument(
-        "--fastq_dataframe",
-        type=str,
-        required=True,
-        help="Path of fastq dataframe, can be generate with yap fastq_dataframe"
-    )
-
-    parser_req.add_argument(
-        "--output_dir",
-        type=str,
-        required=True,
-        help="Pipeline output directory, if not exist, will create recursively."
-    )
-
-    parser_req.add_argument(
-        "--config_path",
-        type=str,
-        required=True,
-        default=None,
-        help="Pipeline configuration (.ini) file path. "
-             "You can use 'yap default-mapping-config' to print out default config can modify it."
-    )
-
-    parser_opt.add_argument(
-        "--demultiplex_only",
-        dest='demultiplex_only',
-        action='store_true',
-        help="(Not for mapping) Only demultiplex 8-cell FASTQ into single cell FASTQ by AD index and then quit"
-    )
-    parser.set_defaults(demultiplex_only=False)
-
-    return
-
-
 def print_default_config_register_subparser(subparser):
     parser = subparser.add_parser('default-mapping-config',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -278,19 +236,18 @@ def make_sample_sheet_register_subparser(subparser):
     return
 
 
-def batch_pipeline_register_subparser(subparser):
-    parser = subparser.add_parser('mapping-qsub',
+def pipeline_register_subparser(subparser):
+    parser = subparser.add_parser('mapping',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Batch mapping pipeline from multiplexed FASTQ file to ALLC file. "
-                                       "Return a command.json file for yap qsub to submit on qsub.")
+                                  help="Batch mapping pipeline from bcl2fastq multiplexed FASTQ file to ALLC file. ")
 
     parser_req = parser.add_argument_group("Required inputs")
 
     parser_req.add_argument(
-        "--fastq_dataframe",
+        "--input_fastq_pattern",
         type=str,
         required=True,
-        help="Path of fastq dataframe, can be generate with yap fastq_dataframe"
+        help="File path pattern with wildcards of demultiplexed fastq files"
     )
 
     parser_req.add_argument(
@@ -308,7 +265,58 @@ def batch_pipeline_register_subparser(subparser):
         help="Pipeline configuration (.ini) file path. "
              "You can use 'yap default-mapping-config' to print out default config can modify it."
     )
+
+    parser.add_argument(
+        "--mct",
+        dest='mct',
+        action='store_true',
+        help="Set this parameter if this library is mCT seq"
+    )
+    parser.set_defaults(mct=False)
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default='command_only',
+        choices=['command_only', 'qsub', 'local'],
+        help="Run mode, if command_only, will only generate command files but not execute; "
+             "if qsub, will execute with SGE qsub system; "
+             "if local, will execute with current system, only use this for debugging."
+    )
+    parser.set_defaults(mct=False)
     return
+
+
+def mapping_summary_register_subparser(subparser):
+    parser = subparser.add_parser('mapping-summary',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Mapping summary after the pipeline finished.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Pipeline output directory, if not exist, will create recursively."
+    )
+
+    parser_req.add_argument(
+        "--config_path",
+        type=str,
+        required=True,
+        default=None,
+        help="Pipeline configuration (.ini) file path. "
+             "You can use 'yap default-mapping-config' to print out default config can modify it."
+    )
+
+    parser.add_argument(
+        "--mct",
+        dest='mct',
+        action='store_true',
+        help="Set this parameter if this library is mCT seq"
+    )
+    parser.set_defaults(mct=False)
 
 
 def main():
@@ -360,6 +368,10 @@ def main():
         from .mapping import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
         from .mapping import make_sample_sheet as func
+    elif cur_command == 'mapping':
+        from .mapping.pipeline import pipeline as func
+    elif cur_command == 'mapping-summary':
+        from .mapping.summary import mapping_summary as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
@@ -370,8 +382,6 @@ def main():
     func(**args_vars)
     log.info(f"# {cur_command} finished.")
     return
-
-
 
 
 if __name__ == '__main__':

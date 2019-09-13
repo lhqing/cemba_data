@@ -29,7 +29,9 @@ def star_mapping(input_dir, output_dir, config):
     star_reference = config['star']['star_reference']
     read_min = int(config['star']['read_min'])
     read_max = int(config['star']['read_max'])
-    threads = int(config['star']['threads'])
+    # Do not allow to change threads
+    # threads = int(config['star']['threads'])
+    threads = 6
 
     try:
         fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
@@ -67,7 +69,7 @@ def star_mapping(input_dir, output_dir, config):
         star_cmd = f'STAR --runThreadN {threads} ' \
                    f'--genomeDir {star_reference} ' \
                    f'--alignEndsType EndToEnd ' \
-                   f'--genomeLoad LoadAndRemove ' \
+                   f'--genomeLoad NoSharedMemory ' \
                    f'--outSAMstrandField intronMotif ' \
                    f'--outSAMtype BAM Unsorted ' \
                    f'--outSAMunmapped Within ' \

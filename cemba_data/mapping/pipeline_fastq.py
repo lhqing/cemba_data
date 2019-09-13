@@ -5,9 +5,7 @@ from cemba_data.mapping import \
     demultiplex, \
     merge_lane, \
     fastq_qc, \
-    command_runner, \
-    summarize_demultiplex, \
-    summarize_fastq_qc
+    command_runner
 from cemba_data.qsub import qsub
 
 
@@ -40,9 +38,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_o
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 2;-l h_vmem=3G',
-             submission_gap=1,
-             qstat_gap=30)
+             qsub_global_parms='-pe smp 2;-l h_vmem=3G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -66,9 +62,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_o
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms=f'-pe smp 2;-l h_vmem=3G',
-             submission_gap=1,
-             qstat_gap=30)
+             qsub_global_parms=f'-pe smp 2;-l h_vmem=3G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -92,9 +86,7 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_o
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms=f'-pe smp 2;-l h_vmem=3G',
-             submission_gap=1,
-             qstat_gap=30)
+             qsub_global_parms=f'-pe smp 2;-l h_vmem=3G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -102,8 +94,3 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_o
     else:
         raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
     return
-
-
-def summarize_fastq(fastq_dir, config_path):
-    summarize_demultiplex(output_dir=fastq_dir, config=config_path)
-    summarize_fastq_qc(output_dir=fastq_dir)
