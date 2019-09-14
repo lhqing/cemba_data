@@ -13,7 +13,9 @@
      \/__/         \/__/         \/__/         \/__/         \/__/
 </pre>
 
-# CEMBA Data Processing (0.1.2)
+# CEMBA Data Processing
 Project for in-house snmC-seq, NOMe-seq, and snmCT-seq mapping and preprocessing
 
-## [See Documentation Here](https://cemba-data.readthedocs.io/en/latest/?)
+[See Documentation Here](https://cemba-data.readthedocs.io/en/latest/?)
+
+[![Documentation Status](https://readthedocs.org/projects/cemba-data/badge/?version=latest)](https://cemba-data.readthedocs.io/en/latest/?badge=latest)
