@@ -39,7 +39,7 @@ def demultiplex(output_dir: str, config: str):
     fastq_dataframe = pd.read_csv(output_dir / 'fastq_dataframe.csv')
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
 
-    random_index_version = config['multiplexIndex']['version']
+    random_index_version = config['multiplexIndex']['barcode_version']
     if random_index_version.upper() == 'V1':
         random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
     elif random_index_version.upper() == 'V2':
@@ -129,7 +129,7 @@ def summarize_demultiplex(output_dir, config):
         return pd.read_csv(output_path)
 
     # get index info
-    random_index_version = config['multiplexIndex']['version']
+    random_index_version = config['multiplexIndex']['barcode_version']
     if random_index_version.upper() == 'V1':
         random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
     elif random_index_version.upper() == 'V2':

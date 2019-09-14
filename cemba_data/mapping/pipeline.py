@@ -27,8 +27,6 @@ def print_default_configuration(mode='mc'):
 
 
 def command_order(output_dir):
-    command_files = {path.name.split('.')[0]: path
-                     for path in pathlib.Path(output_dir).glob('qsub/*/*command*')}
     command_order_full = ['demultiplex_commands',
                           'merge_lane_commands',
                           'fastq_qc_commands',
@@ -36,10 +34,18 @@ def command_order(output_dir):
                           'bam_qc_commands',
                           'select_dna_commands',
                           'final_bam_commands',
+                          'allc_commands',
                           'star_mapping_commands',
                           'star_bam_qc_commands',
                           'select_rna_commands']
-    with open(output_dir / 'command_order.txt', 'w') as f:
+
+    command_files = {path.name.split('.')[0]: path
+                     for path in pathlib.Path(output_dir).glob('qsub/*/*command*')}
+    for key in command_files.keys():
+        if key not in command_order_full:
+            raise KeyError(f'Found unknown command file name {key}.')
+
+    with open(pathlib.Path(output_dir) / 'command_order.txt', 'w') as f:
         for command_name in command_order_full:
             try:
                 f.write(str(command_files[command_name]) + '\n')

@@ -33,7 +33,7 @@ def bismark_mapping(input_dir, output_dir, config):
         remove_fastq_input = config['bismark']['remove_fastq_input']
         if 'mct' in config['mode']['mode'].lower():
             # for mCT seq, do not remove filtered fastq, cause STAR mapping use it
-            remove_fastq_input = False
+            remove_fastq_input = 'False'
 
     except KeyError:
         remove_fastq_input = 'True'
