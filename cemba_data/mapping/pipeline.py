@@ -1,24 +1,26 @@
 import logging
 import os
 import pathlib
-
 import subprocess
+
+from cemba_data.mapping import get_configuration
 
 # logger
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
+MAPPING_MODE_CHOICES = ['mc', 'mct', 'nome', 'mct-nome']
 
-def print_default_configuration(out_path=None):
+
+def print_default_configuration(mode='mc'):
     """
     Print default .ini config file or save to out_path
     """
-    with open(os.path.dirname(__file__) + '/mapping_config.ini') as f:
+    mode = mode.lower()
+    if mode not in MAPPING_MODE_CHOICES:
+        raise ValueError(f'Unknown mode: {mode}')
+    with open(os.path.dirname(__file__) + f'/mapping_config_{mode}.ini') as f:
         configs = f.readlines()
-    if out_path is not None:
-        with open(out_path, 'w') as f:
-            f.writelines(configs)
-    else:
         for line in configs:
             print(line, end='')
     return
@@ -27,7 +29,7 @@ def print_default_configuration(out_path=None):
 def pipeline(input_fastq_pattern,
              output_dir,
              config_path,
-             mct=False,
+             fastq_dataframe_path=None,
              mode='command_only',
              cpu=10):
     _output_dir = pathlib.Path(output_dir)
@@ -35,6 +37,9 @@ def pipeline(input_fastq_pattern,
     _config_path = str(_output_dir / pathlib.Path(config_path).name)
     subprocess.run(['cp', str(config_path), _config_path], check=True)
     config_path = _config_path
+
+    config = get_configuration(config_path)
+    mct = 'mct' in config['mode']['mode'].lower()
 
     # test environment
     from cemba_data.mapping.test_environment import testing_mapping_installation
@@ -45,6 +50,7 @@ def pipeline(input_fastq_pattern,
     pipeline_fastq(input_fastq_pattern,
                    output_dir,
                    config_path,
+                   fastq_dataframe_path=fastq_dataframe_path,
                    mode=mode,
                    cpu=cpu)
     # TODO add pipeline that start from post demultiplex
@@ -64,9 +70,5 @@ def pipeline(input_fastq_pattern,
                      config_path,
                      mode=mode,
                      cpu=cpu)
-
-    # final summary
-    # TODO mapping_summary use CLI
-
     # TODO each individual pipeline step should be able to run separately
     return 0

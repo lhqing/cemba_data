@@ -3,6 +3,8 @@ import pathlib
 import numpy as np
 import pandas as pd
 
+from cemba_data.mapping import get_configuration
+
 
 def transform_demultiplex_stats(stats_df_dict):
     try:
@@ -211,12 +213,15 @@ def aggregate_all_summary(output_dir, mct=False):
     return total_meta
 
 
-def mapping_summary(output_dir, config_path, mct=False):
-    # TODO add mapping summary CLI
+def mapping_summary(output_dir):
     output_dir = pathlib.Path(output_dir)
     fastq_dir = output_dir / 'fastq'
     bismark_bam_dir = output_dir / 'bismark_bam'
     allc_dir = output_dir / 'allc'
+
+    config_path = list(output_dir.glob('*ini'))[0]
+    config = get_configuration(config_path)
+    mct = 'mct' in config['mode']['mode'].lower()
 
     # summarize fastq
     from .demultiplex import summarize_demultiplex
@@ -246,7 +251,7 @@ def mapping_summary(output_dir, config_path, mct=False):
     summarize_generate_allc(allc_dir)
 
     # aggregate all files
-    total_summary = aggregate_all_summary(output_dir)
+    total_summary = aggregate_all_summary(output_dir, mct=mct)
     summary_path = output_dir / 'MappingSummary.csv.gz'
     total_summary.to_csv(summary_path)
     return summary_path

@@ -1,4 +1,5 @@
 import pathlib
+import subprocess
 
 from cemba_data.mapping import \
     make_fastq_dataframe, \
@@ -9,7 +10,12 @@ from cemba_data.mapping import \
 from cemba_data.qsub import qsub
 
 
-def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_only', cpu=10):
+def pipeline_fastq(input_fastq_pattern,
+                   output_dir,
+                   config_path,
+                   fastq_dataframe_path=None,
+                   mode='command_only',
+                   cpu=10):
     # create directory
     output_dir = pathlib.Path(output_dir)
     fastq_dir = output_dir / 'fastq'
@@ -18,9 +24,12 @@ def pipeline_fastq(input_fastq_pattern, output_dir, config_path, mode='command_o
     qsub_dir.mkdir(exist_ok=True, parents=True)
 
     # STEP 1: make fastq dataframe
-    make_fastq_dataframe(file_path=input_fastq_pattern,
-                         output_path=str(fastq_dir / 'fastq_dataframe.csv'),
-                         skip_broken_name=False)
+    if fastq_dataframe_path is None:
+        make_fastq_dataframe(file_path=input_fastq_pattern,
+                             output_path=str(fastq_dir / 'fastq_dataframe.csv'),
+                             skip_broken_name=False)
+    else:
+        subprocess.run(['cp', fastq_dataframe_path, str(fastq_dir / 'fastq_dataframe.csv')])
 
     # STEP 2: demultiplex
     # prepare demultiplex
