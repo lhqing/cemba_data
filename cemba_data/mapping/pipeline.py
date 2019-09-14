@@ -26,6 +26,28 @@ def print_default_configuration(mode='mc'):
     return
 
 
+def command_order(output_dir):
+    command_files = {path.name.split('.')[0]: path
+                     for path in pathlib.Path(output_dir).glob('qsub/*/*command*')}
+    command_order_full = ['demultiplex_commands',
+                          'merge_lane_commands',
+                          'fastq_qc_commands',
+                          'bismark_commands',
+                          'bam_qc_commands',
+                          'select_dna_commands',
+                          'final_bam_commands',
+                          'star_mapping_commands',
+                          'star_bam_qc_commands',
+                          'select_rna_commands']
+    with open(output_dir / 'command_order.txt', 'w') as f:
+        for command_name in command_order_full:
+            try:
+                f.write(str(command_files[command_name]) + '\n')
+            except KeyError:
+                continue
+    return
+
+
 def pipeline(input_fastq_pattern,
              output_dir,
              config_path,
@@ -37,6 +59,11 @@ def pipeline(input_fastq_pattern,
     _config_path = str(_output_dir / pathlib.Path(config_path).name)
     subprocess.run(['cp', str(config_path), _config_path], check=True)
     config_path = _config_path
+
+    if mode == 'command_only':
+        if cpu > 10:
+            print('Local mode is only for testing, better set a smaller cpu. Change to 10.')
+            cpu = 10
 
     config = get_configuration(config_path)
     mct = 'mct' in config['mode']['mode'].lower()
@@ -70,5 +97,8 @@ def pipeline(input_fastq_pattern,
                      config_path,
                      mode=mode,
                      cpu=cpu)
+
+    if mode == 'command_only':
+        command_order(output_dir)
     # TODO each individual pipeline step should be able to run separately
     return 0
