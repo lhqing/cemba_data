@@ -3,8 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to yap's documentation!
+YAP documentation
 ===============================
+YAP (Yet Another Pipeline) is an in-house mapping pipeline for snmC-seq, NOMe-seq, snmCT-seq mapping and preprocessing.
 
 .. toctree::
    :maxdepth: 2
@@ -13,7 +14,10 @@ Welcome to yap's documentation!
    
    installation
    PlateInfoAndSampleSheet
-
+   PrepareMappingConfigINI
+   RunMappingFULL
+   MappingSummary
+   GenerateMCDS
 
 Indices and tables
 ==================
