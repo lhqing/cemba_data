@@ -599,7 +599,7 @@ def batch_call_methylated_sites(bam_result_df, out_dir, config):
     bam_result_df
         dataframe from bam qc step
     out_dir
-        universal pipeline out_dir
+        universal pipeline output_dir
     config
         universal pipeline config
     Returns

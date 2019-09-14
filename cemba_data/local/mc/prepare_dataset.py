@@ -41,7 +41,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     out_dir = pathlib.Path(out_dir).absolute()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # prepare out_dir
+    # prepare output_dir
     cmd_list = []
 
     if '*' in allc_files:
@@ -76,7 +76,7 @@ def generate_dataset(allc_files, out_dir, region_bed_path, region_name,
     with open(cmd_json_path, 'w') as f:
         json.dump(cmd_list, f)
 
-    assemble_command = f'yap assemble-dataset --out_dir {out_dir} ' \
+    assemble_command = f'yap assemble-dataset --output_dir {out_dir} ' \
         f'--region_bed_path {region_paths} ' \
         f'--region_name {region_names} ' \
         f'--dataset_name {dataset_name} ' \

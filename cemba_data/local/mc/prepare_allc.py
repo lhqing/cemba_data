@@ -97,12 +97,12 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
         Input dataframe for all fastq file path and metadata.
         Must include columns: uid, read_type, index_name, lane
     out_dir
-        pipeline universal out_dir
+        pipeline universal output_dir
     config_path
         pipeline universal config
     """
 
-    # prepare out_dir
+    # prepare output_dir
     out_dir = pathlib.Path(out_dir).absolute()
     out_dir.mkdir(parents=True)
     # prepare config
@@ -127,7 +127,7 @@ def batch_pipeline(fastq_dataframe, out_dir, config_path):
         sub_df.to_csv(uid_fastq_dataframe_path,
                       sep='\t', compression='gzip', index=None)
         uid_cmd = f'yap mapping --fastq_dataframe {uid_fastq_dataframe_path} ' \
-                  f'--out_dir {uid_out_dir} --config_path {config_path}'
+                  f'--output_dir {uid_out_dir} --config_path {config_path}'
         command_dict = {
             'command': uid_cmd,
             'pe smp': 20,  # cpu for each command

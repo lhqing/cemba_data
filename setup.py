@@ -15,10 +15,11 @@ setup(
                       'matplotlib', 'seaborn', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
                       'six', 'xarray', 'statsmodels', 'natsort', 'netcdf4', 'adjustText'],
     package_data={
-        '': ['*.txt', '*.tsv', '*.csv']
+        '': ['*.txt', '*.tsv', '*.csv', '*.fa']
     },
     entry_points={
-        'console_scripts': ['yap=cemba_data.__main__:main'],
+        'console_scripts': ['yap=cemba_data.__main__:main',
+                            'yap-internal=cemba_data._yap_internal_cli_:internal_main'],
     }
 )
 
