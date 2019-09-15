@@ -98,6 +98,56 @@ def select_rna_reads_internal_subparser(subparser):
     return
 
 
+def featurecount_internal_subparser(subparser):
+    parser = subparser.add_parser('featurecount',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Batch FeatureCount wrapper")
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--bam_table",
+        type=str,
+        required=True
+    )
+
+    parser_req.add_argument(
+        "--out_prefix",
+        type=str,
+        required=True
+    )
+
+    parser_req.add_argument(
+        "--gtf_path",
+        type=str,
+        required=True
+    )
+
+    parser.add_argument(
+        "--count_type",
+        type=str,
+        default='gene',
+    )
+
+    parser.add_argument(
+        "--id_type",
+        type=str,
+        default='gene_id',
+    )
+
+    parser.add_argument(
+        "--cpu",
+        type=int,
+        default=2
+    )
+
+    parser.add_argument(
+        "--chunksize",
+        type=int,
+        default=50
+    )
+    return
+
+
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -142,6 +192,8 @@ def internal_main():
         from .mapping import select_dna_reads as func
     elif cur_command == 'select-rna-reads':
         from .mapping import select_rna_reads as func
+    elif cur_command == 'featurecount':
+        from .mapping.feature_count import batch_feature_count as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

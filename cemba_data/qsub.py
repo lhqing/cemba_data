@@ -17,7 +17,7 @@ import time
 import shutil
 import pandas as pd
 
-SUBMISSION_GAP = 1
+SUBMISSION_GAP = 0.1
 QSTAT_GAP_INIT = 5
 
 

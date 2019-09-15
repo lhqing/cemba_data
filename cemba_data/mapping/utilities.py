@@ -96,21 +96,25 @@ def command_runner(commands, runner=None, cpu=1):
                          encoding='utf8',
                          shell=True,
                          check=True)
-    with ProcessPoolExecutor(cpu) as pool:
-        futures = []
+    if cpu <= 1:
         for command in commands:
-            future = pool.submit(runner, command)
-            futures.append(future)
+            runner(command)
+    else:
+        with ProcessPoolExecutor(cpu) as pool:
+            futures = []
+            for command in commands:
+                future = pool.submit(runner, command)
+                futures.append(future)
 
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except subprocess.CalledProcessError as e:
-                print("Got error in fastq_qc, command was:")
-                print(command)
-                print(e.stdout)
-                print(e.stderr)
-                raise e
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except subprocess.CalledProcessError as e:
+                    print("Got error in fastq_qc, command was:")
+                    print(command)
+                    print(e.stdout)
+                    print(e.stderr)
+                    raise e
     return
 
 

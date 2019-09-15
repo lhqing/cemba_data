@@ -1,10 +1,12 @@
+import json
 import pathlib
 
 from cemba_data.mapping import \
     prepare_select_rna_reads, \
     command_runner, \
     star_mapping, \
-    star_bam_qc
+    star_bam_qc, \
+    prepare_feature_count
 from cemba_data.qsub import qsub
 
 
@@ -83,7 +85,22 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
         raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
 
     # feature count
-    # TODO add feature count
-    # batch_feature_count(bam_dict, out_prefix, gtf_path,
-    #                    count_type='gene', id_type='gene_id',
-    #                    cpu=2, chunksize=50)
+    feature_count_output, feature_count_command = prepare_feature_count(output_dir=output_dir, config=config_path)
+    with open(qsub_dir / 'feature_count_commands.txt', 'w') as f:
+        f.write(feature_count_command)
+    # runner
+    if mode == 'qsub':
+        qsub(command_file_path=str(qsub_dir / 'feature_count_commands.txt'),
+             working_dir=qsub_dir,
+             project_name='feature_count',
+             wait_until=None,
+             total_cpu=10,
+             total_mem=500,
+             force_redo=False,
+             qsub_global_parms='-pe smp 10;-l h_vmem=5G')
+    elif mode == 'command_only':
+        pass
+    elif mode == 'local':
+        command_runner([feature_count_command], runner=None, cpu=1)
+    else:
+        raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
