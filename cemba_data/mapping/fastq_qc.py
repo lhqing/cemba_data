@@ -29,7 +29,6 @@ def fastq_qc(output_dir, config):
         config = get_configuration(config)
 
     # parameters
-    cutadapt_cores = int(config['fastqTrim']['cutadapt_cores'])
     r1_adapter = config['fastqTrim']['r1_adapter']
     r2_adapter = config['fastqTrim']['r1_adapter']
     length_threshold = config['fastqTrim']['length_threshold']
@@ -80,7 +79,7 @@ def fastq_qc(output_dir, config):
             raise ValueError(f'Unknown read type {read_type}.')
 
         output_path = f'{output_dir}/{uid}-{index_name}-{read_type}.trimmed.fq.gz'
-        cmd = f'cutadapt -j {cutadapt_cores} --report=minimal -O {overlap} ' \
+        cmd = f'cutadapt --report=minimal -O {overlap} ' \
               f'-q {quality_threshold} -u {_left_cut} ' \
               f'-u -{_right_cut} -m {length_threshold} ' \
               f'-a {_adapter} -o {output_path} {fastq_in_path} > {output_path}.stats.txt'
