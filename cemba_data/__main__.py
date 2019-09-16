@@ -184,16 +184,13 @@ def print_default_config_register_subparser(subparser):
     parser = subparser.add_parser('default-mapping-config',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Print out default config of mapping pipeline")
-
-    parser_opt = parser.add_argument_group("Optional inputs")
-
     from cemba_data.mapping.pipeline import MAPPING_MODE_CHOICES
-    parser_opt.add_argument(
+    parser.add_argument(
         "--mode",
         type=str,
-        required=False,
+        required=True,
         choices=MAPPING_MODE_CHOICES,
-        help="Path to save the config file"
+        help="Library mode"
     )
     return
 

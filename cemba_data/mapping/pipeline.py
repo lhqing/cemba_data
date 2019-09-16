@@ -19,7 +19,7 @@ def print_default_configuration(mode='mc'):
     mode = mode.lower()
     if mode not in MAPPING_MODE_CHOICES:
         raise ValueError(f'Unknown mode: {mode}')
-    with open(os.path.dirname(__file__) + f'/mapping_config_{mode}.ini') as f:
+    with open(os.path.dirname(__file__) + f'/files/mapping_config_{mode}.ini') as f:
         configs = f.readlines()
         for line in configs:
             print(line, end='')
