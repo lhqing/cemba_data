@@ -293,7 +293,6 @@ def pipeline_register_subparser(subparser):
              "if qsub, will execute with SGE qsub system; "
              "if local, will execute with current system, only use this for debugging."
     )
-    parser.set_defaults(mct=False)
     return
 
 
