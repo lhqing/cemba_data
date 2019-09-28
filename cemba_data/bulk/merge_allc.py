@@ -5,7 +5,7 @@ from collections import defaultdict
 import pandas as pd
 
 
-def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cpu):
+def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cpu, max_cell_group):
     output_dir = pathlib.Path(output_dir_path).absolute()
     qsub_dir = output_dir / 'qsub'
 
@@ -25,6 +25,10 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
     file_map = {col_name: defaultdict(list) for col_name in col_names}
     for i, (cluster_combination, sub_df) in enumerate(group_table.groupby(col_names)):
         cell_number = sub_df.shape[0]
+        if (max_cell_group is not None) and (cell_number > max_cell_group):
+            sub_df = sub_df.sample(max_cell_group, random_state=1)
+            cell_number = max_cell_group
+
         output_path = cell_merge_output_dir / f'{i}-{cell_number}.allc.tsv.gz'
         file_list_path = cell_merge_output_dir / f'{i}-{cell_number}.cell_list.txt'
 
@@ -45,7 +49,7 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
                   f'--allc_paths {input_path} ' \
                   f'--output_path {output_path} ' \
                   f'--chrom_size_path {chrom_size_path} ' \
-                  f'--cpu {cpu}, {binarize_param}'
+                  f'--cpu {cpu} {binarize_param}'
         command_records.append(cmd)
     command_path = qsub_dir / '_merge_cell_commands.txt'
     with open(command_path, 'w') as f:
