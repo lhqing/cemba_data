@@ -1,5 +1,7 @@
-import seaborn as sns
 import numpy as np
+import pandas as pd
+import seaborn as sns
+
 from .cell import categorical_scatter
 
 
@@ -68,3 +70,35 @@ def plot_kmode_stats(axes, coord_data, cell_profile, coord_base='umap'):
     for ax in axes.flat:
         ax.axis('off')
     return axes
+
+
+def auto_order(confusion_matrix, row_order):
+    confusion_matrix = confusion_matrix.reindex(row_order).copy()
+    records = []
+    for col, row in confusion_matrix.idxmax().iteritems():
+        value = confusion_matrix.loc[row, col]
+        records.append([col, row, value])
+    df = pd.DataFrame(records)
+    order_dict = {}
+    for row, sub_df in df.sort_values(2).groupby(1):
+        order_dict[row] = sub_df[0].tolist()
+    col_order = []
+    for row in row_order:
+        try:
+            col_order += order_dict[row]
+        except KeyError:
+            pass
+    return col_order
+
+
+def plot_confusion_matrix(matrix, ax, row_order, col_order='auto', cmap='viridis',
+                          reverse_diagnal=False, **heatmap_kws):
+    if col_order == 'auto':
+        col_order = auto_order(matrix, row_order)
+    if reverse_diagnal:
+        col_order = col_order[::-1]
+    nrows, ncols = matrix.shape
+    ordered_matrix = matrix.loc[row_order[::-1], col_order]
+    sns.heatmap(ordered_matrix, ax=ax, cmap=cmap, **heatmap_kws)
+    ax.set_ylim(-0.5, nrows + 0.5)
+    return ordered_matrix
