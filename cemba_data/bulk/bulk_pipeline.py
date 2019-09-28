@@ -14,7 +14,7 @@ def bulk_pipeline(
         ignore_names=None,
         mode='command_only',
         h_vmem='5G',
-        max_cell_group=300):
+        max_cell_group=299):
     output_dir = pathlib.Path(output_dir_path)
     output_dir.mkdir(exist_ok=True, parents=True)
     qsub_dir = output_dir / 'qsub'
