@@ -67,7 +67,7 @@ def pipeline(input_fastq_pattern,
     subprocess.run(['cp', str(config_path), _config_path], check=True)
     config_path = _config_path
 
-    if mode == 'command_only':
+    if mode == 'local':
         if cpu > 10:
             print('Local mode is only for testing, better set a smaller cpu. Change to 10.')
             cpu = 10

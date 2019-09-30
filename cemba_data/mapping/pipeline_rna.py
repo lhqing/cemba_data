@@ -85,7 +85,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
         raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
 
     # feature count
-    feature_count_output, feature_count_command = prepare_feature_count(output_dir=output_dir, config=config_path)
+    feature_count_output, feature_count_command = prepare_feature_count(output_dir=bam_dir, config=config_path)
     with open(qsub_dir / 'feature_count_commands.txt', 'w') as f:
         f.write(feature_count_command)
     # runner
