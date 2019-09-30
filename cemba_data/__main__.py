@@ -105,21 +105,6 @@ def qsub_register_subparser(subparser):
                                   help="General qsub helper, need to prepare a command dict file")
 
     parser_req = parser.add_argument_group("Required inputs")
-    parser_opt = parser.add_argument_group("Optional inputs")
-
-    parser_req.add_argument(
-        "--working_dir",
-        type=str,
-        required=True,
-        help="Working directory of the work project"
-    )
-
-    parser_req.add_argument(
-        "--project_name",
-        type=str,
-        required=True,
-        help="Name of the work project"
-    )
 
     parser_req.add_argument(
         "--command_file_path",
@@ -133,23 +118,21 @@ def qsub_register_subparser(subparser):
              "and other optional key specify qsub parameters per job."
     )
 
-    parser_opt.add_argument(
-        "--total_cpu",
-        type=int,
-        required=False,
-        default=30,
-        help="Total CPU in qsub list"
+    parser_req.add_argument(
+        "--working_dir",
+        type=str,
+        required=True,
+        help="Working directory of the qsub project"
     )
 
-    parser_opt.add_argument(
-        "--total_mem",
-        type=int,
-        required=False,
-        default=500,
-        help="Total MEM in qsub list"
+    parser_req.add_argument(
+        "--project_name",
+        type=str,
+        required=True,
+        help="Name of the qsub project"
     )
 
-    parser_opt.add_argument(
+    parser.add_argument(
         "--wait_until",
         type=str,
         nargs='+',
@@ -158,16 +141,26 @@ def qsub_register_subparser(subparser):
              "this job will wait until those job finish first."
     )
 
-    parser_opt.add_argument(
-        "--force_redo",
-        type=bool,
+    parser.add_argument(
+        "--total_cpu",
+        type=int,
         required=False,
-        default=False,
-        help="By default, the finished job (which has an accompanying .json file with the command.sh file) "
-             "will not be submitted again, but if you want to force resubmit all jobs, set this to true. "
+        default=30,
+        help="Total concurrent CPU in qsub list, together with total_mem, "
+             "determines how many jobs running in parallel."
     )
 
-    parser_opt.add_argument(
+    parser.add_argument(
+        "--total_mem",
+        type=int,
+        required=False,
+        default=9999,
+        help="Total concurrent MEM (GBs) in qsub list, together with total_cpu, "
+             "determines how many jobs running in parallel. "
+             "Default is 9999, which means only use total_cpu to determine."
+    )
+
+    parser.add_argument(
         "--qsub_global_parms",
         type=str,
         required=False,
