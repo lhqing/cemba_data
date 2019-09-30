@@ -37,7 +37,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 4;-l h_vmem=5G')
+             qsub_global_parms='-pe smp=4;-l h_vmem=5G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -60,7 +60,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 2;-l h_vmem=4G')
+             qsub_global_parms='-pe smp=2;-l h_vmem=4G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -83,7 +83,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
                  total_cpu=cpu,
                  total_mem=500,
                  force_redo=False,
-                 qsub_global_parms='-pe smp 1;-l h_vmem=5G')
+                 qsub_global_parms='-pe smp=1;-l h_vmem=5G')
         elif mode == 'command_only':
             pass
         elif mode == 'local':
@@ -110,7 +110,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 1;-l h_vmem=5G')
+             qsub_global_parms='-pe smp=1;-l h_vmem=5G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -134,7 +134,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp 2;-l h_vmem=4G')
+             qsub_global_parms='-pe smp=2;-l h_vmem=4G')
     elif mode == 'command_only':
         pass
     elif mode == 'local':

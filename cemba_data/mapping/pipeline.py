@@ -37,7 +37,8 @@ def command_order(output_dir):
                           'allc_commands',
                           'star_mapping_commands',
                           'star_bam_qc_commands',
-                          'select_rna_commands']
+                          'select_rna_commands',
+                          'feature_count_commands']
 
     command_files = {path.name.split('.')[0]: path
                      for path in pathlib.Path(output_dir).glob('qsub/*/*command*')}

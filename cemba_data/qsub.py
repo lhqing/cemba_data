@@ -19,16 +19,15 @@ import pandas as pd
 
 SUBMISSION_GAP = 0.1
 QSTAT_GAP_INIT = 5
+REQUIRED_KEYS = ['pe smp', 'l h_vmem']
 
 
 def _default_command_dict(name, error_path, output_path, working_dir,
-                          cpu=1, memory='2G', h_rt='99:99:99', s_rt='99:99:99'):
+                          h_rt='99:99:99', s_rt='99:99:99'):
     """Default qsub command dict"""
     command_dict = {'command': None,
                     'N': name,
                     'V': '',
-                    'pe smp': cpu,
-                    'l h_vmem': memory,
                     'l h_rt': h_rt,
                     'l s_rt': s_rt,
                     'wd': working_dir,
@@ -313,8 +312,10 @@ class _Qsubmitter:
                     self.success_commands.append(command_obj)
             else:
                 cur_running_command.append(command_obj)
-                cur_running_cpu += int(command_obj.qsub_parameter['pe smp'])
-                cur_running_mem += int(command_obj.qsub_parameter['l h_vmem'].strip('G'))
+                command_cpu = int(command_obj.qsub_parameter['pe smp'])
+                command_mem = int(command_cpu * int(command_obj.qsub_parameter['l h_vmem'].strip('G')))
+                cur_running_cpu += command_cpu
+                cur_running_mem += command_mem
 
         print(f'{self.finish_count} job finished in this submission. {self.success_count} job success.')
         sys.stdout.flush()
@@ -397,7 +398,15 @@ class _Command:
                                                   error_path=self.error_path,
                                                   output_path=self.output_path,
                                                   working_dir=working_dir)
+        # print('default', self.command_dict)
         self.command_dict.update(**command_dict)
+        # print('from input', command_dict)
+        # print('after update', self.command_dict)
+        # sys.stdout.flush()
+        for key_name in REQUIRED_KEYS:
+            if key_name not in self.command_dict:
+                raise KeyError(f'Required Key {key_name} not found in command_dict')
+
         for k, v in self.command_dict.items():
             if v is None:
                 raise ValueError(f'{k} is None in command dict')
@@ -600,6 +609,7 @@ def qsub(command_file_path,
                 global_parm_dict[k] = v
             else:
                 raise ValueError(f'Can not parse global parm part: "{parm_pair}"')
+    # print(global_parm_dict)
 
     if isinstance(command_file_path, str):
         command_file_path = [command_file_path]
