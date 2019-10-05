@@ -14,6 +14,7 @@ import logging
 import pathlib
 import re
 import subprocess
+from collections import defaultdict
 
 import pandas as pd
 
@@ -39,18 +40,21 @@ def demultiplex(output_dir: str, config: str):
     fastq_dataframe = pd.read_csv(output_dir / 'fastq_dataframe.csv')
     fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
 
-    random_index_version = config['multiplexIndex']['barcode_version']
-    if random_index_version.upper() == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
-    elif random_index_version.upper() == 'V2':
-        # random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2.fa')
-        # TODO add v2 func and make sure it works
-        raise NotImplementedError
-    else:
-        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
-
     # make adapter parms
     adapter_type = '-g'  # The random index is always in R1 5 prime
+
+    random_index_version = config['multiplexIndex']['barcode_version'].upper()
+    if random_index_version == 'V1':
+        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
+    elif random_index_version == 'V2':
+        # this path has a place holder will be replaced for each fastq pair based on multiplex group
+        # different group use different random primers, provide right fasta file limit the possible combination
+        # this prevents cross-contamination primer (primer from other group) been created
+        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2/'
+                                                    'random_index_v2.multiplex_group_!MULTIPLEX_GROUP_PLACEHOLDER!.fa')
+    else:
+        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
+    # for V2, need to replace "!MULTIPLEX_GROUP_PLACEHOLDER!" to real multiplex group
     adapter_parms = f'{adapter_type} file:{random_index_fasta_path}'
 
     # standardize read_type
@@ -67,8 +71,17 @@ def demultiplex(output_dir: str, config: str):
         r1_out = output_dir / (f"{uid}-{lane}" + "-{name}-R1.fq.gz")
         r2_out = output_dir / (f"{uid}-{lane}" + "-{name}-R2.fq.gz")
         stat_out = output_dir / (f"{uid}-{lane}" + ".demultiplex.stats.txt")
+
         cmd = f"cutadapt -e 0.01 --no-indels {adapter_parms} " \
               f"-o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in} > {stat_out.absolute()}"
+        if random_index_version == 'V1':
+            pass
+        elif random_index_version == 'V2':
+            multiplex_group = uid.split('-')[-2]
+            # can not use format here because -{name}- used by cutadapt
+            cmd = cmd.replace("!MULTIPLEX_GROUP_PLACEHOLDER!", multiplex_group)
+        else:
+            raise
         records.append([uid, lane, str(r1_out), str(r2_out)])
         command_list.append(cmd)
     with open(output_dir / 'demultiplex.command.txt', 'w') as f:
@@ -76,16 +89,33 @@ def demultiplex(output_dir: str, config: str):
 
     # expend records by random index
     # get index names
-    index_names = []
-    with open(random_index_fasta_path) as f:
-        for line in f:
-            if line.startswith('>'):
-                index_names.append(line.lstrip('>').rstrip())
-    expend_records = []
-    for record in records:
-        for index_name in index_names:
+    if random_index_version == 'V1':
+        index_names = []
+        with open(random_index_fasta_path) as f:
+            for line in f:
+                if line.startswith('>'):
+                    index_names.append(line.lstrip('>').rstrip())
+        expend_records = []
+        for record in records:
+            for index_name in index_names:
+                uid, lane, r1_out, r2_out = record
+                expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
+    elif random_index_version == 'V2':
+        index_names_dict = defaultdict(list)
+        for multiplex_group in range(1, 7):  # multiplex_group is 1, 2, 3, 4, 5, 6
+            multiplex_group = str(multiplex_group)
+            with open(random_index_fasta_path.replace("!MULTIPLEX_GROUP_PLACEHOLDER!", multiplex_group)) as f:
+                for line in f:
+                    if line.startswith('>'):
+                        index_names_dict[multiplex_group].append(line.lstrip('>').rstrip())
+        expend_records = []
+        for record in records:
             uid, lane, r1_out, r2_out = record
-            expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
+            multiplex_group = uid.split('-')[-2]
+            for index_name in index_names_dict[multiplex_group]:
+                expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
+    else:
+        raise
     record_df = pd.DataFrame(expend_records, columns=['uid', 'lane', 'r1_path', 'r2_path'])
     record_df.to_csv(output_dir / 'demultiplex.records.csv', index=None)
     return record_df, command_list
@@ -133,9 +163,10 @@ def summarize_demultiplex(output_dir, config):
     if random_index_version.upper() == 'V1':
         random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
     elif random_index_version.upper() == 'V2':
-        # random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2.fa')
-        # TODO add v2 func and make sure it works
-        raise NotImplementedError
+        # here we don't need to worry about the multiplex_group issue,
+        # because we just need a index_name to index_seq map
+        # we've considered this during demultiplex
+        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2/random_index_v2.fa')
     else:
         raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
     index_seq_dict = parse_index_fasta(random_index_fasta_path)

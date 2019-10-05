@@ -61,7 +61,6 @@ def pipeline(input_fastq_pattern,
              fastq_dataframe_path=None,
              mode='command_only',
              cpu=10):
-    # TODO make records file for each step more informative, e.g. is_symlink, input n cells
     _output_dir = pathlib.Path(output_dir).absolute()
     _output_dir.mkdir(exist_ok=True, parents=True)
     _config_path = str(_output_dir / pathlib.Path(config_path).absolute().name)
@@ -88,7 +87,7 @@ def pipeline(input_fastq_pattern,
                    fastq_dataframe_path=fastq_dataframe_path,
                    mode=mode,
                    cpu=cpu)
-    # TODO add pipeline that start from post demultiplex
+    # TODO add pipeline option that start from post demultiplex
 
     # pipeline_mc
     from cemba_data.mapping.pipeline_mc import pipeline_mc

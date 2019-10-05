@@ -98,6 +98,8 @@ def transform_allc_stats(stats_df_dict):
     # genome cov
     genome_cov = stats_df_dict['generate_allc'].groupby(['uid', 'index_name'])['genome_cov'].apply(lambda i: i.iloc[0])
 
+    # TODO change this to process NOMe
+
     # ALLC stat
     cov_df = stats_df \
         .set_index(['uid', 'index_name', 'mc_context'])['cov'] \
@@ -238,13 +240,13 @@ def mapping_summary(output_dir):
     # mCT specific
     if mct:
         from .mct_bismark_bam_filter import summarize_select_dna_reads
-        summarize_select_dna_reads(bismark_bam_dir, config_path)
+        summarize_select_dna_reads(bismark_bam_dir, config)
 
         from .star_mapping import summarize_star_mapping
         star_bam_dir = output_dir / 'star_bam'
         summarize_star_mapping(star_bam_dir)
         from .mct_star_bam_filter import summarize_select_rna_reads
-        summarize_select_rna_reads(star_bam_dir, config_path)
+        summarize_select_rna_reads(star_bam_dir, config)
 
     # summarize allc
     from .generate_allc import summarize_generate_allc
@@ -252,6 +254,80 @@ def mapping_summary(output_dir):
 
     # aggregate all files
     total_summary = aggregate_all_summary(output_dir, mct=mct)
+
+    random_index_version = config['multiplexIndex']['barcode_version'].upper()
+    if random_index_version == 'V1':
+        total_summary_with_plate_info = add_v1_plateinfo(total_summary)
+    elif random_index_version == 'V2':
+        total_summary_with_plate_info = add_v2_plateinfo(total_summary)
+    else:
+        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
+
     summary_path = output_dir / 'MappingSummary.csv.gz'
-    total_summary.to_csv(summary_path)
+    total_summary_with_plate_info.to_csv(summary_path)
     return summary_path
+
+
+def add_v1_plateinfo(total_summary):
+    total_plate_pos_records = {}
+    for _, (uid, index_name) in total_summary.reset_index()[['uid', 'index_name']].iterrows():
+        record_dict = {}
+        plate1, plate2, pos96 = uid.split('-')
+        record_dict['plate1'] = plate1
+        record_dict['plate2'] = plate2
+        record_dict['Pos96'] = pos96
+        index_name = index_name.lower()
+        record_dict['index_name'] = index_name
+        # judge real plate
+        if index_name in ['ad001', 'ad002', 'ad004', 'ad006']:
+            record_dict['real_plate'] = plate1
+        else:
+            record_dict['real_plate'] = plate2
+        # 96 pos
+        record_dict['Col96'] = int(record_dict['Pos96'][1:]) - 1
+        record_dict['Row96'] = ord(record_dict['Pos96'][0]) - 65  # convert A-H to 0-8
+        # 384 pos
+        ad_index_384_dict = {
+            'ad001': (0, 0), 'ad002': (0, 1),
+            'ad004': (1, 0), 'ad006': (1, 1),
+            'ad007': (0, 0), 'ad008': (0, 1),
+            'ad010': (1, 0), 'ad012': (1, 1)}
+        record_dict['Col384'] = 2 * record_dict['Col96'] + ad_index_384_dict[index_name][0]
+        record_dict['Row384'] = 2 * record_dict['Row96'] + ad_index_384_dict[index_name][1]
+        record_dict['Pos384'] = chr(record_dict['Row384'] + 65) + str(record_dict['Col384'])
+        total_plate_pos_records[(uid, index_name)] = record_dict
+    plate_info_df = pd.DataFrame(total_plate_pos_records).T
+    plate_info_df.index = plate_info_df.index.set_names(['uid', 'index_name'])
+
+    # make index_name lower to agree with plate_info_df
+    total_summary.index.set_levels(
+        total_summary.index.get_level_values('index_name').str.lower(),
+        level='index_name',
+        inplace=True)
+
+    total_data = pd.concat([total_summary, plate_info_df], axis=1)
+    return total_data
+
+
+def add_v2_plateinfo(total_summary):
+    total_plate_pos_records = {}
+    for _, (uid, index_name) in total_summary.reset_index()[['uid', 'index_name']].iterrows():
+        record_dict = {}
+        plate, multiplex_group, primer_name = uid.split('-')
+        record_dict['multiplex_group'] = int(multiplex_group)
+        # primer name is a Pos384 of the illumina primer,
+        # but this pos has nothing to do with cell Pos384.
+        # Cell Pos384 determine by random primer pos (index_name)
+        record_dict['primer_name'] = primer_name
+        record_dict['index_name'] = index_name
+        # V2 doesn't cross multiplex plate, real_plate is plate
+        record_dict['real_plate'] = plate
+
+        # 384 pos
+        record_dict['Pos384'] = index_name
+        record_dict['Col384'] = int(record_dict['Pos384'][1:]) - 1
+        record_dict['Row384'] = ord(record_dict['Pos384'][0]) - 65  # convert A-H to 0-8
+        total_plate_pos_records[(uid, index_name)] = record_dict
+    plate_info_df = pd.DataFrame(total_plate_pos_records).T
+    total_data = pd.concat([total_summary, plate_info_df], axis=1)
+    return total_data

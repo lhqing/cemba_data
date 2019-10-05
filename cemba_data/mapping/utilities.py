@@ -17,6 +17,8 @@ def get_configuration(config_path):
     """
     Read .ini config file from given path
     """
+    if isinstance(config_path, configparser.ConfigParser):
+        return config_path
     ref_path_config = configparser.ConfigParser()
     ref_path_config.read(config_path)
     return ref_path_config

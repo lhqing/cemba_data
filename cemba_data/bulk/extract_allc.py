@@ -1,32 +1,41 @@
+import pathlib
 
-def extract_cg(output_dir, sub_dir_name, chrom_size_path, cpu, mc_contexts='CGN'):
-    qsub_dir = output_dir / 'qsub/extract_cg'
-    qsub_dir.mkdir(exist_ok=True)
+import pandas as pd
 
-    _output_dir = output_dir / sub_dir_name
-    output_records_path = _output_dir / f'merge_{sub_dir_name}.records.json'
-    with open(output_records_path) as f:
-        allc_dict = json.load(f)
-    command_records = []
-    output_records = {}
-    for cluster, allc_path in allc_dict.items():
-        output_prefix = _output_dir / cluster
-        output_path = _output_dir / (cluster + f'.{mc_contexts}-Merge.allc.tsv.gz')
-        output_records[cluster] = output_path
-        if allc_path.is_symlink():
-            # for these smaller files, use real command and actual computation is clearer
-            allc_path = allc_path.resolve()
-        command = f'allcools extract-allc ' \
+
+def extract_strand_merged_cg(output_dir_path, chrom_size_path, mc_context='CGN', cpu=5):
+    output_dir = pathlib.Path(output_dir_path).absolute()
+    group_table_path = output_dir / 'GROUP_TABLE.csv'
+
+    group_table = pd.read_csv(group_table_path, index_col=0)
+    group_levels = group_table.columns[1:]
+    qsub_dir = output_dir / 'qsub'
+
+    commands = []
+    for group_level in group_levels:
+        file_records = []
+        group_dir = output_dir / group_level
+        group_allc_records = group_dir / 'ALLC_table.csv'
+        group_allc_df = pd.read_csv(group_allc_records, index_col=0)
+
+        for allc_path in group_allc_df['AllcPath']:
+            output_prefix = str(allc_path[:-12])
+            output_path = output_prefix + '.CGN-Merge.allc.tsv.gz'
+            cmd = f'allcools extract-allc ' \
                   f'--allc_path {allc_path} ' \
                   f'--output_prefix {output_prefix} ' \
-                  f'--mc_contexts {mc_contexts} ' \
+                  f'--mc_contexts {mc_context} ' \
                   f'--chrom_size_path {chrom_size_path} ' \
                   f'--strandness merge ' \
                   f'--output_format allc ' \
+                  f'--cov_cutoff 99999 ' \
                   f'--cpu {cpu}'
-        command_records.append(command)
-    with open(qsub_dir / f'extract_cg_{sub_dir_name}.commands.txt', 'w') as f:
-        f.write('\n'.join(command_records))
-    with open(_output_dir / f'extract_cg_{sub_dir_name}.records.json', 'w') as f:
-        json.dump(output_records, f)
+            commands.append(cmd)
+            file_records.append(output_path)
+        # group_allc_records will be updated
+        group_allc_df['mCGExtract'] = file_records
+        group_allc_df.to_csv(group_allc_records)
+    with open(qsub_dir / '_extract_cg_commands.txt', 'w') as f:
+        f.write('\n'.join(commands))
 
+    return

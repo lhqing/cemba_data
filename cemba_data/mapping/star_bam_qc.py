@@ -25,7 +25,7 @@ def star_bam_qc(output_dir, config):
         # command
         sort_cmd = f'samtools sort -o {sort_bam} --threads 2 {star_bam_path}'
         filter_cmd = f'samtools view -b -h -q {mapq_threshold} -o {filter_bam} {sort_bam}'
-        cleaning_cmd = f'rm -f {star_bam_path} {sort_bam}'
+        cleaning_cmd = ''  # f'rm -f {star_bam_path} {sort_bam}'
         command = ' && '.join([sort_cmd, filter_cmd, cleaning_cmd])
         records.append([uid, index_name, filter_bam])
         command_list.append(command)

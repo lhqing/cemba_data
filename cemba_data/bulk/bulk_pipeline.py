@@ -1,6 +1,9 @@
 import pathlib
-from ..mapping.utilities import command_runner
+
+import pandas as pd
+
 from .merge_allc import _merge_cell, _merge_cluster
+from ..mapping.utilities import command_runner
 from ..qsub import qsub
 
 
@@ -19,6 +22,9 @@ def bulk_pipeline(
     output_dir.mkdir(exist_ok=True, parents=True)
     qsub_dir = output_dir / 'qsub'
     qsub_dir.mkdir(exist_ok=True)
+
+    group_table = pd.read_csv(group_table_path, index_col=0)
+    group_table.to_csv(output_dir / 'GROUP_TABLE.csv')
 
     # merge ALLC
     # step 1: merge cell ALLC
@@ -49,7 +55,7 @@ def bulk_pipeline(
                  total_cpu=total_cpu,
                  total_mem=500,
                  force_redo=False,
-                 qsub_global_parms=f'-pe smp {merge_cpu};-l h_vmem={h_vmem}')
+                 qsub_global_parms=f'-pe smp={merge_cpu};-l h_vmem={h_vmem}')
         elif mode == 'command_only':
             pass
         elif mode == 'local':

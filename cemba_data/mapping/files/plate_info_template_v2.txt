@@ -11,6 +11,13 @@
 # /____  >___|  /\___  >\___  >__|  __
 #      \/     \/     \/     \/      \/
 #
+# ____   ____________
+# \   \ /   /\_____  \
+#  \   Y   /  /  ____/
+#   \     /  /       \
+#    \___/   \_______ \
+#                    \/
+#
 # PlateInfo template of single cell sequencing demultiplex
 #
 # This file template contain 3 sections.
@@ -35,7 +42,7 @@
 # Explain:
 # Every key=value pairs are required. key name can not be change.
 # Some values have limited options, they are:
-# n_random_index choice: 8 (V1), 384 (V2)
+# n_random_index choice: 384 (V2), if your n_random_index=8, use V1 template!
 # input_plate_size choice: 384
 #
 #
@@ -47,7 +54,8 @@
 # email=your-email@salk.edu
 #
 
-n_random_index=8
+# if your n_random_index=8, use V1 template!
+n_random_index=384
 input_plate_size=384
 pool_id=
 tube_label=
@@ -99,7 +107,7 @@ email=
 # Explain:
 # Plate metadata that specific to certain plates, a tab separated table
 # First row must be header start with: plate_id	primer_quarter
-# First 2 columns are required and must be in the order of: plate_id	primer_quarter
+# First 3 columns are required and must be in the order of: plate_id	multiplex_group	primer_name
 # You can add more plate specific info into additional columns, those info will be appended to LibraryInfo as part of sample_id.
 # All the values will be concatenate by "-" into the sample id and present in file name.
 # So better not to include "-" in value and use UNIX path safe characters.
@@ -109,25 +117,27 @@ email=
 # Because here the plate info is just for barcode demultiplexing, so that we can get single cell data AND the plate position of each cell
 # with the plate position, it should be very convenient for you to add any custom information you designed in your experiment.
 #
-# primer_quarter valid values are:
-# Set1_Q1, Set1_Q2, Set1_Q3, Set1_Q4
-# SetB_Q1, SetB_Q2, SetB_Q3, SetB_Q4
+# primer_name valid values are:
+# [A-P][1-24]
 #
 # Example:
-# plate_id	primer_quarter
-# CEMBA190530_9C_1	SetB_Q1
-# CEMBA190530_9C_2	SetB_Q1
-# CEMBA190530_9C_3	SetB_Q2
-# CEMBA190530_9C_4	SetB_Q2
-# CEMBA190620_9C_1	SetB_Q3
-# CEMBA190620_9C_2	SetB_Q3
-# CEMBA190620_9C_3	SetB_Q4
-# CEMBA190620_9C_4	SetB_Q4
+# plate_id	multiplex_group	primer_name
+# Plate_1	1	B1
+# Plate_1	2	B3
+# Plate_1	3	B5
+# Plate_1	4	B7
+# Plate_1	5	B9
+# Plate_1	6	B11
 #
-# Remember the columns MUST be separate by tab not space
+# Remember the columns MUST be separate by tab, not space or comma
 #
 
-plate_id	primer_quarter
+
+# =====================================================================================================
+# if your n_random_index=8, use V1 template!
+# =====================================================================================================
+
+plate_id	multiplex_group	primer_name
 
 
 

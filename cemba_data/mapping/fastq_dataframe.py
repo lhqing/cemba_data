@@ -4,11 +4,65 @@ import pathlib
 
 import pandas as pd
 
+from .utilities import get_configuration
+
 # logger
 log = logging.getLogger()
 
 
-def make_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
+def parse_v1_fastq_path(path):
+    path = pathlib.Path(path)
+    try:
+        *_, plate1, plate2, multi_field = path.name.split('-')
+        plate_pos, _, lane, read_type, _ = multi_field.split('_')
+        try:
+            assert plate_pos[0] in 'ABCDEFGH'
+            assert int(plate_pos[1:]) in list(range(1, 13))
+            assert lane in {'L001', 'L002', 'L003', 'L004'}
+            assert read_type in {'R1', 'R2'}
+            assert plate1 != plate2
+        except AssertionError:
+            raise ValueError
+    except ValueError:
+        raise ValueError(f'Found unknown name pattern in path {path}')
+    name_dict = dict(plate1=plate1,
+                     plate2=plate2,
+                     plate_pos=plate_pos,
+                     lane=lane,
+                     read_type=read_type,
+                     fastq_path=path,
+                     uid=f'{plate1}-{plate2}-{plate_pos}')
+    name_series = pd.Series(name_dict)
+    return name_series
+
+
+def parse_v2_fastq_path(path):
+    path = pathlib.Path(path)
+    try:
+        *_, plate, multiplex_group, multi_field = path.name.split('-')
+        primer_name, _, lane, read_type, _ = multi_field.split('_')
+        try:
+            assert primer_name[0] in 'ABCDEFGHIJKLMNOP'
+            assert int(primer_name[1:]) in list(range(1, 25))
+            assert int(multiplex_group) in list(range(1, 7))
+            assert lane in {'L001', 'L002', 'L003', 'L004'}
+            assert read_type in {'R1', 'R2'}
+        except AssertionError:
+            raise ValueError
+    except ValueError:
+        raise ValueError(f'Found unknown name pattern in path {path}')
+    name_dict = dict(plate=plate,
+                     multiplex_group=multiplex_group,
+                     primer_name=primer_name,
+                     lane=lane,
+                     read_type=read_type,
+                     fastq_path=path,
+                     uid=f'{plate}-{multiplex_group}-{primer_name}')
+    name_series = pd.Series(name_dict)
+    return name_series
+
+
+def make_fastq_dataframe(file_path, config_path, output_path=None):
     """
     Generate fastq_dataframe for pipeline input.
 
@@ -16,6 +70,8 @@ def make_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
     ----------
     file_path
         Accept 1. path pattern contain wildcard, 2. path list, 3. path of one file contain all the paths.
+    config_path
+        Mapping config path, use to get the barcode version
     output_path
         output path of the fastq dataframe
     skip_broken_name
@@ -24,6 +80,9 @@ def make_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
     -------
         fastq_dataframe for pipeline input.
     """
+    config = get_configuration(config_path)
+    barcode_version = config['multiplexIndex']['barcode_version'].upper()
+
     if isinstance(file_path, str) and ('*' in file_path):
         file_path = [str(pathlib.Path(p).absolute()) for p in glob.glob(file_path)]
     elif isinstance(file_path, list):
@@ -34,37 +93,17 @@ def make_fastq_dataframe(file_path, output_path=None, skip_broken_name=False):
     log.info(f'{len(file_path)} fastq file paths in input')
 
     fastq_data = []
-    broken_names = []
     for path in file_path:
-        path = pathlib.Path(path)
-        try:
-            *_, plate1, plate2, multi_field = path.name.split('-')
-            plate_pos, _, lane, read_type, _ = multi_field.split('_')
-            try:
-                assert plate_pos[0] in 'ABCDEFGH'
-                assert int(plate_pos[1:]) in list(range(1, 13))
-                assert lane in {'L001', 'L002', 'L003', 'L004'}
-                assert read_type in {'R1', 'R2'}
-                assert plate1 != plate2
-            except AssertionError:
-                raise ValueError
-        except ValueError:
-            broken_names.append(path)
-            if skip_broken_name:
-                continue
-            raise ValueError(f'Found unknown name pattern in path {path}')
-        name_dict = dict(plate1=plate1,
-                         plate2=plate2,
-                         plate_pos=plate_pos,
-                         lane=lane,
-                         read_type=read_type,
-                         fastq_path=path,
-                         uid=f'{plate1}-{plate2}-{plate_pos}')
-        name_series = pd.Series(name_dict)
+        if barcode_version == 'V1':
+            name_series = parse_v1_fastq_path(path)
+        elif barcode_version == 'V2':
+            name_series = parse_v2_fastq_path(path)
+        else:
+            raise ValueError(
+                f'Unknown version name {barcode_version} in multiplexIndex section of the config file.')
         fastq_data.append(name_series)
 
     fastq_df = pd.DataFrame(fastq_data)
-    log.info(f'{len(broken_names)} broken names.')
     log.info(f'{fastq_df.shape[0]} valid fastq names.')
     if fastq_df.shape[0] == 0:
         log.info('No fastq name remained, check if the name pattern is correct.')

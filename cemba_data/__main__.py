@@ -192,6 +192,15 @@ def print_plate_info_register_subparser(subparser):
     parser = subparser.add_parser('default-plate-info',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Print out default plate info template.")
+
+    parser.add_argument(
+        "--primer_version", '-v', '-V',
+        type=str,
+        default='V2',
+        choices=['V1', 'V2'],
+        help="Use V1 template for 8-random-index library version, "
+             "Use V2 template for 384-random-index library version."
+    )
     return
 
 

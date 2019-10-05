@@ -27,7 +27,7 @@ def pipeline_fastq(input_fastq_pattern,
     if fastq_dataframe_path is None:
         make_fastq_dataframe(file_path=input_fastq_pattern,
                              output_path=str(fastq_dir / 'fastq_dataframe.csv'),
-                             skip_broken_name=False)
+                             config_path=config_path)
     else:
         subprocess.run(['cp', fastq_dataframe_path, str(fastq_dir / 'fastq_dataframe.csv')])
 

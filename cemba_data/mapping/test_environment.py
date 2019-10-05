@@ -9,7 +9,6 @@ def testing_cmd(command, expected_return_code=0):
                            stdout=subprocess.PIPE,
                            encoding='utf8',
                            check=True)
-        print(p.stdout)
     except subprocess.CalledProcessError as e:
         if e.returncode == expected_return_code:
             return

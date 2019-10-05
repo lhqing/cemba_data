@@ -1,32 +1,38 @@
-import json
+import pathlib
 
-def generate_bigwig(output_dir,
-                    sub_dir_name,
+import pandas as pd
+
+
+def generate_bigwig(output_dir_path,
                     chrom_size_path,
                     cpu,
                     mc_contexts_list,
                     bin_size):
-    qsub_dir = output_dir / 'qsub/bigwig'
-    qsub_dir.mkdir(exist_ok=True)
+    output_dir = pathlib.Path(output_dir_path).absolute()
+    group_table_path = output_dir / 'GROUP_TABLE.csv'
 
-    _output_dir = output_dir / sub_dir_name
-    output_records_path = _output_dir / f'merge_{sub_dir_name}.records.json'
-    with open(output_records_path) as f:
-        allc_dict = json.load(f)
+    group_table = pd.read_csv(group_table_path, index_col=0)
+    group_levels = group_table.columns[1:]
+    qsub_dir = output_dir / 'qsub'
+
+    bigwig_dir = output_dir / 'BW'
+    bigwig_dir.mkdir(exist_ok=True)
+
     command_records = []
-    output_records = {}
-    for cluster, allc_path in allc_dict.items():
-        output_prefix = _output_dir / cluster
+    for group_level in group_levels:
+        _group_output_dir = bigwig_dir / group_level
+        _group_output_dir.mkdir(exist_ok=True)
 
-        if allc_path.is_symlink():
-            real_allc = allc_path.resolve()
-            bw_files = real_allc.parent.glob(f'{cluster}*bw')
-            for bw_file_path in bw_files:
-                bw_suffix = '.'.join(bw_file_path.name.split('.')[-3:])
-                command = f'ln -s {bw_file_path} {output_prefix}.{bw_suffix}'
-                command_records.append(command)
-        else:
+        file_records = []
+        group_dir = output_dir / group_level
+        group_allc_records = group_dir / 'ALLC_table.csv'
+        group_allc_df = pd.read_csv(group_allc_records, index_col=0)
+
+        for allc_path in group_allc_df['AllcPath']:
             mc_contexts_str = ' '.join(mc_contexts_list)
+            output_prefix = _group_output_dir / pathlib.Path(allc_path).name[:-12]
+            output_path = ''  # TODO
+
             command = f'allcools allc-to-bigwig ' \
                       f'--allc_path {allc_path} ' \
                       f'--output_prefix {output_prefix} ' \
@@ -36,7 +42,12 @@ def generate_bigwig(output_dir,
                       f'--remove_additional_chrom ' \
                       f'--cpu {cpu}'
             command_records.append(command)
-    with open(qsub_dir / f'bigwig_{sub_dir_name}.commands.txt', 'w') as f:
+            file_records.append(output_path)
+
+        # TODO group_allc_records will be updated
+        # group_allc_df[''] = file_records
+        # group_allc_df.to_csv(group_allc_records)
+
+    with open(qsub_dir / f'_bigwig.commands.txt', 'w') as f:
         f.write('\n'.join(command_records))
-    with open(_output_dir / f'bigwig_{sub_dir_name}.records.json', 'w') as f:
-        json.dump(output_records, f)
+    return

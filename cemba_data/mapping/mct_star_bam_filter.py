@@ -148,8 +148,7 @@ def summarize_select_rna_reads(output_dir, config):
     output_path = bam_dir / 'select_rna_reads.stats.csv'
     if output_path.exists():
         return str(output_path)
-    if isinstance(config, str):
-        config = get_configuration(config)
+    config = get_configuration(config)
 
     records = []
     select_dna_reads_stat_list = list(bam_dir.glob('*.reads_profile.csv'))
