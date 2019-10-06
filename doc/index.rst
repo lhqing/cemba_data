@@ -14,7 +14,8 @@ YAP (Yet Another Pipeline) is an in-house mapping pipeline for snmC-seq, NOMe-se
    
    installation
    PlateInfoAndSampleSheet
-   PrepareMappingConfigINI
+   PipelineInput
+   MakeFastqDataframe
    RunMappingFULL
    MappingSummary
 
