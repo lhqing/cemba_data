@@ -14,48 +14,11 @@ import cemba_data
 log = logging.getLogger()
 
 DESCRIPTION = """
-yap (yet another pipeline) is a toolkit for single cell methylation sequencing analysis
-Author: Hanqing Liu, hanliu@salk.edu
+YAP (Yet Another Pipeline) is an in-house mapping pipeline for 
+snmC-seq, NOMe-seq, snmCT-seq mapping and preprocessing.
 
-This toolkit contain functions for 3-stage analysis:
-    Stage 1 Preprocessing: Mapping FASTQ, generate single cell ALLC
-    Stage 2 Cell Level Analysis: Prepare MCDS dataset for cell based analysis
-    Stage 3 Cluster Level Analysis: merge ALLC and ALLC related functions
-    Other functions: qsub submitter for SGE QSUB; simulation functions
-
-STAGE 1
-    - Mapping pipeline:
-    mapping - Actual mapping function
-    default-mapping-config - Print the default mapping config
-    mapping-qsub - Qsub wrapper for mapping that run with "yap qsub" 
-    mapping-summary - Summary mapping output directory after mapping
-    
-    - Stand alone STAGE 1 functions:
-    bam-to-allc - Take 1 after QC and position sorted BAM file, generate and index 1 ALLC file.
-
-STAGE 2
-    map-to-region - Map ALLC file into a region BED file
-    assemble-dataset - Assemble all cell-region BED file into MCDS
-    generate-dataset - Wrapper for map-to-region and assemble-dataset that run with "yap qsub"
-
-STAGE 3
-    merge-allc - Merge single cell ALLC files into cluster ALLC.
-    allc-profile - Generate summary statistics for a ALLC file.
-    allc-to-bigwig - ALLC to BIGWIG.
-    allc-extract - Extract ALLC file information. 
-    cluster-merge - Wrapper for above stage 3 functions that run with "yap qsub"
-    
-Qsub
-    qsub - Qsubmitter for SGE QSUB.
-
-SIMULATION (exp)
-    simulate-allc - Simulate single cell ALLC based on given high coverage ALLC.
-    simulate-long-reads-coverage - Simulate genome coverage BED file for long reads.
+See documentation at https://cemba-data.readthedocs.io
 """
-# TODO add DESCRIPTION for structured functional groups
-# mapping
-# allc
-# dataset etc
 
 EPILOG = """
 Author: Hanqing Liu, hanliu@salk.edu

@@ -173,9 +173,9 @@ class _Qsubmitter:
         return
 
     def _parse_command_file(self, merge_jobs=None):
-        with open(self.command_file_path) as command:
+        with open(self.command_file_path) as command_f:
             if self.command_file_path.endswith('json'):
-                command_dict_list = json.load(command)
+                command_dict_list = json.load(command_f)
             else:
                 print('\ncommand file name does not end with "json", '
                       'will read each line in the file as a single command.\n'
@@ -184,14 +184,16 @@ class _Qsubmitter:
                       '--qsub_global_parms, this will apply to every command in this command file.\n'
                       'If you want to specify qsub parameters for each job separately, '
                       'use JSON format command file.\n')
+                total_commands = command_f.readlines()
+
                 command_dict_list = []
-                if merge_jobs is None:
-                    for line in command:
+                if (merge_jobs is None) or (merge_jobs >= len(total_commands)):
+                    for line in total_commands:
                         command_dict_list.append({'command': line})
                 else:
                     print(f'Will merge commands into {merge_jobs} qsub jobs.')
                     job_lists = [[] for _ in range(merge_jobs)]
-                    for i, line in enumerate(command):
+                    for i, line in enumerate(total_commands):
                         job_lists[i % merge_jobs].append(line)
                     for single_job_list in job_lists:
                         # in this case, the command value would be a list, will detect in writing command file
@@ -221,14 +223,14 @@ class _Qsubmitter:
             if command_obj.finish:
                 # happens when command_obj.status_path exist
                 self.finished_commands.append(command_obj)
-                if not self.resubmit_failed:
-                    # do not resubmit_failed commands, just continue
-                    continue
-                else:
-                    # otherwise, only continue for successful command
+                if self.resubmit_failed:
+                    # resubmit_failed commands, and only skip success command
                     if command_obj.success:
                         self.success_commands.append(command_obj)
                         continue
+                else:
+                    # skip all the finish command (has .json file), no matter fail or success
+                    continue
             command_cpu = int(command_obj.qsub_parameter['pe smp'])
             # here is the total memory, need to multiply by command_cpu
             command_mem = command_cpu * int(command_obj.qsub_parameter['l h_vmem'].strip('G'))
@@ -275,7 +277,7 @@ class _Qsubmitter:
             if self.running_cpu == 0:
                 break  # all job finished
             time.sleep(temp_gap)
-            if temp_gap < 300:
+            if temp_gap < 60:
                 temp_gap += 5
         return
 
@@ -379,7 +381,7 @@ class _Command:
         self.unique_id = unique_id  # unique id is given by submitter, qsub_id is given by qsub system
 
         # command status
-        self.submitted = False
+        self.submitted_in_this_run = False
         self.qsub_id = None
         self.submission_fail = False
         self.finish = False  # if submitted is True and not in qstat. For resubmit, if self.status_path exist.
@@ -450,21 +452,16 @@ class _Command:
         return
 
     def submit(self):
-        # there is no force submit option, because the force_redo is under control by whole project
-        if os.path.exists(self.status_path):
-            # if status file exist, just read the previous status, not submit job
-            self.check_submitted_status()
-            return
-        else:
-            job_id_pattern = re.compile(r'(?<=Your job )\d+')
-            return_obj = run(['qsub', self.script_path], stdout=PIPE, encoding='utf8')
-            print(f'Submitted {self.unique_id}, stdout: {return_obj.stdout.strip()}')
-            try:
-                self.qsub_id = job_id_pattern.search(return_obj.stdout).group()
-            except AttributeError:
-                self.submission_fail = True
-            self.submitted = True
-            return
+        """Submit the qsub script"""
+        job_id_pattern = re.compile(r'(?<=Your job )\d+')
+        return_obj = run(['qsub', self.script_path], stdout=PIPE, encoding='utf8')
+        print(f'Submitted {self.unique_id}, stdout: {return_obj.stdout.strip()}')
+        try:
+            self.qsub_id = job_id_pattern.search(return_obj.stdout).group()
+        except AttributeError:
+            self.submission_fail = True
+        self.submitted_in_this_run = True
+        return
 
     def check_submitted_status(self):
         if not os.path.exists(self.status_path):
@@ -477,7 +474,6 @@ class _Command:
             print('Fail to load status dict, treat as failed.')
             return None
 
-        self.submitted = True
         self.finish = True
         self.qsub_id = status_dict['qsub_id']
         self.start_time = datetime.datetime.strptime(status_dict['start_time'],
