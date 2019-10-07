@@ -255,6 +255,9 @@ def mapping_summary(output_dir):
     # aggregate all files
     total_summary = aggregate_all_summary(output_dir, mct=mct)
 
+    summary_path = output_dir / 'MappingSummary.csv.gz'
+    total_summary.to_csv(summary_path)
+
     random_index_version = config['multiplexIndex']['barcode_version'].upper()
     if random_index_version == 'V1':
         total_summary_with_plate_info = add_v1_plateinfo(total_summary)
@@ -263,7 +266,6 @@ def mapping_summary(output_dir):
     else:
         raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
 
-    summary_path = output_dir / 'MappingSummary.csv.gz'
     total_summary_with_plate_info.to_csv(summary_path)
     return summary_path
 
@@ -300,10 +302,9 @@ def add_v1_plateinfo(total_summary):
     plate_info_df.index = plate_info_df.index.set_names(['uid', 'index_name'])
 
     # make index_name lower to agree with plate_info_df
-    total_summary.index.set_levels(
-        total_summary.index.get_level_values('index_name').str.lower(),
-        level='index_name',
-        inplace=True)
+    total_summary.reset_index(inplace=True)
+    total_summary['index_name'] = total_summary['index_name'].str.lower()
+    total_summary = total_summary.set_index(['uid', 'index_name'])
 
     total_data = pd.concat([total_summary, plate_info_df], axis=1)
     return total_data
