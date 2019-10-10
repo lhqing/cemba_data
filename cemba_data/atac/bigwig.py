@@ -14,36 +14,39 @@ def fragment_to_bigwig(fragment_bed_path,
                        sort_mem='2%',
                        sort_cpu=1):
     """Cluster fragment bed file to bigwig file"""
-    # TODO this function has memory problem
-
     output_prefix = str(output_prefix).rstrip('.')
     out_bw_path = output_prefix + '.bw'
-    if pathlib.Path(out_bw_path).exists():
-        return
 
-    frag_bed_df = pd.read_csv(fragment_bed_path, sep='\t', header=None,
-                              names=['chrom', 'start', 'end', 'fragment'])
-    frag_bed = pybedtools.BedTool.from_dataframe(frag_bed_df)
-    frag_sorted_bed = frag_bed.sort(g=chrom_size_path)
-    scale = scale_factor / frag_bed_df.shape[0]
+    print('Sort fragment')
+    out_sort_path = str(out_bw_path) + 'temp.sort.bed'
+    try:
+        subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n '
+                       f'-S {sort_mem} --parallel {int(sort_cpu)} > {out_sort_path}',
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
+                       check=True, shell=True)
+        # count reads
+        p = subprocess.run(['wc', '-l', out_sort_path],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
+                           check=True)
+        total_reads = int(p.stdout.split(' ')[0])
+        scale = scale_factor / total_reads
+    except subprocess.CalledProcessError as e:
+        print(e.stderr)
+        raise e
 
     print('Calculate COV')
+    frag_sorted_bed = pybedtools.BedTool(out_sort_path)
     cov_bed = frag_sorted_bed.genome_coverage(scale=scale, bg=True, g=chrom_size_path)
-    out_path = output_prefix + '.bg'
-    cov_bed.saveas(str(out_path))
+    out_bg_path = output_prefix + '.bg'
+    cov_bed.saveas(str(out_bg_path))
 
     print('Generate bigwig')
-    out_sort_path = str(out_path) + '.sort'
-    with open(str(out_path) + '.sort', 'wb') as f:
-        p = subprocess.run(['sort', '-k1,1', '-k2,2n',
-                            '-S', sort_mem, '--parallel', str(sort_cpu), out_path],
-                           stdout=subprocess.PIPE)
-        f.write(p.stdout)
-    subprocess.run(['bedGraphToBigWig', out_sort_path, chrom_size_path, out_bw_path], check=True)
+    subprocess.run(['bedGraphToBigWig', out_bg_path, chrom_size_path, out_bw_path],
+                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8', check=True)
     if remove_bg:
-        subprocess.run(['rm', '-f', out_path, out_sort_path], check=True)
+        subprocess.run(['rm', '-f', out_bg_path, out_sort_path], check=True)
     else:
-        subprocess.run(['mv', '-f', out_sort_path, out_path], check=True)
+        subprocess.run(['mv', '-f', out_sort_path], check=True)
     return out_bw_path
 
 
