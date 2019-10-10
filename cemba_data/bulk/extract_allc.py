@@ -35,7 +35,8 @@ def extract_strand_merged_cg(output_dir_path, chrom_size_path, mc_context='CGN',
         # group_allc_records will be updated
         group_allc_df['mCGExtract'] = file_records
         group_allc_df.to_csv(group_allc_records)
-    with open(qsub_dir / '_extract_cg_commands.txt', 'w') as f:
-        f.write('\n'.join(commands))
 
-    return
+    command_file_path = qsub_dir / '_extract_cg_commands.txt'
+    with open(command_file_path, 'w') as f:
+        f.write('\n'.join(commands))
+    return command_file_path

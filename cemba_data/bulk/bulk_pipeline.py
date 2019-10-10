@@ -2,9 +2,9 @@ import pathlib
 
 import pandas as pd
 
+from .allc_to_bigwig import generate_bigwig
+from .extract_allc import extract_strand_merged_cg
 from .merge_allc import _merge_cell, _merge_cluster
-from ..mapping.utilities import command_runner
-from ..qsub import qsub
 
 
 def bulk_pipeline(
@@ -13,11 +13,11 @@ def bulk_pipeline(
         chrom_size_path,
         binarize_single_cell=True,
         merge_cpu=10,
-        total_cpu=100,
         ignore_names=None,
-        mode='command_only',
-        h_vmem='5G',
-        max_cell_group=299):
+        max_cell_group=299,
+        cg_context='CGN',
+        bigwig_context=None,
+        bigwig_binsize=50):
     output_dir = pathlib.Path(output_dir_path)
     output_dir.mkdir(exist_ok=True, parents=True)
     qsub_dir = output_dir / 'qsub'
@@ -45,24 +45,19 @@ def bulk_pipeline(
                                        cpu=merge_cpu)
     command_file_list.append(command_file_path)
 
-    # merge ALLC runner
-    for command_file_path in command_file_list:
-        if mode == 'qsub':
-            qsub(command_file_path=str(command_file_path),
-                 working_dir=qsub_dir,
-                 project_name='merge',
-                 wait_until=None,
-                 total_cpu=total_cpu,
-                 total_mem=500,
-                 force_redo=False,
-                 qsub_global_parms=f'-pe smp={merge_cpu};-l h_vmem={h_vmem}')
-        elif mode == 'command_only':
-            pass
-        elif mode == 'local':
-            with open(command_file_path) as f:
-                commands = [l.strip() for l in f.readlines()]
-            total_cpu = min(30, total_cpu)
-            command_runner(commands, cpu=total_cpu)
-        else:
-            raise ValueError(f'mode can only be in ["qsub", "command_only", "local"], got {mode}')
+    # step3: extract mCG ALLC
+    command_file_path = extract_strand_merged_cg(output_dir_path,
+                                                 chrom_size_path,
+                                                 mc_context=cg_context,
+                                                 cpu=1)
+    command_file_list.append(command_file_path)
+
+    # step4: bigwig
+    if bigwig_context is not None:
+        command_file_path = generate_bigwig(output_dir_path,
+                                            chrom_size_path,
+                                            cpu=1,
+                                            mc_contexts_list=bigwig_context,
+                                            bin_size=bigwig_binsize)
+        command_file_list.append(command_file_path)
     return
