@@ -48,7 +48,8 @@ def fragment_to_bigwig(fragment_bed_path,
     return out_bw_path
 
 
-def frag_to_bw_batch(frag_bed_path_list, chrom_size_path, cpu=1):
+def frag_to_bw_batch(frag_bed_path_list, chrom_size_path, remove_temp=True, cpu=1):
+    future_list = []
     with ProcessPoolExecutor(cpu) as executor:
         for fragment_bed_path in frag_bed_path_list:
             future = executor.submit(fragment_to_bigwig,
@@ -56,7 +57,7 @@ def frag_to_bw_batch(frag_bed_path_list, chrom_size_path, cpu=1):
                                      chrom_size_path=chrom_size_path,
                                      output_prefix=str(fragment_bed_path)[:-7],
                                      scale_factor=1e6,
-                                     remove_bg=True,
+                                     remove_bg=remove_temp,
                                      sort_mem='2%',
                                      sort_cpu=1)
             future_list.append(future)

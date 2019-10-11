@@ -58,7 +58,6 @@ def macs2(frag_bed_path_list, cpu, species, remove_temp=True, **macs2_kws):
                 cmd.append(k)
                 if v != '':
                     cmd.append(v)
-            print(cmd)
             future = executor.submit(process_runner, cmd)
             futures[future] = output_prefix
 
@@ -70,7 +69,8 @@ def macs2(frag_bed_path_list, cpu, species, remove_temp=True, **macs2_kws):
                     subprocess.run(['rm', '-f',
                                     f'{output_prefix}_control_lambda.bdg',
                                     f'{output_prefix}_peaks.xls',
-                                    f'{output_prefix}_summits.bed'])
+                                    f'{output_prefix}_summits.bed',
+                                    f'{output_prefix}_treat_pileup.bdg'])
             except subprocess.CalledProcessError as e:
                 print(e.stderr)
                 raise e

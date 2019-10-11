@@ -9,6 +9,7 @@ def atac_bulk_pipeline(cell_group_path,
                        chrom_size_path,
                        cpu,
                        species='mm',
+                       remove_temp=True,
                        **macs2_kws):
     """
     Given a clustering assignment table and related SNAP files, do:
@@ -35,6 +36,7 @@ def atac_bulk_pipeline(cell_group_path,
         chromosome size file path
     species
         hs or mm
+    remove_temp
 
     Returns
     -------
@@ -51,6 +53,7 @@ def atac_bulk_pipeline(cell_group_path,
     frag_to_bw_batch(
         frag_bed_path_list=frag_bed_path_list,
         chrom_size_path=chrom_size_path,
+        remove_temp=remove_temp,
         cpu=cpu)
 
     # call peaks
@@ -58,4 +61,5 @@ def atac_bulk_pipeline(cell_group_path,
         frag_bed_path_list=frag_bed_path_list,
         cpu=cpu,
         species=species,
+        remove_temp=remove_temp,
         **macs2_kws)
