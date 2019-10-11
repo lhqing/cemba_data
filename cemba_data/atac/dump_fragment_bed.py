@@ -103,32 +103,13 @@ def _dump_frags_single_cluster(output_path, cluster_df, sample_snap_dict):
 def dump_frags(cell_group_path, output_dir_path, sample_snap_path, cpu=1):
     """
     Extract fragment bed file for levels of clustering results from snap file.
-
-    Parameters
-    ----------
-    cell_group_path:
-        first row is header, names of cluster columns will be used as output names;
-        Column 0 is sample name;
-        Column 1 is cell barcode;
-        Column 2, ..., n are level of cell group/clusters;
-    output_dir_path
-        Output directory, each cluster col will be a sub-dir
-    sample_snap_path
-        no header;
-        Column 0 is sample name;
-        Column 1 is sample SNAP file path;
-    cpu
-        Number of cpu to parallel
-
-    Returns
-    -------
-
     """
     sample_snap_dict = pd.read_csv(sample_snap_path, index_col=0, header=None, squeeze=True).to_dict()
     cell_group_table = pd.read_csv(cell_group_path, index_col=None)
     output_dir = pathlib.Path(output_dir_path).absolute()
     print(sample_snap_dict)
     future_list = []
+    output_path_list = []
     with ProcessPoolExecutor(cpu) as executor:
         for col in cell_group_table.columns[2:]:
             col_dir = output_dir / col
@@ -141,6 +122,7 @@ def dump_frags(cell_group_path, output_dir_path, sample_snap_path, cpu=1):
                                          cluster_df=cluster_df,
                                          sample_snap_dict=sample_snap_dict)
                 future_list.append(future)
+                output_path_list.append(output_path)
     for future in as_completed(future_list):
         future.result()
-    return
+    return output_path_list

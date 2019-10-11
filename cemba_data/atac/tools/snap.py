@@ -149,7 +149,6 @@ def merge_cell(adata, embedding_data, target=5000, n_neighbors=30, max_dist=0.3,
     original_name = adata.obs_names[cell_selection]
 
     # get neighbors
-    # TODO: try more fancy neighbor select
     distance, points = clf.kneighbors(embedding_data)
     distance = distance[cell_selection, :]
     points = points[cell_selection, :]

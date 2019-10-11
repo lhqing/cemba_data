@@ -1,8 +1,6 @@
-import pathlib
 import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import pandas as pd
 import pybedtools
 
 
@@ -50,23 +48,18 @@ def fragment_to_bigwig(fragment_bed_path,
     return out_bw_path
 
 
-def frag_to_bw_batch(cell_group_path, output_dir_path, chrom_size_path, cpu=1):
-    cell_group_table = pd.read_csv(cell_group_path, index_col=None)
-    output_dir = pathlib.Path(output_dir_path).absolute()
-    future_list = []
+def frag_to_bw_batch(frag_bed_path_list, chrom_size_path, cpu=1):
     with ProcessPoolExecutor(cpu) as executor:
-        for col in cell_group_table.columns[2:]:
-            col_dir = output_dir / col
-            for fragment_bed_path in col_dir.glob('*.bed.gz'):
-                future = executor.submit(fragment_to_bigwig,
-                                         fragment_bed_path=fragment_bed_path,
-                                         chrom_size_path=chrom_size_path,
-                                         output_prefix=str(fragment_bed_path)[:-7],
-                                         scale_factor=1e6,
-                                         remove_bg=True,
-                                         sort_mem='2%',
-                                         sort_cpu=1)
-                future_list.append(future)
+        for fragment_bed_path in frag_bed_path_list:
+            future = executor.submit(fragment_to_bigwig,
+                                     fragment_bed_path=fragment_bed_path,
+                                     chrom_size_path=chrom_size_path,
+                                     output_prefix=str(fragment_bed_path)[:-7],
+                                     scale_factor=1e6,
+                                     remove_bg=True,
+                                     sort_mem='2%',
+                                     sort_cpu=1)
+            future_list.append(future)
     for future in as_completed(future_list):
         future.result()
     return
