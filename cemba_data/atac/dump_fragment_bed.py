@@ -93,7 +93,6 @@ def _dump_frags_single_cluster(output_path, cluster_df, sample_snap_dict):
     with open_gz(output_path, 'w') as f:
         # cluster_df col 0 is sample, col 1 is barcode
         for sample, cluster_sample_df in cluster_df.groupby(cluster_df.iloc[:, 0]):
-            print(output_path, sample, cluster_sample_df.shape[0])
             snap_path = sample_snap_dict[sample]
             barcodes = cluster_sample_df.iloc[:, 1].tolist()
             _dump_frags_single_snap(snap_path=snap_path, out_f=f, barcodes=barcodes)
@@ -107,7 +106,6 @@ def dump_frags(cell_group_path, output_dir_path, sample_snap_path, cpu=1):
     sample_snap_dict = pd.read_csv(sample_snap_path, index_col=0, header=None, squeeze=True).to_dict()
     cell_group_table = pd.read_csv(cell_group_path, index_col=None)
     output_dir = pathlib.Path(output_dir_path).absolute()
-    print(sample_snap_dict)
     future_list = []
     output_path_list = []
     with ProcessPoolExecutor(cpu) as executor:

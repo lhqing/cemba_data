@@ -62,7 +62,7 @@ def frag_to_bw_batch(frag_bed_path_list, chrom_size_path, remove_temp=True, cpu=
                                      output_prefix=str(fragment_bed_path)[:-7],
                                      scale_factor=1e6,
                                      remove_bg=remove_temp,
-                                     sort_mem='2%',
+                                     sort_mem='3%',
                                      sort_cpu=1)
             future_list.append(future)
     for future in as_completed(future_list):
