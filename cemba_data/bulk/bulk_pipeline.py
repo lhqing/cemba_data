@@ -11,7 +11,7 @@ def bulk_pipeline(
         output_dir_path,
         group_table_path,
         chrom_size_path,
-        binarize_single_cell=True,
+        binarize_single_cell=False,
         merge_cpu=10,
         ignore_names=None,
         max_cell_group=999,
@@ -24,7 +24,8 @@ def bulk_pipeline(
     qsub_dir.mkdir(exist_ok=True)
 
     group_table = pd.read_csv(group_table_path, index_col=0).fillna('NOT_A_CLUSTER')
-    group_table.to_csv(output_dir / 'GROUP_TABLE.csv')
+    group_table_path = output_dir / 'GROUP_TABLE.csv'
+    group_table.to_csv(group_table_path)
 
     # merge ALLC
     # step 1: merge cell ALLC
