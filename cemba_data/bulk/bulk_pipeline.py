@@ -14,7 +14,7 @@ def bulk_pipeline(
         binarize_single_cell=True,
         merge_cpu=10,
         ignore_names=None,
-        max_cell_group=299,
+        max_cell_group=999,
         cg_context='CGN',
         bigwig_context=None,
         bigwig_binsize=50):
@@ -23,7 +23,7 @@ def bulk_pipeline(
     qsub_dir = output_dir / 'qsub'
     qsub_dir.mkdir(exist_ok=True)
 
-    group_table = pd.read_csv(group_table_path, index_col=0)
+    group_table = pd.read_csv(group_table_path, index_col=0).fillna('NOT_A_CLUSTER')
     group_table.to_csv(output_dir / 'GROUP_TABLE.csv')
 
     # merge ALLC
@@ -38,6 +38,11 @@ def bulk_pipeline(
     command_file_list.append(command_file_path)
 
     # step 2: merge cluster ALLC
+    if ignore_names is None:
+        ignore_names = ['NOT_A_CLUSTER']
+    else:
+        ignore_names.append('NOT_A_CLUSTER')
+
     command_file_path = _merge_cluster(output_dir_path,
                                        cell_group_allc_map,
                                        ignore_names,
