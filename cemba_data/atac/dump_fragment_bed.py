@@ -42,6 +42,33 @@ def read_snap(file_path, bin_size=5000):
     return adata
 
 
+
+
+def read_snap_gene(file_path):
+    with h5py.File(file_path) as f:
+        data = f[f'/GM/count'].value
+        idx = f[f'/GM/idx'].value - 1  # R is 1 based, python is 0 based
+        idy = f[f'/GM/idy'].value - 1  # R is 1 based, python is 0 based
+
+        gene_id = f[f'/GM/name'].value.astype(str)
+
+        cell_barcode = f['/BD/name'].value.astype(str)
+        cell_id = [f'ATAC_{i}' for i in range(cell_barcode.size)]
+        cell_meta = pd.DataFrame([], index=cell_id)
+        cell_meta['barcode'] = cell_barcode
+        for name in f['/BD/'].keys():
+            if name == 'name':
+                continue
+            cell_meta[name] = f[f'/BD/{name}'].value
+        data = ss.coo_matrix((data, (idx, idy)), shape=(cell_barcode.size, gene_id.size)).tocsc()
+
+    adata = AnnData(X=data,
+                    obs=cell_meta,
+                    var=pd.DataFrame([],
+                                     index=pd.Index(gene_id, name='gene')))
+    return adata
+
+
 @lru_cache(maxsize=100)
 def _get_barcode_dict(snap_path):
     with h5py.File(snap_path, 'r') as f:
