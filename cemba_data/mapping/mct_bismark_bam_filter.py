@@ -4,9 +4,8 @@ from collections import defaultdict
 
 import pandas as pd
 import pysam
-from ALLCools._open import open_bam
 
-from .utilities import get_bam_header_str, get_configuration
+from .utilities import get_configuration
 
 METHYLATED_CHAR = 'H'
 UNMETHYLATED_CHAR = 'h'
@@ -28,19 +27,18 @@ def select_dna_reads(input_bam,
                      mc_rate_max_threshold=0.5,
                      cov_min_threshold=5,
                      remove_input=True):
-    bam_header = get_bam_header_str(input_bam)
     read_profile_dict = defaultdict(int)
-    with pysam.AlignmentFile(input_bam) as f, open_bam(output_bam, 'w') as out_f:
-        out_f.write(bam_header)
-        for read in f:
-            bismark_tag = read.get_tag('XM')
-            mc_rate, cov = read_mc_level(bismark_tag)
-            read_profile_dict[(int(100 * mc_rate), cov)] += 1
+    with pysam.AlignmentFile(input_bam) as f:
+        with pysam.AlignmentFile(output_bam, header=f.header, mode='w') as out_f:
+            for read in f:
+                bismark_tag = read.get_tag('XM')
+                mc_rate, cov = read_mc_level(bismark_tag)
+                read_profile_dict[(int(100 * mc_rate), cov)] += 1
 
-            # split reads
-            if (mc_rate > mc_rate_max_threshold) or (cov < cov_min_threshold):
-                continue
-            out_f.write(read.tostring() + '\n')
+                # split reads
+                if (mc_rate > mc_rate_max_threshold) or (cov < cov_min_threshold):
+                    continue
+                out_f.write(read)
     read_profile = pd.Series(read_profile_dict)
     read_profile.index.name = ['mc_rate', 'cov']
     read_profile.to_csv(str(output_bam) + '.reads_profile.csv', header=True)

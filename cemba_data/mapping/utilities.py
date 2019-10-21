@@ -118,14 +118,3 @@ def command_runner(commands, runner=None, cpu=1):
                     print(e.stderr)
                     raise e
     return
-
-
-def get_bam_header_str(bam_path):
-    bam_header = ''
-    with open_bam(bam_path, include_header=True) as f:
-        for line in f:
-            if line.startswith('@'):
-                bam_header += line
-            else:
-                break
-    return bam_header
