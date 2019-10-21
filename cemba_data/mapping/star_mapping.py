@@ -29,6 +29,13 @@ def star_mapping(input_dir, output_dir, config):
     star_reference = config['star']['star_reference']
     read_min = int(config['star']['read_min'])
     read_max = int(config['star']['read_max'])
+
+    try:
+        genome_load = config['star']['genome_load']
+    except KeyError:
+        print('"genome_load" parameter not found in [star] section, will set to default "NoSharedMemory".')
+        genome_load = "NoSharedMemory"
+
     # Do not allow to change threads
     # threads = int(config['star']['threads'])
     threads = 6
@@ -69,7 +76,7 @@ def star_mapping(input_dir, output_dir, config):
         star_cmd = f'STAR --runThreadN {threads} ' \
                    f'--genomeDir {star_reference} ' \
                    f'--alignEndsType EndToEnd ' \
-                   f'--genomeLoad NoSharedMemory ' \
+                   f'--genomeLoad {genome_load} ' \
                    f'--outSAMstrandField intronMotif ' \
                    f'--outSAMtype BAM Unsorted ' \
                    f'--outSAMunmapped Within ' \

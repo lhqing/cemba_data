@@ -89,46 +89,87 @@ def transform_bismark_bam_qc_stats(stats_df_dict):
     return bam_result
 
 
-def transform_allc_stats(stats_df_dict):
-    stats_df = stats_df_dict['generate_allc']
-    stats_df = stats_df.set_index(stats_df.columns[0])
-    stats_df.index.name = 'mc_context'
-    stats_df.reset_index(inplace=True)
-
-    # genome cov
-    genome_cov = stats_df_dict['generate_allc'].groupby(['uid', 'index_name'])['genome_cov'].apply(lambda i: i.iloc[0])
-
-    # TODO change this to process NOMe
-
-    # ALLC stat
+def _stats_df_profile(stats_df):
     cov_df = stats_df \
         .set_index(['uid', 'index_name', 'mc_context'])['cov'] \
         .unstack('mc_context') \
         .fillna(0).astype(int)
-    ccc_cov = cov_df['CCC']
+    ccc_cov = cov_df[f'CCC']
     cov_df = cov_df.groupby(lambda i: i[:2], axis=1) \
         .sum()[['CA', 'CC', 'CG', 'CT']] \
-        .rename(columns={c: c + '_Cov' for c in ['CA', 'CC', 'CG', 'CT']})
-    cov_df['CH_Cov'] = cov_df[['CA_Cov', 'CC_Cov', 'CT_Cov']].sum(axis=1)
+        .rename(columns={c: c + '_Cov'
+                         for c in ['CA', 'CC', 'CG', 'CT']})
+
     mc_df = stats_df \
         .set_index(['uid', 'index_name', 'mc_context'])['mc'] \
-        .unstack('mc_context').fillna(0).astype(int)
+        .unstack('mc_context') \
+        .fillna(0).astype(int)
     ccc_mc = mc_df['CCC']
     mc_df = mc_df.groupby(lambda i: i[:2], axis=1) \
         .sum()[['CA', 'CC', 'CG', 'CT']] \
-        .rename(columns={c: c + '_Mc' for c in ['CA', 'CC', 'CG', 'CT']})
-    mc_df['CH_Mc'] = mc_df[['CA_Mc', 'CC_Mc', 'CT_Mc']].sum(axis=1)
-    # add mc rate
-    mc_df['CH_Rate'] = mc_df['CH_Mc'] / cov_df['CH_Cov']
-    mc_df['CG_Rate'] = mc_df['CG_Mc'] / cov_df['CG_Cov']
-    # add CCC rate and use it to add adj mc rate
+        .rename(columns={c: c + '_Mc'
+                         for c in ['CA', 'CC', 'CG', 'CT']})
+
+    # mCCC
     mc_df['CCC_Mc'] = ccc_mc
     mc_df['CCC_Cov'] = ccc_cov
     mc_df['CCC_Rate'] = ccc_mc / ccc_cov
-    mc_df['CH_RateAdj'] = (mc_df['CH_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
+
+    # mCG
+    mc_df['CG_Rate'] = mc_df['CG_Mc'] / cov_df['CG_Cov']
     mc_df['CG_RateAdj'] = (mc_df['CG_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
-    mc_df['genome_cov'] = genome_cov
+
+    # mCH
+    cov_df[f'CH_Cov'] = cov_df[['CA_Cov', 'CC_Cov', 'CT_Cov']].sum(axis=1)
+    mc_df['CH_Mc'] = mc_df[['CA_Mc', 'CC_Mc', 'CT_Mc']].sum(axis=1)
+    mc_df['CH_Rate'] = mc_df['CH_Mc'] / cov_df['CH_Cov']
+    mc_df['CH_RateAdj'] = (mc_df['CH_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
+
+    # mCY
+    cov_df[f'CY_Cov'] = cov_df[['CC_Cov', 'CT_Cov']].sum(axis=1)
+    mc_df['CY_Mc'] = mc_df[['CC_Mc', 'CT_Mc']].sum(axis=1)
+    mc_df['CY_Rate'] = mc_df['CY_Mc'] / cov_df['CY_Cov']
+    mc_df['CY_RateAdj'] = (mc_df['CY_Rate'] - mc_df['CCC_Rate']) / (1 - mc_df['CCC_Rate'])
     return mc_df
+
+
+def transform_allc_stats(stats_df, nome=False):
+    stats_df.index.name = 'mc_context'
+    stats_df.reset_index(inplace=True)
+    genome_cov = stats_df.groupby(['uid', 'index_name'])['genome_cov'].apply(lambda i: i.iloc[0])
+
+    if nome:
+        nome_stats_df = stats_df[stats_df.mc_context.str.startswith('G')].copy()  # select GCN records
+        nome_stats_df['mc_context'] = nome_stats_df['mc_context'].str[1:]  # remove the first base
+        nome_results = _stats_df_profile(nome_stats_df)
+
+        stats_df = stats_df[~stats_df.mc_context.str.startswith('G')].copy()  # select HCN records
+        stats_df['mc_context'] = stats_df['mc_context'].str[1:]  # remove the first base
+        stats_df = stats_df.groupby(['uid', 'index_name', 'mc_context']).sum()[['mc', 'cov']].reset_index()
+        mc_results = _stats_df_profile(stats_df)
+
+        # select useful col
+        mc_results = mc_results[['CCC_Rate',
+                                 'CG_Rate', 'CG_RateAdj',
+                                 'CH_Rate', 'CH_RateAdj',
+                                 'CY_Rate', 'CY_RateAdj']].copy()
+        mc_results.columns = mc_results.columns.map(lambda i: f'H{i}')
+        nome_results = nome_results[['CG_Rate',
+                                     'CH_Rate',
+                                     'CY_Rate']].copy()
+        nome_results.columns = nome_results.columns.map(lambda i: f'G{i}')
+        mc_results = pd.concat([nome_results, mc_results], axis=1)
+        mc_results['GCH_RateAdj'] = (mc_results['GCH_Rate'] - mc_results['HCCC_Rate']) / (1 - mc_results['HCCC_Rate'])
+        mc_results['GCY_RateAdj'] = (mc_results['GCY_Rate'] - mc_results['HCCC_Rate']) / (1 - mc_results['HCCC_Rate'])
+
+    else:
+        mc_results = _stats_df_profile(stats_df)
+        mc_results = mc_results[['CCC_Rate',
+                                 'CG_Rate', 'CG_RateAdj',
+                                 'CH_Rate', 'CH_RateAdj']].copy()
+
+    mc_results['genome_cov'] = genome_cov
+    return mc_results
 
 
 def transform_select_reads_stats(stats_df_dict, read_kind):

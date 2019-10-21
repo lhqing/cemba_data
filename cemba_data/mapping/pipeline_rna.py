@@ -1,4 +1,3 @@
-import json
 import pathlib
 
 from cemba_data.mapping import \
