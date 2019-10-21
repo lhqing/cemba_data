@@ -135,7 +135,7 @@ def _stats_df_profile(stats_df):
 
 def transform_allc_stats(stats_df_dict, nome=False):
     stats_df = stats_df_dict['generate_allc']
-    stats_df.set_index(stats_df.columns[0], inplcae=True)
+    stats_df = stats_df.set_index(stats_df.columns[0])
     stats_df.index.name = 'mc_context'
     stats_df.reset_index(inplace=True)
     genome_cov = stats_df.groupby(['uid', 'index_name'])['genome_cov'].apply(lambda i: i.iloc[0])
