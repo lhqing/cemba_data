@@ -133,7 +133,8 @@ def _stats_df_profile(stats_df):
     return mc_df
 
 
-def transform_allc_stats(stats_df, nome=False):
+def transform_allc_stats(stats_df_dict, nome=False):
+    stats_df = stats_df_dict['generate_allc']
     stats_df.index.name = 'mc_context'
     stats_df.reset_index(inplace=True)
     genome_cov = stats_df.groupby(['uid', 'index_name'])['genome_cov'].apply(lambda i: i.iloc[0])
@@ -229,7 +230,7 @@ POSSIBLE_STATS_NAME = [
 ]
 
 
-def aggregate_all_summary(output_dir, mct=False):
+def aggregate_all_summary(output_dir, mct=False, nome=False):
     stats_df_dict = {}
     for path in pathlib.Path(output_dir).glob('**/*stats.csv'):
         name = path.name.split('.')[0]
@@ -243,7 +244,7 @@ def aggregate_all_summary(output_dir, mct=False):
     stats_final_dict['fastq_qc'] = transform_fastq_qc_stats(stats_df_dict, stats_final_dict)
     stats_final_dict['bismark_mapping'] = transform_bismark_mapping_stats(stats_df_dict)
     stats_final_dict['bismark_bam_qc'] = transform_bismark_bam_qc_stats(stats_df_dict)
-    stats_final_dict['generate_allc'] = transform_allc_stats(stats_df_dict)
+    stats_final_dict['generate_allc'] = transform_allc_stats(stats_df_dict, nome=nome)
 
     if mct:
         stats_final_dict['select_dna_reads'] = transform_select_reads_stats(stats_df_dict, 'dna')
@@ -265,6 +266,7 @@ def mapping_summary(output_dir):
     config_path = list(output_dir.glob('*ini'))[0]
     config = get_configuration(config_path)
     mct = 'mct' in config['mode']['mode'].lower()
+    nome = 'nome' in config['mode']['mode'].lower()
 
     # summarize fastq
     from .demultiplex import summarize_demultiplex
@@ -294,7 +296,7 @@ def mapping_summary(output_dir):
     summarize_generate_allc(allc_dir)
 
     # aggregate all files
-    total_summary = aggregate_all_summary(output_dir, mct=mct)
+    total_summary = aggregate_all_summary(output_dir, mct=mct, nome=nome)
 
     summary_path = output_dir / 'MappingSummary.csv.gz'
     total_summary.to_csv(summary_path)
