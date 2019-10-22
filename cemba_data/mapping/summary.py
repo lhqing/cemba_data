@@ -323,7 +323,6 @@ def add_v1_plateinfo(total_summary):
         record_dict['plate2'] = plate2
         record_dict['Pos96'] = pos96
         index_name = index_name.lower()
-        record_dict['index_name'] = index_name
         # judge real plate
         if index_name in ['ad001', 'ad002', 'ad004', 'ad006']:
             record_dict['real_plate'] = plate1
@@ -364,7 +363,6 @@ def add_v2_plateinfo(total_summary):
         # but this pos has nothing to do with cell Pos384.
         # Cell Pos384 determine by random primer pos (index_name)
         record_dict['primer_name'] = primer_name
-        record_dict['index_name'] = index_name
         # V2 doesn't cross multiplex plate, real_plate is plate
         record_dict['real_plate'] = plate
 
