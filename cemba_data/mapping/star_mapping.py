@@ -20,6 +20,9 @@ def star_mapping(input_dir, output_dir, config):
     STAR RNA reads mapping
     """
     output_dir = pathlib.Path(output_dir)
+    star_batch_command_dir = output_dir / 'batch_star_cmd'
+    star_batch_command_dir.mkdir(exist_ok=True)
+
     input_dir = pathlib.Path(input_dir)
     fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
                                    index_col=['uid', 'index_name', 'read_type'], squeeze=True)
@@ -99,7 +102,10 @@ def star_mapping(input_dir, output_dir, config):
     for i in range(0, len(command_list), command_per_script):
         commands_str = '\n'.join(command_list[i: i+command_per_script])
         total_command = f'{genome_load_cmd}\n{commands_str}\n{genome_remove_cmd}'
-        fold_command_list.append(total_command)
+        star_command_script_path = star_batch_command_dir / f'{i}-{i+command_per_script}.sh'
+        with open(star_command_script_path, 'w') as f:
+            f.write(total_command)
+        fold_command_list.append(f'sh {star_command_script_path.absolute()}')
 
     with open(output_dir / 'star_mapping.command.txt', 'w') as f:
         f.write('\n'.join(fold_command_list))
