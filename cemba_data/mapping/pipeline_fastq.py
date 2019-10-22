@@ -47,7 +47,8 @@ def pipeline_fastq(input_fastq_pattern,
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp=2;-l h_vmem=3G')
+             qsub_global_parms='-pe smp=2;-l h_vmem=3G',
+             merge_jobs=100)
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -71,7 +72,8 @@ def pipeline_fastq(input_fastq_pattern,
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms=f'-pe smp=2;-l h_vmem=3G')
+             qsub_global_parms=f'-pe smp=2;-l h_vmem=3G',
+             merge_jobs=100)
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -95,7 +97,8 @@ def pipeline_fastq(input_fastq_pattern,
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms=f'-pe smp=2;-l h_vmem=3G')
+             qsub_global_parms=f'-pe smp=2;-l h_vmem=3G',
+             merge_jobs=100)
     elif mode == 'command_only':
         pass
     elif mode == 'local':

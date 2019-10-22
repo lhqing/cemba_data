@@ -54,7 +54,8 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp=1;-l h_vmem=4G')
+             qsub_global_parms='-pe smp=1;-l h_vmem=4G',
+             merge_jobs=96)
     elif mode == 'command_only':
         pass
     elif mode == 'local':
@@ -75,7 +76,8 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp=1;-l h_vmem=4G')
+             qsub_global_parms='-pe smp=1;-l h_vmem=4G',
+             merge_jobs=192)
     elif mode == 'command_only':
         pass
     elif mode == 'local':
