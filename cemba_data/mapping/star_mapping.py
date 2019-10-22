@@ -17,7 +17,7 @@ PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 def star_mapping(input_dir, output_dir, config):
     """
-    reads level QC and trimming. R1 R2 separately.
+    STAR RNA reads mapping
     """
     output_dir = pathlib.Path(output_dir)
     input_dir = pathlib.Path(input_dir)
@@ -29,12 +29,6 @@ def star_mapping(input_dir, output_dir, config):
     star_reference = config['star']['star_reference']
     read_min = int(config['star']['read_min'])
     read_max = int(config['star']['read_max'])
-
-    try:
-        genome_load = config['star']['genome_load']
-    except KeyError:
-        print('"genome_load" parameter not found in [star] section, will set to default "NoSharedMemory".')
-        genome_load = "NoSharedMemory"
 
     # Do not allow to change threads
     # threads = int(config['star']['threads'])
@@ -76,7 +70,7 @@ def star_mapping(input_dir, output_dir, config):
         star_cmd = f'STAR --runThreadN {threads} ' \
                    f'--genomeDir {star_reference} ' \
                    f'--alignEndsType EndToEnd ' \
-                   f'--genomeLoad {genome_load} ' \
+                   f'--genomeLoad LoadAndKeep ' \
                    f'--outSAMstrandField intronMotif ' \
                    f'--outSAMtype BAM Unsorted ' \
                    f'--outSAMunmapped Within ' \
@@ -97,12 +91,22 @@ def star_mapping(input_dir, output_dir, config):
         records.append([uid, index_name, output_path])
         command_list.append(star_cmd)
 
+    fold_command_list = []
+    # fold STAR cmd and add genome load genome remove
+    command_per_script = 50
+    genome_load_cmd = f'STAR --genomeDir {star_reference} --genomeLoad LoadAndExit'
+    genome_remove_cmd = f'STAR --genomeDir {star_reference} --genomeLoad Remove'
+    for i in range(0, len(command_list), command_per_script):
+        commands_str = '\n'.join(command_list[i: i+command_per_script])
+        total_command = f'{genome_load_cmd}\n{commands_str}\n{genome_remove_cmd}'
+        fold_command_list.append(total_command)
+
     with open(output_dir / 'star_mapping.command.txt', 'w') as f:
-        f.write('\n'.join(command_list))
+        f.write('\n'.join(fold_command_list))
     record_df = pd.DataFrame(records,
                              columns=['uid', 'index_name', 'bam_path'])
     record_df.to_csv(output_dir / 'star_mapping.records.csv', index=None)
-    return record_df, command_list
+    return record_df, fold_command_list
 
 
 def _parse_star_log(log_path):
