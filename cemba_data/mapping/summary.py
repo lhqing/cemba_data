@@ -197,8 +197,8 @@ def transform_select_reads_stats(stats_df_dict, read_kind):
                         row_df['ch_cov'].astype(float) > row['cov_min_threshold'])]['read_count'].sum()
             else:
                 raise ValueError(f'Unknown read_kind {read_kind}')
-            row_dict['bismark_bam_final_reads'] = total_reads
-            row_dict['selected_dna_reads'] = pass_reads
+            row_dict[f'{read_kind.lower()}_total_reads'] = total_reads
+            row_dict[f'{read_kind.lower()}_selected_reads'] = pass_reads
             total_records[(uid, index_name)] = row_dict
         reads_count_df = pd.DataFrame(total_records).T
         sub_df = pd.concat([sub_df, reads_count_df], sort=True, axis=1)

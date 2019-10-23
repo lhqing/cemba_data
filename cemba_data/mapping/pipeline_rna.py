@@ -31,7 +31,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
              project_name='star_mapping',
              wait_until=None,
              total_cpu=cpu,
-             total_mem=500,
+             total_mem=1000,
              force_redo=False,
              qsub_global_parms='-pe smp=6;-l h_vmem=6G')
     elif mode == 'command_only':
@@ -76,8 +76,8 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
              total_cpu=cpu,
              total_mem=500,
              force_redo=False,
-             qsub_global_parms='-pe smp=1;-l h_vmem=4G',
-             merge_jobs=192)
+             qsub_global_parms='-pe smp=2;-l h_vmem=4G',
+             merge_jobs=96)
     elif mode == 'command_only':
         pass
     elif mode == 'local':
