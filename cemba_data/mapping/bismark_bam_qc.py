@@ -35,7 +35,7 @@ def bismark_bam_qc(output_dir, config):
         # command
         filter_cmd = f'samtools view -b -h -q {mapq_threshold} -o {filter_bam} {bismark_bam_path}'
         sort_cmd = f'samtools sort -o {sort_bam} --threads 2 {filter_bam}'
-        dedup_cmd = f'picard -Xms4g -Xmx4g MarkDuplicates ' \
+        dedup_cmd = f'picard MarkDuplicates ' \
                     f'I={sort_bam} O={final_bam} M={dedup_matrix} REMOVE_DUPLICATES=true TMP_DIR={tmp_dir}'
         cleaning_cmd = f'rm -f {bismark_bam_path} {sort_bam} {filter_bam}'
         command = ' && '.join([filter_cmd, sort_cmd, dedup_cmd, cleaning_cmd])
