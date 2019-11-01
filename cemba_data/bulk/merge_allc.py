@@ -42,7 +42,8 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
         # command
         if cell_number == 1:
             input_path = sub_df['AllcPath'][0]
-            cmd = f'cp {input_path} {output_path}'
+            cmd = f'cp {input_path} {output_path}; ' \
+                  f'cp {input_path}.tbi {output_path}.tbi'
         else:
             input_path = file_list_path
             cmd = f'allcools merge-allc ' \

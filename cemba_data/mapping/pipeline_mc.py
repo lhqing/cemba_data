@@ -86,7 +86,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
                  total_mem=500,
                  force_redo=False,
                  qsub_global_parms='-pe smp=1;-l h_vmem=5G',
-             merge_jobs=192)
+                 merge_jobs=192)
         elif mode == 'command_only':
             pass
         elif mode == 'local':
