@@ -5,7 +5,7 @@
 
 YAP documentation
 ===============================
-YAP (Yet Another Pipeline) is an in-house mapping pipeline for snmC-seq, NOMe-seq, snmCT-seq mapping and preprocessing.
+YAP (Yet Another Pipeline) is a versatile mapping pipeline for snmC-seq, NOMe-seq, snmCT-seq.
 
 - Code: https://github.com/lhqing/cemba_data
 - Author: Hanqing Liu, hanliu@salk.edu
