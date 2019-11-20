@@ -300,7 +300,6 @@ def mapping_summary(output_dir):
     total_summary = aggregate_all_summary(output_dir, mct=mct, nome=nome)
 
     summary_path = output_dir / 'MappingSummary.csv.gz'
-    total_summary.to_csv(summary_path)
 
     random_index_version = config['multiplexIndex']['barcode_version'].upper()
     if random_index_version == 'V1':

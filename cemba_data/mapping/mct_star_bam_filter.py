@@ -80,7 +80,7 @@ def single_read_mch_level(read):
 def select_rna_reads(input_bam,
                      output_bam,
                      mc_rate_min_threshold=0.9,
-                     cov_min_threshold=5,
+                     cov_min_threshold=3,
                      remove_input=True):
     read_profile_dict = defaultdict(int)
     with pysam.AlignmentFile(input_bam) as bam:

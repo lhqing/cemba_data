@@ -94,6 +94,8 @@ def read_plate_info(plateinfo_path):
         if k in plate_info.columns:
             raise ValueError(f'Found duplicated key {k} between [PlateInfo] and [LibraryInfo]')
         plate_info[k] = v
+    if plate_info['plate_id'].duplicated().sum() != 0:
+        raise ValueError(f'Found duplicated plate_id in [PlateInfo] section.')
 
     if critical_info['n_random_index'] == '8':
         n_plate_info_fix_col = 2
