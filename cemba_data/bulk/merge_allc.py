@@ -32,6 +32,9 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
         output_path = cell_merge_output_dir / f'{i}-{cell_number}.allc.tsv.gz'
         file_list_path = cell_merge_output_dir / f'{i}-{cell_number}.cell_list.txt'
 
+        if isinstance(cluster_combination, str):
+            cluster_combination = [cluster_combination]
+
         for col_name, cluster_name in zip(col_names, cluster_combination):
             file_map[col_name][cluster_name].append(str(output_path))
 

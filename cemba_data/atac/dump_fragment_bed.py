@@ -42,8 +42,6 @@ def read_snap(file_path, bin_size=5000):
     return adata
 
 
-
-
 def read_snap_gene(file_path):
     with h5py.File(file_path) as f:
         data = f[f'/GM/count'].value
