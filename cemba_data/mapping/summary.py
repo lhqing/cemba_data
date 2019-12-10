@@ -254,7 +254,7 @@ def aggregate_all_summary(output_dir, mct=False, nome=False):
 
     # concat total meta
     total_meta = pd.concat(stats_final_dict.values(),
-                           sort=True, axis=1).dropna()
+                           sort=True, axis=1)
     return total_meta
 
 
