@@ -148,6 +148,63 @@ def featurecount_internal_subparser(subparser):
     return
 
 
+def atac_bulk_pipeline_register_subparser(subparser):
+    parser = subparser.add_parser('atac-bulk-pipeline',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Simple Wrapper. "
+                                       "Make cluster level merged fragment bed, bigwig "
+                                       "and MACS2 peaks from ATAC clustering results.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--cell_group_path",
+        type=str,
+        required=True,
+        help="first row is header, names of cluster columns will be used as output names; "
+             "Column 0 is sample name; "
+             "Column 1 is cell barcode; "
+             "Column 2, ..., n are level of cell group/clusters;"
+    )
+
+    parser_req.add_argument(
+        "--output_dir_path",
+        type=str,
+        required=True,
+        help="Output directory, each cluster col will be a sub-dir"
+    )
+
+    parser_req.add_argument(
+        "--sample_snap_path",
+        type=str,
+        required=True,
+        help="no header; "
+             "Column 0 is sample name; "
+             "Column 1 is sample SNAP file path;"
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="chromosome size file path"
+    )
+
+    parser_req.add_argument(
+        "--species",
+        type=str,
+        required=True,
+        help="hs or mm"
+    )
+
+    parser.add_argument(
+        "--cpu",
+        type=int,
+        default=1,
+        help="Number of cpu to parallel"
+    )
+
+
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -194,6 +251,8 @@ def internal_main():
         from .mapping import select_rna_reads as func
     elif cur_command == 'featurecount':
         from .mapping.feature_count import batch_feature_count as func
+    elif cur_command == 'atac-bulk-pipeline':
+        from .atac.bulk_pipeline import atac_bulk_pipeline as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

@@ -138,6 +138,7 @@ def dump_frags(cell_group_path, output_dir_path, sample_snap_path, cpu=1):
             col_dir = output_dir / col
             col_dir.mkdir(exist_ok=True)
 
+            # if col contain NA, its excluded from pd.DataFrame.groupby
             for cluster, cluster_df in cell_group_table.groupby(col):
                 output_path = col_dir / f'{cluster}.bed.gz'
                 future = executor.submit(_dump_frags_single_cluster,

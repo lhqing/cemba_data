@@ -7,8 +7,8 @@ def atac_bulk_pipeline(cell_group_path,
                        output_dir_path,
                        sample_snap_path,
                        chrom_size_path,
-                       cpu,
-                       species='mm',
+                       species,
+                       cpu=10,
                        remove_temp=True,
                        **macs2_kws):
     """

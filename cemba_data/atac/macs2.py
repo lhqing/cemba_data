@@ -74,6 +74,4 @@ def macs2(frag_bed_path_list, cpu, species, remove_temp=True, **macs2_kws):
             except subprocess.CalledProcessError as e:
                 print(e.stderr)
                 raise e
-
-
     return
