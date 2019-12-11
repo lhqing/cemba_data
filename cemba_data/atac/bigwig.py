@@ -17,10 +17,19 @@ def fragment_to_bigwig(fragment_bed_path,
     out_sort_path = str(out_bw_path) + 'temp.sort.bed'
     try:
         # sort fragment bed
-        subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n '
-                       f'-S {sort_mem} --parallel {int(sort_cpu)} > {out_sort_path}',
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
-                       check=True, shell=True)
+        try:
+            subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n '
+                           f'-S {sort_mem} --parallel {int(sort_cpu)} > {out_sort_path}',
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
+                           check=True, shell=True)
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 2:
+                # old sort command do not support parallel
+                subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n  > {out_sort_path}',
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
+                               check=True, shell=True)
+            else:
+                raise e
 
         # count reads
         p = subprocess.run(['wc', '-l', out_sort_path],
