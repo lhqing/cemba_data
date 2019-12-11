@@ -13,6 +13,9 @@ def test_macs2():
     return
 
 
+test_macs2()
+
+
 def process_runner(cmd):
     p = subprocess.run(cmd,
                        stderr=subprocess.PIPE,
