@@ -148,7 +148,7 @@ def featurecount_internal_subparser(subparser):
     return
 
 
-def atac_bulk_pipeline_register_subparser(subparser):
+def atac_bulk_pipeline_internal_subparser(subparser):
     parser = subparser.add_parser('atac-bulk-pipeline',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Simple Wrapper. "
