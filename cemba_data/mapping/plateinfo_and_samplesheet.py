@@ -94,13 +94,14 @@ def read_plate_info(plateinfo_path):
         if k in plate_info.columns:
             raise ValueError(f'Found duplicated key {k} between [PlateInfo] and [LibraryInfo]')
         plate_info[k] = v
-    if plate_info['plate_id'].duplicated().sum() != 0:
-        raise ValueError(f'Found duplicated plate_id in [PlateInfo] section.')
-
     if critical_info['n_random_index'] == '8':
         n_plate_info_fix_col = 2
+        if plate_info['plate_id'].duplicated().sum() != 0:
+            raise ValueError(f'Found duplicated plate_id in [PlateInfo] section.')
     elif critical_info['n_random_index'] == '384':
         n_plate_info_fix_col = 3
+        if plate_info.set_index(['plate_id', 'multiplex_group']).index.duplicated().sum() != 0:
+            raise ValueError(f'Found duplicated plate_id, multiplex_group combination in [PlateInfo] section.')
     else:
         raise ValueError(f'[CriticalInfo] n_random_index got unknown value '
                          f'{critical_info["n_random_index"]}')
