@@ -30,7 +30,7 @@ def fastq_qc(output_dir, config):
 
     # parameters
     r1_adapter = config['fastqTrim']['r1_adapter']
-    r2_adapter = config['fastqTrim']['r1_adapter']
+    r2_adapter = config['fastqTrim']['r2_adapter']
     length_threshold = config['fastqTrim']['length_threshold']
     quality_threshold = config['fastqTrim']['quality_threshold']
     r1_left_cut = config['fastqTrim']['r1_left_cut']
