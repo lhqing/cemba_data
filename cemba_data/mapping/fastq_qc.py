@@ -103,7 +103,11 @@ def summarize_fastq_qc(output_dir):
     records = []
     fastq_stat_list = list(fastq_dir.glob('*.trimmed.fq.gz.stats.txt'))
     for path in fastq_stat_list:
-        fastq_qc_stat = pd.read_csv(path, sep='\t').T[0]
+        try:
+            fastq_qc_stat = pd.read_csv(path, sep='\t').T[0]
+        except pd.errors.EmptyDataError:
+            print(path, 'is empty')
+            continue
         *uid, index_name, suffix = path.name.split('-')
         uid = '-'.join(uid)
         read_type = suffix.split('.')[0]
