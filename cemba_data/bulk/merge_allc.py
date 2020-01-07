@@ -20,7 +20,7 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
     cell_merge_output_dir = output_dir / 'CELL_GROUP'
     cell_merge_output_dir.mkdir(exist_ok=True)
 
-    command_records = []
+    command_records = {}
     col_names = group_table.columns[1:].tolist()
     file_map = {col_name: defaultdict(list) for col_name in col_names}
     for i, (cluster_combination, sub_df) in enumerate(group_table.groupby(col_names)):
@@ -54,10 +54,13 @@ def _merge_cell(group_table_path, output_dir_path, chrom_size_path, binarize, cp
                   f'--output_path {output_path} ' \
                   f'--chrom_size_path {chrom_size_path} ' \
                   f'--cpu {cpu} {binarize_param}'
-        command_records.append(cmd)
+        command_records[cmd] = cell_number
+
     command_path = qsub_dir / '_merge_cell_commands.txt'
     with open(command_path, 'w') as f:
-        f.write('\n'.join(command_records))
+        # write down commands order by cell number, larger number first
+        for cmd in pd.Series(command_records).sort_values(ascending=False).index:
+            f.write(cmd + '\n')
 
     with open(cell_merge_output_dir / '_file_map.json', 'w') as f:
         json.dump(file_map, f)
