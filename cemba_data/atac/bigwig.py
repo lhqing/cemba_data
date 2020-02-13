@@ -12,20 +12,21 @@ def fragment_to_bigwig(fragment_bed_path,
     """Cluster fragment bed file to bigwig file"""
     output_prefix = str(output_prefix).rstrip('.')
     out_bw_path = output_prefix + '.bw'
+    temp_dir = '/'.join(output_prefix.split('/')[:-1])
 
     print('Sort fragment')
     out_sort_path = str(out_bw_path) + 'temp.sort.bed'
     try:
         # sort fragment bed
         try:
-            subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n '
+            subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n -T {temp_dir} '
                            f'-S {sort_mem} --parallel {int(sort_cpu)} > {out_sort_path}',
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
                            check=True, shell=True)
         except subprocess.CalledProcessError as e:
             if e.returncode == 2:
                 # old sort command do not support parallel
-                subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n  > {out_sort_path}',
+                subprocess.run(f'zcat {fragment_bed_path} | sort -k1,1 -k2,2n -T {temp_dir} > {out_sort_path}',
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf8',
                                check=True, shell=True)
             else:
