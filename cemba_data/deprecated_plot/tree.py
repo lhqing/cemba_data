@@ -320,10 +320,10 @@ def _plot_groups_brackets(ax, group_positions, group_labels,
     group_labels
         List of group labels
     left_adjustment : `float`
-        adjustment to plot the bracket start slightly before or after the first gene position.
+        adjustment to deprecated_plot the bracket start slightly before or after the first gene position.
         If the value is negative the start is moved before.
     right_adjustment : `float`
-        adjustment to plot the bracket end slightly before or after the last gene position
+        adjustment to deprecated_plot the bracket end slightly before or after the last gene position
         If the value is negative the start is moved before.
     rotation : `float` (default None)
         rotation degrees for the labels. If not given, small labels (<4 characters) are not

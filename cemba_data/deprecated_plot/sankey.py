@@ -148,7 +148,7 @@ class Sankey:
                     self._side_col_text(label=label, text_label_kws=text_label_kws, first=False)
                 else:
                     self._col_text(label=label, text_label_kws=text_label_kws)
-            # plot column names
+            # deprecated_plot column names
             self._col_title(col, text_label_kws, col_title_pad)
 
         # Create patch collection with specified colour/alpha

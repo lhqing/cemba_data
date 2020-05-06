@@ -86,7 +86,7 @@ def highly_variable_methylation_feature(X, feature_mean_cov, var_names,
     if bin_more_than.shape[0] == 0:
         raise ValueError(f'No bin have more than {bin_min_features} features, uss larger bin size.')
     # for those bin have too less features, merge them with closest bin in manhattan distance
-    # this usually don't cause much difference (a few hundred features), but the scatter plot will look more nature
+    # this usually don't cause much difference (a few hundred features), but the scatter deprecated_plot will look more nature
     index_map = {}
     for _, (mean_id, cov_id, count) in bin_count.iterrows():
         if count > 1:

@@ -46,7 +46,7 @@ def pair_plot(data, hue=None, interactive=False, hue_overlay=False,
             plot_data = table
         g = hv.operation.gridmatrix(plot_data,
                                     chart_type=hv.Points)
-        g = g.opts({'Points': {'plot': {'tools': ['box_select', 'lasso_select', 'hover']}}})
+        g = g.opts({'Points': {'deprecated_plot': {'tools': ['box_select', 'lasso_select', 'hover']}}})
 
     else:
         # do not sample data for non-interactive plots
@@ -84,7 +84,7 @@ def categorical_scatter(x, y, color, data=None, sample=3000, size=5,
             style_kws = {}
         style_kws['size'] = size
 
-        opts_dict = {'Scatter': {'plot': plot_kws,
+        opts_dict = {'Scatter': {'deprecated_plot': plot_kws,
                                  'style': style_kws}}
         _scatter = data_table.to.scatter(x, y)
         g = _scatter.overlay(color).opts(opts_dict)
@@ -99,7 +99,7 @@ def continuous_scatter(x, y, color, data=None, sample=3000, size=5,
         # sampling to speed up and prevent over-plotting
         data = sample_data(data, sample)
         data = data[[x, y, color]]
-        opts_dict = {'Points': {'plot': dict(color_index=color,
+        opts_dict = {'Points': {'deprecated_plot': dict(color_index=color,
                                              scaling_factor=50,
                                              tools=['lasso_select'],
                                              height=height,
@@ -133,9 +133,9 @@ def reduced_scatter_plot(data, x, y, category_col,
         value_dimensions.append(color_col)
 
     if not return_point:
-        # still plot points, but invisible
+        # still deprecated_plot points, but invisible
         alpha = 0
-    opts_dict = {'Scatter': {'plot': dict(color_index=color_col,
+    opts_dict = {'Scatter': {'deprecated_plot': dict(color_index=color_col,
                                           size_index=size_col,
                                           tools=['hover'],
                                           height=height,

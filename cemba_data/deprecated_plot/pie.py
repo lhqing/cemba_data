@@ -98,14 +98,14 @@ def sunbrust(pie_data, ax,
     if col_color_dict is not None:
         _col_color_dict.update(col_color_dict)
 
-    # prepare plot parameters
+    # prepare deprecated_plot parameters
     ncols = pie_data.columns.size
     if anno_col is None:
         anno_layer_size = 0
     outer_radius = outer_radius - anno_layer_size
     layer_size = (outer_radius - inner_radius) / ncols
 
-    # plot multiple donuts
+    # deprecated_plot multiple donuts
     previous_order = pd.Series([])
     anno_wedges = []
     anno_names = []
@@ -129,7 +129,7 @@ def sunbrust(pie_data, ax,
                 _ordered_data = pd.concat(records)
                 previous_order = _ordered_data
 
-        # plot the real pie charts
+        # deprecated_plot the real pie charts
         pie_color = _col_color_dict[col_name]
         if isinstance(pie_color, dict):
             pie_color = [pie_color[i] for i in _ordered_data.index]
@@ -137,7 +137,7 @@ def sunbrust(pie_data, ax,
                colors=pie_color, startangle=startangle,
                wedgeprops=dict(width=layer_size, edgecolor='w'))
 
-        # plot an additional thin layer to anchor anno label
+        # deprecated_plot an additional thin layer to anchor anno label
         if anno_col == col:
             wedges, texts = ax.pie(_ordered_data, radius=outer_radius + anno_layer_size,
                                    colors=pie_color, startangle=startangle,

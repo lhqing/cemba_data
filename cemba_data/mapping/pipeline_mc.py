@@ -28,7 +28,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
     with open(qsub_dir / 'bismark_commands.txt', 'w') as f:
         f.write('\n'.join(bismark_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'bismark_commands.txt'),
              working_dir=qsub_dir,
@@ -52,7 +52,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
     with open(qsub_dir / 'bam_qc_commands.txt', 'w') as f:
         f.write('\n'.join(bam_qc_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'bam_qc_commands.txt'),
              working_dir=qsub_dir,
@@ -76,7 +76,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
         with open(qsub_dir / 'select_dna_commands.txt', 'w') as f:
             f.write('\n'.join(select_dna_commands))
 
-        # runner
+        # worker
         if mode == 'qsub':
             qsub(command_file_path=str(qsub_dir / 'select_dna_commands.txt'),
                  working_dir=qsub_dir,
@@ -104,7 +104,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
     with open(qsub_dir / 'final_bam_commands.txt', 'w') as f:
         f.write('\n'.join(final_bam_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'final_bam_commands.txt'),
              working_dir=qsub_dir,
@@ -129,7 +129,7 @@ def pipeline_mc(output_dir, config_path, mct=False, mode='command_only', cpu=10)
     with open(qsub_dir / 'allc_commands.txt', 'w') as f:
         f.write('\n'.join(allc_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'allc_commands.txt'),
              working_dir=qsub_dir,

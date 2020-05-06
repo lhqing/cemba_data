@@ -65,16 +65,16 @@ def plot_dendrogram(linkage_df,
 
     if ax is not None:
         for node_id, (node_x, node_y) in node_pos.items():
-            # plot node
+            # deprecated_plot node
             ax.text(node_x, node_y, node_id, fontsize=4, ha='center', va='center')
 
-            # plot branch
+            # deprecated_plot branch
             # only non-singleton node has branch:
             if node_id in direct_link_map:
                 # get child
                 left_child, right_child = direct_link_map[node_id]
 
-                # plot left branch
+                # deprecated_plot left branch
                 if branch_type == 'straight':
                     # left_branch_lines
                     _ = straight_branch(ax, (node_x, node_y),
@@ -84,7 +84,7 @@ def plot_dendrogram(linkage_df,
                     _ = curve_branch(ax, (node_x, node_y),
                                      node_pos[left_child], plot_kws)
 
-                # plot right branch
+                # deprecated_plot right branch
                 if branch_type == 'straight':
                     # right_branch_lines
                     _ = straight_branch(ax, (node_x, node_y),

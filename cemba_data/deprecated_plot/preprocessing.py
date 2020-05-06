@@ -18,7 +18,7 @@ def plot_on_plate(data, value_col, groupby, ncols=4,
     value_col
         value to be plotted on plate view
     groupby
-        groupby column, typically groupby plate id column(s) to plot each plate separately
+        groupby column, typically groupby plate id column(s) to deprecated_plot each plate separately
     ncols
         number of column for axes, nrows will be calculated accordingly
     plate_base

@@ -42,7 +42,7 @@ def fancy_heatmap(ax, tidy_data, row_col, col_col,
     data['col_i'] = data[col_col].map(lambda i: col_order.index(i))
     data['sig_marker'] = data[size_col] > sig_cutoff
 
-    # plot color blocks
+    # deprecated_plot color blocks
     _heatmap_scatter_kws = dict(hue_norm=(-1, 1), size_norm=(sig_cutoff / 2, sig_cutoff * 2), sizes=(20, 800),
                                 legend=None, marker='s')
     if heatmap_scatter_kws is not None:
@@ -50,7 +50,7 @@ def fancy_heatmap(ax, tidy_data, row_col, col_col,
     sns.scatterplot(x='row_i', y='col_i',
                     data=data, palette=palette,
                     hue=color_col, size=size_col, **_heatmap_scatter_kws, ax=ax)
-    # plot sig marker
+    # deprecated_plot sig marker
     _sig_scatter_kws = dict(color='white', linewidth=1, s=100, marker='+')
     if sig_scatter_kws is not None:
         _sig_scatter_kws.update(sig_scatter_kws)

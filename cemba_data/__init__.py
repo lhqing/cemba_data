@@ -5,7 +5,7 @@ test/
     pytest data and code
 mapping/
     dealing with snmc-seq2 hdf5 mapping, from fastq to allc, and generate QC stats.
-plot/
+deprecated_plot/
     all plotting functions related to any step of analysis
 tools/
     function for analysis and manipulating text based files (allc, bed, bigwig etc.).

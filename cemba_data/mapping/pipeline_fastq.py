@@ -38,7 +38,7 @@ def pipeline_fastq(input_fastq_pattern,
     with open(qsub_dir / 'demultiplex_commands.txt', 'w') as f:
         f.write('\n'.join(demultiplex_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'demultiplex_commands.txt'),
              working_dir=qsub_dir,
@@ -63,7 +63,7 @@ def pipeline_fastq(input_fastq_pattern,
     with open(qsub_dir / 'merge_lane_commands.txt', 'w') as f:
         f.write('\n'.join(merge_lane_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'merge_lane_commands.txt'),
              working_dir=qsub_dir,
@@ -88,7 +88,7 @@ def pipeline_fastq(input_fastq_pattern,
     with open(qsub_dir / 'fastq_qc_commands.txt', 'w') as f:
         f.write('\n'.join(fastq_qc_commands))
 
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'fastq_qc_commands.txt'),
              working_dir=qsub_dir,

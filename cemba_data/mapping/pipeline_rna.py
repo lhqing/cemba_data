@@ -24,7 +24,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
                                                                config=config_path)
     with open(qsub_dir / 'star_mapping_commands.txt', 'w') as f:
         f.write('\n'.join(star_mapping_commands))
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'star_mapping_commands.txt'),
              working_dir=qsub_dir,
@@ -45,7 +45,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
     star_bam_qc_records, star_bam_qc_commands = star_bam_qc(output_dir=bam_dir, config=config_path)
     with open(qsub_dir / 'star_bam_qc_commands.txt', 'w') as f:
         f.write('\n'.join(star_bam_qc_commands))
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'star_bam_qc_commands.txt'),
              working_dir=qsub_dir,
@@ -67,7 +67,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
     select_rna_records, select_rna_commands = prepare_select_rna_reads(output_dir=bam_dir, config=config_path)
     with open(qsub_dir / 'select_rna_commands.txt', 'w') as f:
         f.write('\n'.join(select_rna_commands))
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'select_rna_commands.txt'),
              working_dir=qsub_dir,
@@ -89,7 +89,7 @@ def pipeline_rna(output_dir, config_path, mode='command_only', cpu=10):
     feature_count_output, feature_count_command = prepare_feature_count(output_dir=bam_dir, config=config_path)
     with open(qsub_dir / 'feature_count_commands.txt', 'w') as f:
         f.write(feature_count_command)
-    # runner
+    # worker
     if mode == 'qsub':
         qsub(command_file_path=str(qsub_dir / 'feature_count_commands.txt'),
              working_dir=qsub_dir,

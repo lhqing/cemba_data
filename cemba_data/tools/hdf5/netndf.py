@@ -62,9 +62,9 @@ class MCDS(xr.Dataset):
         mc_type
             mc_type to mean
         min_cov
-            minimum cov mean, suggest to plot distribution first.
+            minimum cov mean, suggest to deprecated_plot distribution first.
         max_cov
-            maximum cov mean, suggest ot plot distribution first.
+            maximum cov mean, suggest ot deprecated_plot distribution first.
 
         Returns
         -------
@@ -102,9 +102,9 @@ class MCDS(xr.Dataset):
         mc_type
             mc_type to mean
         min_cov
-            minimum cov mean, suggest to plot distribution first.
+            minimum cov mean, suggest to deprecated_plot distribution first.
         max_cov
-            maximum cov mean, suggest ot plot distribution first.
+            maximum cov mean, suggest ot deprecated_plot distribution first.
         white_list
             regions to keep no matter how
         black_list

@@ -50,7 +50,7 @@ def _make_tiny_axis_lable(ax, coord_name, arrow_kws=None, fontsize=6):
 
 def _text_anno_scatter(data, ax, edge_color=(0.5, 0.5, 0.5, 0.2), face_color=(0.8, 0.8, 0.8, 0.2), palette=None,
                        dodge_text=False, anno_col='text_anno', text_anno_kws=None, dodge_kws=None):
-    """Add text annotation to a scatter plot"""
+    """Add text annotation to a scatter deprecated_plot"""
     _text_anno_kws = dict(fontsize=10,
                           fontweight='black',
                           horizontalalignment='center',
@@ -89,7 +89,7 @@ def _text_anno_scatter(data, ax, edge_color=(0.5, 0.5, 0.5, 0.2), face_color=(0.
 
 
 def _sizebar(ax, color=(0.5, 0.5, 0.5), lw=0.5):
-    """plot a triangle sizebar"""
+    """deprecated_plot a triangle sizebar"""
     from matplotlib.patches import PathPatch
     from matplotlib.path import Path
 
@@ -158,7 +158,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
                         show_legend=False, legend_kws=None,  # about legend
                         axis_format='tiny', max_points=5000):  # other adjustment
     data = data.copy()
-    # down sample plot data if needed.
+    # down sample deprecated_plot data if needed.
     if max_points is not None:
         if data.shape[0] > max_points:
             data = density_based_sample(data, seed=1, size=max_points,
@@ -231,7 +231,7 @@ def categorical_scatter(data, ax, coord_base='umap', scatter_kws=None,  # about 
         exist_hues = _data[hue].unique()
         for hue_name, color in palette_dict.items():
             if hue_name not in exist_hues:
-                # skip hue_name that do not appear in the plot
+                # skip hue_name that do not appear in the deprecated_plot
                 continue
             handle = Line2D([0], [0], marker='o', color='w',
                             markerfacecolor=color, markersize=_legend_kws['fontsize'])
@@ -253,7 +253,7 @@ def continuous_scatter(data, ax, coord_base='umap', scatter_kws=None,
                        text_anno_kws=None, text_anno_palette=None,
                        axis_format='tiny', max_points=5000):
     data = data.copy()
-    # down sample plot data if needed.
+    # down sample deprecated_plot data if needed.
     if max_points is not None:
         if data.shape[0] > max_points:
             data = density_based_sample(data, seed=1, size=max_points,
@@ -415,6 +415,6 @@ def scatter_density(ax, data, groupby, coord_base='umap', contour_levels=(-0.5,)
         else:
             _color = palette[group]
 
-        # plot contour line(s)
+        # deprecated_plot contour line(s)
         ax.contour(xx, yy, z, colors=_color, **_contour_kws)
     return ax

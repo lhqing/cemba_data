@@ -1,6 +1,7 @@
 """
 Data visualization functions
 """
+print('Plotting function moves to ALLCools, this is deprecated, will be deleted.')
 
 # preprocessing related plots
 from .preprocessing import \
@@ -17,7 +18,7 @@ from .color import \
     get_kv_dict, \
     palplot
 
-# cell scatter plot and related functions
+# cell scatter deprecated_plot and related functions
 from .cell import \
     density_based_sample, \
     categorical_scatter, \
