@@ -23,5 +23,5 @@ setup(
 
 if __name__ == '__main__':
     f = open("cemba_data/__init__.py", 'w')
-    f.write(f"__version__ = '{cemba_data_version}'\n")
+    f.write(f"__version__ = '{yap_version}'\n")
     f.close()

@@ -3,18 +3,22 @@ Contain codes about parse plate info and generate sample sheet
 """
 
 import pathlib
+import re
 from collections import OrderedDict
 
 import pandas as pd
 
 import cemba_data
 
+# Load defaults
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
+# the Illumina sample sheet header used by Ecker Lab
 with open(PACKAGE_DIR / 'mapping/files/sample_sheet_header.txt') as _f:
     SAMPLESHEET_DEFAULT_HEADER = _f.read()
 
 SECTIONS = ['[CriticalInfo]', '[LibraryInfo]', '[PlateInfo]']
+
 LIMITED_CHOICES = {
     'n_random_index': [8, 384, '8', '384'],
     'input_plate_size': [384, '384'],
@@ -31,15 +35,21 @@ BARCODE_TABLE = {
 }
 
 
+def clean_str_for_path(str_in):
+    # replace special char with _
+    str_out = re.sub('[^a-zA-Z0-9]', '_', str_in.strip())
+    return str_out
+
+
 def get_kv_pair(line):
     try:
         k, v = line.split('=')
-        return k, v
+        return clean_str_for_path(k), clean_str_for_path(v)
     except ValueError:
         raise ValueError(f'Each key=value line must contain a "=" to separate key and value. Got {line}')
 
 
-def read_plate_info(plateinfo_path):
+def read_plate_info(plate_info_path):
     cur_section = ''
     cur_section_id = -1
 
@@ -48,12 +58,11 @@ def read_plate_info(plateinfo_path):
     plate_header = True
     plate_info = []
 
-    with open(plateinfo_path) as f:
+    with open(plate_info_path) as f:
         for line in f:
             line = line.strip('\n')
             if line == '' or line.startswith('#'):
                 continue
-            # print(line)
 
             # determine section
             if line.startswith('['):
@@ -125,7 +134,7 @@ def plate_384_random_index_8(plate_info, barcode_table):
     # check plate_info primer compatibility
     for primer_quarter, n_plate in plate_info['primer_quarter'].value_counts().iteritems():
         if n_plate < 2:
-            raise ValueError(f'{primer_quarter} only have 1 plate in the table, are you really sure?')
+            print(f'{primer_quarter} only have 1 plate in the table, please make sure this is correct.')
         elif n_plate == 2:
             pass
         else:
@@ -135,7 +144,12 @@ def plate_384_random_index_8(plate_info, barcode_table):
         if primer_quarter not in LIMITED_CHOICES['primer_quarter']:
             raise ValueError(f'Unknown primer_quarter value {primer_quarter}')
 
-        plate1, plate2 = plate_pair['plate_id']
+        if plate_pair.shape[0] == 1:
+            # sometimes, a quarter only index 1 plate
+            plate1, *plate2 = plate_pair['plate_id']
+            plate2 = 'GHOST_PLATE'
+        else:
+            plate1, plate2 = plate_pair['plate_id']
 
         # check plate pair info consistence
         for col_name, col in plate_pair.iteritems():
@@ -163,31 +177,8 @@ def plate_384_random_index_8(plate_info, barcode_table):
                                 'index2': i5_barcode,  # the index2 must be i5
                                 'Sample_Project': plate_pair['tube_label'].iloc[0],
                                 'Description': plate_pair['email'].iloc[0]})
-    # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
-    sample_sheet = pd.DataFrame(records)
-    sample_sheet['Sample_Name'] = ''
-    sample_sheet['Sample_Well'] = ''
-    sample_sheet['I7_Index_ID'] = ''
-    sample_sheet['I5_Index_ID'] = ''
-    sample_sheet['I7_Index_ID'] = ''
-    sample_sheet['Sample_Plate'] = 'Plate'
 
-    miseq_sample_sheet = sample_sheet[['Sample_ID', 'Sample_Name', 'Sample_Plate',
-                                       'Sample_Well', 'I7_Index_ID', 'index',
-                                       'I5_Index_ID', 'index2', 'Sample_Project',
-                                       'Description']].copy()
-
-    lanes = []
-    for i in range(1, 5):
-        lane_df = miseq_sample_sheet.copy()
-        lane_df['Lane'] = i
-        lanes.append(lane_df)
-    nova_sample_sheet = pd.concat(lanes)
-    nova_sample_sheet = nova_sample_sheet[['Lane', 'Sample_ID', 'Sample_Name', 'Sample_Plate',
-                                           'Sample_Well', 'I7_Index_ID', 'index',
-                                           'I5_Index_ID', 'index2', 'Sample_Project',
-                                           'Description']].copy()
-
+    miseq_sample_sheet, nova_sample_sheet = make_final_samplesheet(records)
     return miseq_sample_sheet, nova_sample_sheet
 
 
@@ -218,6 +209,12 @@ def plate_384_random_index_384(plate_info, barcode_table):
                         'index2': i5_barcode,  # the index2 must be i5
                         'Sample_Project': row['tube_label'],
                         'Description': row['email']})
+
+    miseq_sample_sheet, nova_sample_sheet = make_final_samplesheet(records)
+    return miseq_sample_sheet, nova_sample_sheet
+
+
+def make_final_samplesheet(records):
     # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
     sample_sheet = pd.DataFrame(records)
     sample_sheet['Sample_Name'] = ''
@@ -242,68 +239,50 @@ def plate_384_random_index_384(plate_info, barcode_table):
                                            'Sample_Well', 'I7_Index_ID', 'index',
                                            'I5_Index_ID', 'index2', 'Sample_Project',
                                            'Description']].copy()
-
     return miseq_sample_sheet, nova_sample_sheet
 
 
-def make_sample_sheet(plate_info_paths, output_prefix, header_path=None):
-    if isinstance(plate_info_paths, str):
-        plate_info_paths = [plate_info_paths]
-    critical_infos = []
-    plate_infos = []
+def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None):
+    # read plate info
+    critical_info, plate_info = read_plate_info(plate_info_path)
 
-    miseq_sample_sheets = []
-    nova_sample_sheets = []
+    # check valid choice
+    for k in ['n_random_index', 'input_plate_size']:
+        if critical_info[k] not in LIMITED_CHOICES[k]:
+            raise ValueError(f'Invalid value in critical_info section for {k}: {critical_info[k]}')
 
-    for plate_info_path in plate_info_paths:
-        critical_info, plate_info = read_plate_info(plate_info_path)
-        critical_infos.append(critical_info)
-        plate_infos.append(plate_info)
-
-        # check valid choice
-        for k in ['n_random_index', 'input_plate_size']:
-            if critical_info[k] not in LIMITED_CHOICES[k]:
-                raise ValueError(f'Invalid value in critical_info section for {k}: {critical_info[k]}')
-
-        n_random_index = critical_info['n_random_index']
-        input_plate_size = critical_info['input_plate_size']
-
-        barcode_table_path = BARCODE_TABLE[n_random_index, input_plate_size]
-        if (critical_info['n_random_index'], critical_info['input_plate_size']) == ('8', '384'):
-            barcode_table = pd.read_csv(barcode_table_path, sep='\t')
-            barcode_table['primer_quarter'] = barcode_table['Index_set'] + "_" + barcode_table['Index_quarter']
-            barcode_table.set_index(['primer_quarter', 'plate_pos'], inplace=True)
-            miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_8(plate_info, barcode_table)
-        elif (critical_info['n_random_index'], critical_info['input_plate_size']) == ('384', '384'):
-            barcode_table = pd.read_csv(barcode_table_path,
-                                        sep='\t', index_col='set_384_plate_pos')
-            miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_384(plate_info, barcode_table)
-        else:
-            raise NotImplementedError(f"Unknown combination of n_random_index {critical_info['n_random_index']} "
-                                      f"and input_plate_size {critical_info['input_plate_size']}")
-        miseq_sample_sheets.append(miseq_sample_sheet)
-        nova_sample_sheets.append(nova_sample_sheet)
-    miseq_sample_sheet = pd.concat(miseq_sample_sheets)
-    nova_sample_sheet = pd.concat(nova_sample_sheets)
+    n_random_index = critical_info['n_random_index']
+    input_plate_size = critical_info['input_plate_size']
+    barcode_table_path = BARCODE_TABLE[n_random_index, input_plate_size]
+    if (n_random_index, input_plate_size) == ('8', '384'):
+        barcode_table = pd.read_csv(barcode_table_path, sep='\t')
+        barcode_table['primer_quarter'] = barcode_table['Index_set'] + "_" + barcode_table['Index_quarter']
+        barcode_table.set_index(['primer_quarter', 'plate_pos'], inplace=True)
+        miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_8(plate_info, barcode_table)
+    elif (critical_info['n_random_index'], critical_info['input_plate_size']) == ('384', '384'):
+        barcode_table = pd.read_csv(barcode_table_path,
+                                    sep='\t', index_col='set_384_plate_pos')
+        miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_384(plate_info, barcode_table)
+    else:
+        raise NotImplementedError(f"Unknown combination of n_random_index {n_random_index} "
+                                  f"and input_plate_size {input_plate_size}")
 
     # before write out, check plate info compatibility:
-    total_plate_info = pd.concat(plate_infos)
     # check plate_info primer compatibility
     if int(n_random_index) == 8:
-        for primer_quarter, n_plate in total_plate_info['primer_quarter'].value_counts().iteritems():
+        for primer_quarter, n_plate in plate_info['primer_quarter'].value_counts().iteritems():
             if n_plate < 2:
-                raise ValueError(f'{primer_quarter} only have 1 plate in the table, are you really sure?')
+                print(f'{primer_quarter} only have 1 plate, please make sure this is right.')
             elif n_plate == 2:
                 pass
             else:
                 raise ValueError(f'{primer_quarter} have {n_plate} plates in the table, that is impossible.')
     elif int(n_random_index) == 384:
-        for primer_name, n_primer in total_plate_info['primer_name'].value_counts().iteritems():
+        for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
             if n_primer > 1:
                 raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, that is impossible.')
     else:
-        # should be raised above already
-        raise
+        raise ValueError(f'Unknown n_random_index {n_random_index}.')
 
     # write miseq sample sheet
     with open(output_prefix + '.miseq.sample_sheet.csv', 'w') as output_f:

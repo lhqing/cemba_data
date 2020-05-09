@@ -319,12 +319,12 @@ def main():
     # Do real import here:
     if cur_command == 'qsub':
         from cemba_data.qsub import qsub as func
-    elif cur_command == 'default-mapping-config':
-        from .mapping.pipeline import print_default_configuration as func
     elif cur_command == 'default-plate-info':
         from .mapping import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
         from .mapping import make_sample_sheet as func
+    elif cur_command == 'default-mapping-config':
+        from .mapping.pipeline import print_default_configuration as func
     elif cur_command == 'mapping':
         from .mapping.pipeline import pipeline as func
     elif cur_command == 'mapping-summary':
