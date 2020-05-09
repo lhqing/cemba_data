@@ -176,12 +176,10 @@ def make_sample_sheet_register_subparser(subparser):
     parser_opt = parser.add_argument_group("Optional inputs")
 
     parser_req.add_argument(
-        "--plate_info_paths",
+        "--plate_info_path",
         type=str,
         required=True,
-        nargs='+',
-        help="Space separated paths of plate infos, at least one file should be provided. "
-             "If multiple files provided, will check barcode compatibility."
+        help="Path of the plate information file."
     )
 
     parser_req.add_argument(

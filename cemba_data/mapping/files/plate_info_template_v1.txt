@@ -71,7 +71,7 @@ email=
 # library metadata that applies to all plates
 # this whole part is optional, may contain any "key=value" pairs necessary to describe the library.
 # All the values will be concatenate by "-" into the sample id and present in file name. Use UNIX path safe characters.
-# Any "-" in value will be replaced by "_"
+# Any character does not belong to [a-zA-Z0-9] will be replaced by "_"
 # Here are the recommended information to include, you can define your own based on your needs,
 # non of these information is actually used in demultiplex or mapping:
 # these keys are ALL optional, but better be consistent throughout the project.
@@ -89,7 +89,6 @@ email=
 # sequencer=NovaSeq
 # se_pe=pe
 # read_length=150
-# requested_by=HL
 #
 
 

@@ -11,7 +11,7 @@ setup(
     description='Pipelines for single nucleus methylome and multi-omic dataset.',
     long_description=open('README.md').read(),
     include_package_data=True,
-    install_requires=['pandas=1.0'],
+    install_requires=['pandas>=1.0'],
     package_data={
         '': ['*.txt', '*.tsv', '*.csv', '*.fa']
     },
