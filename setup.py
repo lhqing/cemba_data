@@ -1,19 +1,17 @@
 from setuptools import setup, find_packages
 
-cemba_data_version = '0.1.2'
+yap_version = '0.2'
 
 setup(
-    name='cemba_data',
-    version=cemba_data_version,
+    name='yap',
+    version=yap_version,
     author='Hanqing Liu',
     author_email='hanliu@salk.edu',
     packages=find_packages(),
-    description='A package for processing and analyzing single cell sequencing data.',
+    description='Pipelines for single nucleus methylome and multi-omic dataset.',
     long_description=open('README.md').read(),
     include_package_data=True,
-    install_requires=['pandas>=0.24', 'pybedtools', 'h5py', 'numpy', 'scipy', 'anndata', 'scikit-learn', 'scanpy',
-                      'matplotlib', 'seaborn', 'holoviews', 'IPython', 'annoy', 'fbpca', 'psutil', 'tables',
-                      'six', 'xarray', 'statsmodels', 'natsort', 'netcdf4', 'adjustText'],
+    install_requires=['pandas=1.0'],
     package_data={
         '': ['*.txt', '*.tsv', '*.csv', '*.fa']
     },
