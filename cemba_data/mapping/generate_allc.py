@@ -1,76 +1,113 @@
 import pathlib
-import subprocess
+import warnings
 
 import pandas as pd
 
-from .utilities import get_configuration
+from .utilities import parse_mc_pattern
 
 
-def generate_allc(input_dir, output_dir, config):
-    input_dir = pathlib.Path(input_dir)
-    output_dir = pathlib.Path(output_dir)
-    config = get_configuration(config)
+def generate_allc(
+        output_dir,
+        reference_fasta,
+        num_upstr_bases=0,
+        num_downstr_bases=2,
+        compress_level=5):
+    output_dir = pathlib.Path(output_dir).absolute()
+    bam_batch = pd.read_csv(output_dir / 'snakemake/bismark_bam_list.txt',
+                            header=None, index_col=0, squeeze=True)
+    allc_dir = output_dir / 'allc'
+    allc_dir.mkdir(exist_ok=True)
 
-    bam_records = pd.read_csv(input_dir / 'final_bam.records.csv',
-                              index_col=['uid', 'index_name'],
-                              squeeze=True)
-    reference_fasta = config['callMethylation']['reference_fasta']
-    num_upstr_bases = config['callMethylation']['num_upstr_bases']
-    num_downstr_bases = config['callMethylation']['num_downstr_bases']
-    compress_level = config['callMethylation']['compress_level']
+    for batch_id, sub_series in bam_batch.groupby(bam_batch):
+        bam_dict = {pathlib.Path(i).name.split('.')[0]: i
+                    for i in sub_series.index}
+        total_rules = ''
+        allc_paths = []
+        for i, (cell_id, bam_path) in enumerate(bam_dict.items()):
+            uid = '-'.join(cell_id.split('-')[:-1])
+            this_allc_dir = allc_dir / uid
+            this_allc_dir.mkdir(exist_ok=True)
+            allc_path = this_allc_dir / f'{cell_id}.allc.tsv.gz'
+            stat_path = this_allc_dir / f'{cell_id}.allc.tsv.gz.count.csv'
+            rule_template = f"""
+rule allc_{i}:
+    input:
+        "{bam_path}"
+    output:
+        "{allc_path}"
+    log:
+        "{stat_path}"
+    shell:
+        'allcools bam-to-allc '
+        '--bam_path {{input}} '
+        '--reference_fasta {reference_fasta} '
+        '--output_path {{output}} '
+        '--cpu 1 '
+        '--num_upstr_bases {num_upstr_bases} '
+        '--num_downstr_bases {num_downstr_bases} '
+        '--compress_level {compress_level} '
+        '--save_count_df'
 
-    records = []
-    command_list = []
-    for (uid, index_name), bismark_bam_path in bam_records.iteritems():
-        # file path
-        output_allc_path = output_dir / f'{uid}-{index_name}.allc.tsv.gz'
-        # command
-        command = f'allcools bam-to-allc ' \
-                  f'--bam_path {bismark_bam_path} ' \
-                  f'--reference_fasta {reference_fasta} ' \
-                  f'--output_path {output_allc_path} ' \
-                  f'--cpu 1 ' \
-                  f'--num_upstr_bases {num_upstr_bases} ' \
-                  f'--num_downstr_bases {num_downstr_bases} ' \
-                  f'--compress_level {compress_level} ' \
-                  f'--save_count_df'
-        records.append([uid, index_name, output_allc_path])
-        command_list.append(command)
+"""
+            total_rules += rule_template
+            allc_paths.append(str(allc_path))
 
-    with open(output_dir / 'generate_allc.command.txt', 'w') as f:
-        f.write('\n'.join(command_list))
-    record_df = pd.DataFrame(records,
-                             columns=['uid', 'index_name', 'allc_path'])
-    record_df.to_csv(output_dir / 'generate_allc.records.csv', index=None)
-    return record_df, command_list
+        with open(output_dir / f'snakemake/snakefile_generate_allc_{batch_id}', 'w') as f:
+            f.write(f"""
+rule allc:
+    input:
+        {allc_paths}
+
+{total_rules}
+""")
+    return
 
 
-def summarize_generate_allc(output_dir):
-    bam_dir = pathlib.Path(output_dir)
-    output_path = bam_dir / 'generate_allc.stats.csv'
-    if output_path.exists():
-        return str(output_path)
+def _parse_allc_stat(stat_path, mc_patterns):
+    try:
+        report_df = pd.read_csv(stat_path, index_col=0)
+    except pd.errors.EmptyDataError:
+        report_df = pd.DataFrame([], columns=['mc', 'cov', 'mc_rate', 'genome_cov'])
+    cell_id = pathlib.Path(stat_path).name.split('.')[0]
+    report_df['cell_id'] = cell_id
 
-    records = []
-    allc_stat_list = list(bam_dir.glob('*.count.csv'))
-    for path in allc_stat_list:
-        try:
-            report_df = pd.read_csv(path)
-        except pd.errors.EmptyDataError:
-            # means the bam file is empty
-            subprocess.run(['rm', '-f', path])
-            continue
-        if report_df.shape[0] == 0:
-            subprocess.run(['rm', '-f', path])
-            continue
+    mc_rates = {}
+    for pattern in mc_patterns:
+        contexts = parse_mc_pattern(pattern)
+        mc_sum = report_df.loc[report_df.index.isin(contexts), ['mc', 'cov']].sum()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mc_rates[f'{pattern}Rate'] = mc_sum['mc'] / mc_sum['cov']
+    mc_rate = pd.Series(mc_rates, name=cell_id)
+    return mc_rate
 
-        *uid, suffix = path.name.split('-')
-        uid = '-'.join(uid)
-        index_name = suffix.split('.')[0]
-        report_df['uid'] = uid
-        report_df['index_name'] = index_name
-        records.append(report_df)
-        subprocess.run(['rm', '-f', path])
-    total_stats_df = pd.concat(records)
-    total_stats_df.to_csv(output_path, index=None)
-    return str(output_path)
+
+def generate_allc_stats(output_dir, patterns=('CHN', 'CGN', 'CCC')):
+    output_dir = pathlib.Path(output_dir).absolute()
+    allc_stats_dict = {p.name.split('.')[0]: p for p in output_dir.glob('allc/*/*count.csv')}
+    # real all cell stats
+    total_stats = []
+    for cell_id, path in allc_stats_dict.items():
+        allc_stat = pd.read_csv(path, index_col=0)
+        allc_stat['cell_id'] = cell_id
+        total_stats.append(allc_stat)
+    total_stats = pd.concat(total_stats)
+
+    # aggregate into patterns
+    cell_records = []
+    for pattern in patterns:
+        contexts = parse_mc_pattern(pattern)
+        pattern_stats = total_stats[total_stats.index.isin(contexts)]
+        cell_sum = pattern_stats.groupby('cell_id')[['mc', 'cov']].sum()
+        cell_rate = cell_sum['mc'] / cell_sum['cov']
+
+        pattern_trans = {'CCC': 'mCCC',
+                         'CGN': 'mCG',
+                         'CHN': 'mCH'}
+        _pattern = pattern_trans[pattern] if pattern in pattern_trans else pattern
+        cell_rate.name = f'{_pattern}Rate'
+        cell_records.append(cell_rate)
+    final_df = pd.DataFrame(cell_records).T.reindex(allc_stats_dict.keys())
+    final_df.index.name = 'cell_id'
+    final_df.to_csv(output_dir / 'allc/allc_stats.csv')
+    return

@@ -80,11 +80,10 @@ def single_read_mch_level(read):
 def select_rna_reads(input_bam,
                      output_bam,
                      mc_rate_min_threshold=0.9,
-                     cov_min_threshold=3,
-                     remove_input=True):
+                     cov_min_threshold=3):
     read_profile_dict = defaultdict(int)
     with pysam.AlignmentFile(input_bam) as bam:
-        with pysam.AlignmentFile(output_bam, header=bam.header, mode='w') as out_bam:
+        with pysam.AlignmentFile(output_bam, header=bam.header, mode='wb') as out_bam:
             for read in bam:
                 read_mch_rate, cov, other_snp = single_read_mch_level(read)
                 read_profile_dict[(int(100 * read_mch_rate), cov)] += 1
@@ -94,11 +93,10 @@ def select_rna_reads(input_bam,
                     continue
                 out_bam.write(read)
 
-    read_profile = pd.Series(read_profile_dict)
-    read_profile.index.name = ['mc_rate', 'cov']
-    read_profile.to_csv(str(output_bam) + '.reads_profile.csv', header=True)
-    if remove_input:
-        subprocess.run(['rm', '-f', input_bam])
+    with open(str(output_bam) + '.reads_profile.csv', 'w') as stat_f:
+        stat_f.write('mc_rate,cov,count\n')
+        for (mc_rate, cov), count in read_profile_dict.items():
+            stat_f.write(f'{mc_rate},{cov},{count}\n')
     return
 
 

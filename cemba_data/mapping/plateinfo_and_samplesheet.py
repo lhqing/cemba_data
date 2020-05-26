@@ -35,21 +35,21 @@ BARCODE_TABLE = {
 }
 
 
-def clean_str_for_path(str_in):
+def _clean_str_for_path(str_in):
     # replace special char with _
     str_out = re.sub('[^a-zA-Z0-9]', '_', str_in.strip())
     return str_out
 
 
-def get_kv_pair(line):
+def _get_kv_pair(line):
     try:
         k, v = line.split('=')
-        return clean_str_for_path(k), clean_str_for_path(v)
+        return _clean_str_for_path(k), _clean_str_for_path(v)
     except ValueError:
         raise ValueError(f'Each key=value line must contain a "=" to separate key and value. Got {line}')
 
 
-def read_plate_info(plate_info_path):
+def _read_plate_info(plate_info_path):
     cur_section = ''
     cur_section_id = -1
 
@@ -74,13 +74,13 @@ def read_plate_info(plate_info_path):
                         f'Section name and order must be [CriticalInfo] [LibraryInfo] [PlateInfo], '
                         f'got {line} at No.{cur_section_id + 1} section.')
             elif cur_section == '[CriticalInfo]':
-                k, v = get_kv_pair(line)
+                k, v = _get_kv_pair(line)
                 if k not in CRITICAL_INFO_KEYS:
                     raise ValueError(f'Unknown key {k} in [CriticalInfo]')
                 else:
                     critical_info[k] = v
             elif cur_section == '[LibraryInfo]':
-                k, v = get_kv_pair(line)
+                k, v = _get_kv_pair(line)
                 if (k in critical_info.keys()) or (k in library_info.keys()):
                     raise ValueError(f'Found duplicated key {k}')
                 else:
@@ -128,7 +128,7 @@ def read_plate_info(plate_info_path):
     return critical_info, plate_info
 
 
-def plate_384_random_index_8(plate_info, barcode_table):
+def _plate_384_random_index_8(plate_info, barcode_table):
     records = []
 
     # check plate_info primer compatibility
@@ -178,11 +178,11 @@ def plate_384_random_index_8(plate_info, barcode_table):
                                 'Sample_Project': plate_pair['tube_label'].iloc[0],
                                 'Description': plate_pair['email'].iloc[0]})
 
-    miseq_sample_sheet, nova_sample_sheet = make_final_samplesheet(records)
+    miseq_sample_sheet, nova_sample_sheet = _make_final_samplesheet(records)
     return miseq_sample_sheet, nova_sample_sheet
 
 
-def plate_384_random_index_384(plate_info, barcode_table):
+def _plate_384_random_index_384(plate_info, barcode_table):
     records = []
 
     # check plate_info primer compatibility
@@ -210,11 +210,11 @@ def plate_384_random_index_384(plate_info, barcode_table):
                         'Sample_Project': row['tube_label'],
                         'Description': row['email']})
 
-    miseq_sample_sheet, nova_sample_sheet = make_final_samplesheet(records)
+    miseq_sample_sheet, nova_sample_sheet = _make_final_samplesheet(records)
     return miseq_sample_sheet, nova_sample_sheet
 
 
-def make_final_samplesheet(records):
+def _make_final_samplesheet(records):
     # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
     sample_sheet = pd.DataFrame(records)
     sample_sheet['Sample_Name'] = ''
@@ -244,7 +244,7 @@ def make_final_samplesheet(records):
 
 def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None):
     # read plate info
-    critical_info, plate_info = read_plate_info(plate_info_path)
+    critical_info, plate_info = _read_plate_info(plate_info_path)
 
     # check valid choice
     for k in ['n_random_index', 'input_plate_size']:
@@ -258,11 +258,11 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
         barcode_table = pd.read_csv(barcode_table_path, sep='\t')
         barcode_table['primer_quarter'] = barcode_table['Index_set'] + "_" + barcode_table['Index_quarter']
         barcode_table.set_index(['primer_quarter', 'plate_pos'], inplace=True)
-        miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_8(plate_info, barcode_table)
+        miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_8(plate_info, barcode_table)
     elif (critical_info['n_random_index'], critical_info['input_plate_size']) == ('384', '384'):
         barcode_table = pd.read_csv(barcode_table_path,
                                     sep='\t', index_col='set_384_plate_pos')
-        miseq_sample_sheet, nova_sample_sheet = plate_384_random_index_384(plate_info, barcode_table)
+        miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_384(plate_info, barcode_table)
     else:
         raise NotImplementedError(f"Unknown combination of n_random_index {n_random_index} "
                                   f"and input_plate_size {input_plate_size}")
@@ -306,10 +306,12 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
 
 def print_plate_info(primer_version):
     if primer_version.upper() == 'V1':
-        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v1.txt') as _f:
-            template = _f.read()
+        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v1.txt') as f:
+            template = f.read()
     elif primer_version.upper() == 'V2':
-        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v2.txt') as _f:
-            template = _f.read()
+        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v2.txt') as f:
+            template = f.read()
+    else:
+        raise ValueError(f'Primer Version can only be V1 or V2, got {primer_version}.')
     print(template)
     return

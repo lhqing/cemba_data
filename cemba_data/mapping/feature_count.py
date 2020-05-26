@@ -1,11 +1,13 @@
 import pathlib
-import pandas as pd
-import numpy as np
-import subprocess
 import shlex
+import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+import numpy as np
+import pandas as pd
+
 from cemba_data.mapping.utilities import get_configuration
+
 
 def _execute_one_feature_count(record):
     try:
@@ -47,7 +49,7 @@ def batch_feature_count(bam_table, out_prefix, gtf_path,
                         count_type='gene', id_type='gene_id',
                         cpu=2, chunksize=100):
     """
-    Count RNA read using featureCount, return a pandas msgpack file
+    Count RNA read using featureCount
 
     Parameters
     ----------
@@ -98,17 +100,18 @@ def batch_feature_count(bam_table, out_prefix, gtf_path,
             sample_ids = []
             bam_paths = []
     # last chunk:
-    chunk_id = count // chunksize + 1  # prevent dup
-    bam_paths_str = ' '.join(bam_paths)
-    out_path = out_prefix + f'.tmp.{count_type}.{id_type}.{chunk_id}.tsv'
-    cmd = f'featureCounts -t {count_type} ' \
-          f'-g {id_type} -a {gtf_path} -o {str(out_path)} {bam_paths_str}'
-    cmd_dict = {
-        'cmd': cmd,
-        'samples': sample_ids,
-        'out_path': str(out_path)
-    }
-    records.append(cmd_dict)
+    if len(bam_paths) > 0:
+        chunk_id = count // chunksize + 1  # prevent dup
+        bam_paths_str = ' '.join(bam_paths)
+        out_path = out_prefix + f'.tmp.{count_type}.{id_type}.{chunk_id}.tsv'
+        cmd = f'featureCounts -t {count_type} ' \
+              f'-g {id_type} -a {gtf_path} -o {str(out_path)} {bam_paths_str}'
+        cmd_dict = {
+            'cmd': cmd,
+            'samples': sample_ids,
+            'out_path': str(out_path)
+        }
+        records.append(cmd_dict)
 
     with ProcessPoolExecutor(cpu) as executor:
         future_dict = {executor.submit(_execute_one_feature_count,
@@ -116,15 +119,14 @@ def batch_feature_count(bam_table, out_prefix, gtf_path,
                        for record_id, record in enumerate(records)}
 
         for future in as_completed(future_dict):
-            record_id = future_dict[future]
             future.result()  # try to get return status or the error will raise
 
     total_summary, total_count = _assemble_feature_count_output(records)
 
     output_store_path = out_prefix + '.h5'
     with pd.HDFStore(output_store_path, 'a') as store:
-        store[f'{count_type}-{id_type}'] = total_count
-        store[f'{count_type}-{id_type}-summary'] = total_summary
+        store[f'count'] = total_count
+        store[f'summary'] = total_summary
 
     # rm tmp files
     subprocess.run(f'rm -f {out_prefix}*tmp*', shell=True)
@@ -160,3 +162,20 @@ def prepare_feature_count(output_dir, config):
         f.write(output_path)
     return output_path, feature_count_command
 
+
+def feature_count(output_dir, gtf_path, cpu):
+    bam_dir = output_dir / 'rna_bam'
+
+    total_bam_table = pd.concat([pd.read_csv(path, index_col=0, header=None)
+                                 for path in output_dir.glob('rna_bam/*/cell_rna_reads_bam.csv')])
+    bam_table_path = f'{bam_dir}/total_cell_rna_reads_bam.csv'
+    output_prefix = f'{bam_dir}/TotalGeneCount'
+    total_bam_table.to_csv(bam_table_path, header=False, sep='\t')
+    batch_feature_count(bam_table=bam_table_path,
+                        out_prefix=output_prefix,
+                        gtf_path=gtf_path,
+                        count_type='gene',
+                        id_type='gene_id',
+                        cpu=cpu,
+                        chunksize=min(total_bam_table // cpu, 100))
+    return

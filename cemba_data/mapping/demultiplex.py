@@ -1,12 +1,5 @@
 """
-Input: fasta_dataframe, i7 i5 demultiplexed fastq files by bcl2fastq
-Process: remove snmC-seq2 random index by cutadapt to get single cell raw fastq files
-Output: Lane merged single cell fastq files
-
-Output file name pattern
-
-r1_out = pathlib.Path(output_dir) / (f"{uid}-{lane}" + "-{name}-R1.fq.gz")
-r2_out = pathlib.Path(output_dir) / (f"{uid}-{lane}" + "-{name}-R2.fq.gz")
+Demultiplex pipeline
 """
 
 import locale
@@ -14,120 +7,228 @@ import logging
 import pathlib
 import re
 import subprocess
-from collections import defaultdict
 
 import pandas as pd
 
 import cemba_data
-from .fastq_dataframe import validate_fastq_dataframe
-from .utilities import get_configuration, parse_index_fasta
+from .fastq_dataframe import make_fastq_dataframe
+from .utilities import snakemake
 
 # logger
+
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
-def demultiplex(output_dir: str, config: str):
+def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
     """
-    make a command dataframe that contains all cutadapt demultiplex command
+    Input raw FASTQ file pattern
+    1. automatically parse the name to generate fastq dataframe
+    2. use the FASTQ dataframe to generate dir structure for each uid
+    3. generate snakefile for demultiplexing each uid
+    4. generate final snakefile in output_dir
+    5. execute snakefile
+
+    Parameters
+    ----------
+    fastq_pattern
+    output_dir
+    barcode_version
+    cpu
+
+    Returns
+    -------
+
     """
-    output_dir = pathlib.Path(output_dir)
-    config = get_configuration(config)
+    output_dir = pathlib.Path(output_dir).absolute()
 
-    # read and validate fastq_dataframe
-    fastq_dataframe = pd.read_csv(output_dir / 'fastq_dataframe.csv')
-    fastq_dataframe = validate_fastq_dataframe(fastq_dataframe)
+    # make fastq dataframe
+    fastq_df = make_fastq_dataframe(fastq_pattern,
+                                    barcode_version=barcode_version,
+                                    output_path=output_dir / 'fastq_dataframe.csv')
 
-    # make adapter parms
-    adapter_type = '-g'  # The random index is always in R1 5 prime
-
-    random_index_version = config['multiplexIndex']['barcode_version'].upper()
-    if random_index_version == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
-    elif random_index_version == 'V2':
-        # this path has a place holder will be replaced for each fastq pair based on multiplex group
-        # different group use different random primers, provide right fasta file limit the possible combination
-        # this prevents cross-contamination primer (primer from other group) been created
-        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2/'
-                                                    'random_index_v2.multiplex_group_!MULTIPLEX_GROUP_PLACEHOLDER!.fa')
-    else:
-        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
-    # for V2, need to replace "!MULTIPLEX_GROUP_PLACEHOLDER!" to real multiplex group
-    adapter_parms = f'{adapter_type} file:{random_index_fasta_path}'
-
-    # standardize read_type
-    fastq_dataframe['read_type'] = fastq_dataframe['read_type'].apply(lambda i: 'R2' if '2' in str(i) else 'R1')
-
-    records = []
-    command_list = []
-    for (uid, lane), sub_df in fastq_dataframe.groupby(['uid', 'lane']):
-        tmp_sub_df = sub_df.set_index('read_type')
-        r1_in = tmp_sub_df.loc['R1', 'fastq_path']
-        r2_in = tmp_sub_df.loc['R2', 'fastq_path']
-
-        # {name} is not format string, its for cutadapt and cutadapt will replace {name} to random index name.
-        r1_out = output_dir / (f"{uid}-{lane}" + "-{name}-R1.fq.gz")
-        r2_out = output_dir / (f"{uid}-{lane}" + "-{name}-R2.fq.gz")
-        stat_out = output_dir / (f"{uid}-{lane}" + ".demultiplex.stats.txt")
-
-        cmd = f"cutadapt -e 0.01 --no-indels {adapter_parms} " \
-              f"-o {r1_out.absolute()} -p {r2_out.absolute()} {r1_in} {r2_in} > {stat_out.absolute()}"
-        if random_index_version == 'V1':
-            pass
-        elif random_index_version == 'V2':
+    # prepare UID sub dir
+    snakefile_list = []
+    total_stats_list = []
+    rule_count = 0
+    for uid, uid_df in fastq_df.groupby('uid'):
+        # determine index file path
+        if barcode_version == 'V1':
+            random_index_fasta_path = str(PACKAGE_DIR /
+                                          'mapping/files/random_index_v1.fa')
+        elif barcode_version == 'V2':
             multiplex_group = uid.split('-')[-2]
-            # can not use format here because -{name}- used by cutadapt
-            cmd = cmd.replace("!MULTIPLEX_GROUP_PLACEHOLDER!", multiplex_group)
+            random_index_fasta_path = str(
+                PACKAGE_DIR / 'mapping/files/random_index_v2/'
+                              f'random_index_v2.multiplex_group_{multiplex_group}.fa')
         else:
-            raise
-        records.append([uid, lane, str(r1_out), str(r2_out)])
-        command_list.append(cmd)
-    with open(output_dir / 'demultiplex.command.txt', 'w') as f:
-        f.write('\n'.join(command_list))
+            raise ValueError(
+                f'Unknown barcode version name: {barcode_version}.')
 
-    # expend records by random index
-    # get index names
-    if random_index_version == 'V1':
-        index_names = []
-        with open(random_index_fasta_path) as f:
-            for line in f:
-                if line.startswith('>'):
-                    index_names.append(line.lstrip('>').rstrip())
-        expend_records = []
-        for record in records:
-            for index_name in index_names:
-                uid, lane, r1_out, r2_out = record
-                expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
-    elif random_index_version == 'V2':
-        index_names_dict = defaultdict(list)
-        for multiplex_group in range(1, 7):  # multiplex_group is 1, 2, 3, 4, 5, 6
-            multiplex_group = str(multiplex_group)
-            with open(random_index_fasta_path.replace("!MULTIPLEX_GROUP_PLACEHOLDER!", multiplex_group)) as f:
-                for line in f:
-                    if line.startswith('>'):
-                        index_names_dict[multiplex_group].append(line.lstrip('>').rstrip())
-        expend_records = []
-        for record in records:
-            uid, lane, r1_out, r2_out = record
-            multiplex_group = uid.split('-')[-2]
-            for index_name in index_names_dict[multiplex_group]:
-                expend_records.append([uid, lane, r1_out.format(name=index_name), r2_out.format(name=index_name)])
-    else:
-        raise
-    record_df = pd.DataFrame(expend_records, columns=['uid', 'lane', 'r1_path', 'r2_path'])
-    record_df.to_csv(output_dir / 'demultiplex.records.csv', index=None)
-    return record_df, command_list
+        # create a directory for each uid, within this UID, do multiplex and lane merge
+        uid_output_dir = output_dir / uid
+        uid_output_dir.mkdir(exist_ok=True)
+        lane_files_dir = uid_output_dir / 'lanes'
+        lane_files_dir.mkdir(exist_ok=True)
+
+        # standardize input fastq name for easier parsing
+        raw_dir = uid_output_dir / 'raw'
+        raw_dir.mkdir(exist_ok=True)
+        for _, row in uid_df.iterrows():
+            uid, read_type, lane, old_path = row[[
+                'uid', 'read_type', 'lane', 'fastq_path'
+            ]]
+            new_path = raw_dir / f'{uid}+{lane}+{read_type}.fq.gz'
+            subprocess.run(['ln', '-s', old_path, new_path], check=True)
+        lanes = list(uid_df['lane'].unique())
+        name_str = '{{name}}'
+
+        # make snakefile
+        stats_out_list = [
+            f'{lane_files_dir}/{uid}-{lane}.demultiplex.stats.txt'
+            for lane in lanes
+        ]
+        total_stats_list += stats_out_list
+        rules = ""
+        for lane in lanes:
+            snake_file_template = f"""
+rule demultiplex_{rule_count}:
+    input:
+        r1_in = f'{raw_dir}/{uid}+{lane}+R1.fq.gz',
+        r2_in = f'{raw_dir}/{uid}+{lane}+R2.fq.gz'
+    params:
+        r1_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R1.fq.gz',
+        r2_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R2.fq.gz'
+    output:
+        stats_out = '{lane_files_dir}/{uid}-{lane}.demultiplex.stats.txt'
+    shell:
+        "cutadapt -Z -e 0.01 --no-indels -g file:{random_index_fasta_path} "
+        "-o {{params.r1_out}} -p {{params.r2_out}} {{input.r1_in}} {{input.r2_in}} > {{output.stats_out}}"
+
+    """
+            rule_count += 1
+            rules += snake_file_template
+
+        snake_file_path = lane_files_dir / 'Snakefile'
+        with open(snake_file_path, 'w') as f:
+            f.write(rules)
+        snakefile_list.append(f'{uid}/lanes/Snakefile')
+
+    # make final snakefile for demultiplex step
+    final_rules = ''
+    for path in snakefile_list:
+        final_rules += f'include: "{path}"\n'
+    # final rules
+    final_rules += f"""
+rule final:
+    input: {total_stats_list}
+"""
+    final_snake_path = output_dir / 'Snakefile_demultiplex'
+    with open(final_snake_path, 'w') as f:
+        f.write(final_rules)
+
+    print('Demultiplexing raw FASTQ')
+    snakemake(workdir=output_dir, snakefile=final_snake_path, cores=cpu)
+    return
+
+
+def _merge_lane(output_dir, cpu):
+    output_dir = pathlib.Path(output_dir).absolute()
+    fastq_df = pd.read_csv(output_dir / 'fastq_dataframe.csv')
+    snakefile_list = []
+    total_output_list = []
+    rule_uid = 0
+    # prepare snakefile in each uid
+    for uid in fastq_df['uid'].unique():
+        uid_output_dir = output_dir / uid
+        lanes_dir = uid_output_dir / 'lanes'
+
+        # prepare demultiplex results cell_fastq_df
+        records = []
+        for path in lanes_dir.glob('*fq.gz'):
+            *uid, lane, index_name, read_type = path.name[:-6].split('-')
+            uid = '-'.join(uid)
+            cell_id = f'{uid}-{index_name}'
+            records.append([cell_id, lane, read_type, str(path)])
+        cell_fastq_df = pd.DataFrame(
+            records, columns=['cell_id', 'index_name', 'read_type', 'fastq_path'])
+
+        # prepare snakefile for each cell_id * read_type
+        rules = ''
+        output_paths = []
+        for (cell_id, read_type), sub_df in cell_fastq_df.groupby(['cell_id', 'read_type']):
+            input_paths = list(sub_df['fastq_path'])
+            output_path = uid_output_dir / f'{cell_id}-{read_type}.fq.gz'
+
+            snake_file_template = f"""
+rule merge_{rule_uid}:
+    input: 
+        {input_paths}
+    output: 
+        "{output_path}"
+    shell:
+        "gzip -cd {{input}} | gzip -6 > {{output}} && rm -f {{input}}"
+
+"""
+            rule_uid += 1
+            rules += snake_file_template
+            output_paths.append(str(output_path))
+
+        snakefile_path = uid_output_dir / 'Snakefile'
+        with open(snakefile_path, 'w') as f:
+            f.write(rules)
+        snakefile_list.append(snakefile_path)
+        total_output_list += output_paths
+
+    # prepare final snakefile
+    final_rules = ''
+    for path in snakefile_list:
+        final_rules += f'include: "{path}"\n'
+    # final rules
+    final_rules += f"""
+rule final:
+    input: {total_output_list}
+"""
+    final_snake_path = output_dir / 'Snakefile_merge_lane'
+    with open(final_snake_path, 'w') as f:
+        f.write(final_rules)
+
+    print('Merging lanes to get cell FASTQ')
+    subprocess.run(
+        ['snakemake', '--snakefile',
+         str(final_snake_path), '--cores',
+         str(cpu)],
+        check=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        encoding='utf8')
+    return
+
+
+def _parse_index_fasta(fasta_path):
+    records = {}
+    with open(fasta_path) as f:
+        key_line = True
+        for line in f:
+            if key_line:
+                key = line.lstrip('>').rstrip('\n')
+                key_line = False
+            else:
+                value = line.lstrip('^').rstrip('\n')
+                records[key] = value
+                key_line = True
+    return records
 
 
 def _read_cutadapt_result(stat_path):
     """
-    Ugly parser of cutadapt output
-    TODO: make this nicer, add example output
+    Parser of cutadapt output
     """
     with open(stat_path) as f:
-        p = re.compile(r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times.")
+        p = re.compile(
+            r"Sequence: .+; Type: .+; Length: \d+; Trimmed: \d+ times")
         series = []
         total_pairs = -1
         for line in f:
@@ -145,37 +246,39 @@ def _read_cutadapt_result(stat_path):
                 result_series = pd.Series(result_dict)
                 series.append(result_series)
         total_df = pd.DataFrame(series)
-        total_df['Trimmed'] = total_df['Trimmed'].apply(lambda c: c.split(' ')[0]).astype(int)
+        total_df['Trimmed'] = total_df['Trimmed'].apply(
+            lambda c: c.split(' ')[0]).astype(int)
         total_df['TotalPair'] = total_pairs
         total_df['Ratio'] = total_df['Trimmed'] / total_pairs
     return total_df
 
 
-def summarize_demultiplex(output_dir, config):
-    output_dir = pathlib.Path(output_dir)
-    config = get_configuration(config)
+def _summarize_demultiplex(output_dir, barcode_version):
+    output_dir = pathlib.Path(output_dir).absolute()
     output_path = output_dir / 'demultiplex.stats.csv'
-    if output_path.exists():
-        return pd.read_csv(output_path)
+    barcode_version = barcode_version.upper()
 
     # get index info
-    random_index_version = config['multiplexIndex']['barcode_version']
-    if random_index_version.upper() == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v1.fa')
-    elif random_index_version.upper() == 'V2':
+    if barcode_version == 'V1':
+        random_index_fasta_path = str(PACKAGE_DIR /
+                                      'mapping/files/random_index_v1.fa')
+    elif barcode_version == 'V2':
         # here we don't need to worry about the multiplex_group issue,
         # because we just need a index_name to index_seq map
         # we've considered this during demultiplex
-        random_index_fasta_path = str(PACKAGE_DIR / 'mapping/files/random_index_v2/random_index_v2.fa')
+        random_index_fasta_path = str(
+            PACKAGE_DIR / 'mapping/files/random_index_v2/random_index_v2.fa')
     else:
-        raise ValueError(f'Unknown version name {random_index_version} in multiplexIndex section of the config file.')
-    index_seq_dict = parse_index_fasta(random_index_fasta_path)
+        raise ValueError(
+            f'Unknown version name {barcode_version} in multiplexIndex section of the config file.'
+        )
+    index_seq_dict = _parse_index_fasta(random_index_fasta_path)
     index_name_dict = {v: k for k, v in index_seq_dict.items()}
 
     # read the demultiplex stats, its per lane, so need to sum up lane together of each uid and index name
     # but R1 R2 is demultiplexed together, so this table don't separate R1 R2
     stat_list = []
-    stat_path_list = list(output_dir.glob('*demultiplex.stats.txt'))
+    stat_path_list = list(output_dir.glob('*/lanes/*demultiplex.stats.txt'))
     for path in stat_path_list:
         single_df = _read_cutadapt_result(path)
         *uid, suffix = path.name.split('-')
@@ -187,6 +290,75 @@ def summarize_demultiplex(output_dir, config):
         assert single_df['index_name'].isna().sum() == 0
         stat_list.append(single_df)
     total_demultiplex_stats = pd.concat(stat_list)
-    total_demultiplex_stats.to_csv(output_path, index=None)
-    subprocess.run(['rm', '-f'] + list(map(str, stat_path_list)))
-    return total_demultiplex_stats
+
+    # calculate cell level table
+    total_demultiplex_stats['cell_id'] = total_demultiplex_stats[
+                                             'uid'] + '-' + total_demultiplex_stats['index_name']
+
+    cell_table = total_demultiplex_stats.groupby('cell_id').agg({
+        'Trimmed': 'sum',
+        'TotalPair': 'sum',
+        'index_name': lambda i: i.unique()[0],
+        'uid': lambda i: i.unique()[0]
+    })
+    cell_table.rename(columns={
+        'Trimmed': 'CellInputReadPairs',
+        'TotalPair': 'MultiplexedTotalReadPairs',
+        'index_name': 'IndexName',
+        'uid': 'UID'
+    },
+        inplace=True)
+    cell_table['CellBarcodeRatio'] = cell_table[
+                                         'CellInputReadPairs'] / cell_table['MultiplexedTotalReadPairs']
+    cell_table['BarcodeVersion'] = barcode_version
+    cell_table.to_csv(output_path)
+    return
+
+
+def _final_cleaning(output_dir):
+    """
+    remove intermediate files
+    """
+    output_dir = pathlib.Path(output_dir)
+
+    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/*-unknown-R*.fq.gz']
+
+    total_paths = []
+    for pattern in delete_patterns:
+        total_paths += list(map(str, output_dir.glob(pattern)))
+
+    subprocess.run(['rm', '-rf'] + total_paths, check=True)
+    return
+
+
+def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
+    output_dir = pathlib.Path(output_dir).absolute() / 'fastq'
+    if output_dir.exists():
+        print('Delete existing output_dir...')
+        subprocess.run(['rm', '-rf', str(output_dir)], check=True)
+        output_dir.mkdir()
+    else:
+        output_dir.mkdir(parents=True)
+
+    barcode_version = barcode_version.upper()
+    if barcode_version not in ['V1', 'V2']:
+        raise ValueError(f'Barcode version can only be V1 or V2, got {barcode_version}')
+    with open(output_dir / '.barcode_version', 'w') as f:
+        f.write(barcode_version)
+
+    mode = mode.lower()
+    supported_tech = ['mc', 'mct', 'mc2t']
+    if mode not in supported_tech:
+        raise ValueError(f"Technologies should be in {supported_tech}, got {barcode_version}")
+    with open(output_dir / '.mode', 'w') as f:
+        f.write(mode)
+
+    _demultiplex(
+        fastq_pattern=fastq_pattern,
+        output_dir=output_dir,
+        barcode_version=barcode_version,
+        cpu=cpu)
+    _merge_lane(output_dir=output_dir, cpu=cpu)
+    _summarize_demultiplex(output_dir=output_dir, barcode_version=barcode_version)
+    _final_cleaning(output_dir=output_dir)
+    return

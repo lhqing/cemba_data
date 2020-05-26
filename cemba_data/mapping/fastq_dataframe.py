@@ -1,16 +1,19 @@
+"""
+Generate raw FASTQ dataframe based on fixed name pattern
+name pattern is based on samplesheet generated in plateinfo_and_samplesheet.py
+"""
+
 import glob
 import logging
 import pathlib
 
 import pandas as pd
 
-from .utilities import get_configuration
-
 # logger
 log = logging.getLogger()
 
 
-def parse_v1_fastq_path(path):
+def _parse_v1_fastq_path(path):
     path = pathlib.Path(path)
     try:
         *_, plate1, plate2, multi_field = path.name.split('-')
@@ -36,7 +39,7 @@ def parse_v1_fastq_path(path):
     return name_series
 
 
-def parse_v2_fastq_path(path):
+def _parse_v2_fastq_path(path):
     path = pathlib.Path(path)
     try:
         *_, plate, multiplex_group, multi_field = path.name.split('-')
@@ -62,7 +65,7 @@ def parse_v2_fastq_path(path):
     return name_series
 
 
-def make_fastq_dataframe(file_path, config_path, output_path=None):
+def make_fastq_dataframe(file_path, barcode_version, output_path=None):
     """
     Generate fastq_dataframe for pipeline input.
 
@@ -70,18 +73,21 @@ def make_fastq_dataframe(file_path, config_path, output_path=None):
     ----------
     file_path
         Accept 1. path pattern contain wildcard, 2. path list, 3. path of one file contain all the paths.
-    config_path
-        Mapping config path, use to get the barcode version
+    barcode_version
+        Only accept two options: 1) V1 for 8 random index; 2) V2 for 384 random index.
     output_path
         output path of the fastq dataframe
-    skip_broken_name
-        If true, ignore any unrecognized file names in file_path
     Returns
     -------
         fastq_dataframe for pipeline input.
     """
-    config = get_configuration(config_path)
-    barcode_version = config['multiplexIndex']['barcode_version'].upper()
+    barcode_version = barcode_version.upper()
+    if barcode_version == 'V1':
+        parser = _parse_v1_fastq_path
+    elif barcode_version == 'V2':
+        parser = _parse_v2_fastq_path
+    else:
+        raise ValueError(f'Primer Version can only be V1 or V2, got {barcode_version}.')
 
     if isinstance(file_path, str) and ('*' in file_path):
         file_path = [str(pathlib.Path(p).absolute()) for p in glob.glob(file_path)]
@@ -89,20 +95,13 @@ def make_fastq_dataframe(file_path, config_path, output_path=None):
         pass
     else:
         with open(file_path) as f:
-            file_path = [l.strip() for l in f]
-    log.info(f'{len(file_path)} fastq file paths in input')
+            file_path = [line.strip() for line in f]
+    log.info(f'{len(file_path)} FASTQ file paths in input')
 
     fastq_data = []
     for path in file_path:
-        if barcode_version == 'V1':
-            name_series = parse_v1_fastq_path(path)
-        elif barcode_version == 'V2':
-            name_series = parse_v2_fastq_path(path)
-        else:
-            raise ValueError(
-                f'Unknown version name {barcode_version} in multiplexIndex section of the config file.')
+        name_series = parser(path)
         fastq_data.append(name_series)
-
     fastq_df = pd.DataFrame(fastq_data)
     log.info(f'{fastq_df.shape[0]} valid fastq names.')
     if fastq_df.shape[0] == 0:
@@ -116,25 +115,3 @@ def make_fastq_dataframe(file_path, config_path, output_path=None):
     if output_path is not None:
         fastq_df.to_csv(output_path, index=None)
     return fastq_df
-
-
-def validate_fastq_dataframe(fastq_dataframe):
-    """
-    Check if fastq_dataframe is
-    1. have required columns
-    2. uid is unique
-    """
-    if isinstance(fastq_dataframe, str):
-        fastq_dataframe = pd.read_csv(fastq_dataframe, index_col=None, sep='\t')
-
-    for required in ['uid', 'lane', 'read_type', 'fastq_path']:
-        if required not in fastq_dataframe.columns:
-            raise ValueError(f'column {required} not in fastq dataframe columns, '
-                             f'remember that the 4 required columns of fastq dataframe are: '
-                             f'uid, lane, read_type, fastq_path. '
-                             f'The orders do not matter, but the names need to be exact.')
-
-    for _, df in fastq_dataframe.groupby(['lane', 'read_type']):
-        if df['uid'].unique().size != df['uid'].size:
-            raise ValueError('uid column are not unique for each lane and read-type combination.')
-    return fastq_dataframe

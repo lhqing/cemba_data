@@ -1,157 +1,164 @@
 import logging
-import operator
 import pathlib
+import shlex
 import subprocess
 
 import pandas as pd
-
-import cemba_data
-from .utilities import get_configuration
+import pysam
 
 # logger
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
-PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
+
+def star_mapping(output_dir, star_reference, threads=30,
+                 mc_rate_min_threshold=0.9, cov_min_threshold=3):
+    output_dir = pathlib.Path(output_dir).absolute()
+    cell_batch = pd.read_csv(output_dir / 'snakemake/bismark_bam_list.txt',
+                             header=None, index_col=0, squeeze=True)
+    # each batch will map together
+    cell_batch.index = cell_batch.index.map(lambda path: pathlib.Path(path).name.split('.')[0])
+    rna_dir = output_dir / 'rna_bam'
+    rna_dir.mkdir(exist_ok=True)
+
+    for batch_id, sub_series in cell_batch.groupby(cell_batch):
+        trimmed_fastqs = []
+        samples = sub_series.index
+        for i, cell_id in enumerate(sub_series.index):
+            uid = '-'.join(cell_id.split('-')[:-1])
+            trimmed_fastq = output_dir / f'bam/{uid}/{cell_id}-R1.trimmed.fq.gz'
+            trimmed_fastqs.append(str(trimmed_fastq))
+        this_output_dir = output_dir / f'rna_bam/{batch_id}'
+        this_output_dir.mkdir(exist_ok=True)
+        output_prefix = this_output_dir / f'Total_'
+        read_files_in_str = ','.join(trimmed_fastqs)
+        samples_str = ' , ID:'.join(samples)
+
+        filtered_bam = f'{output_prefix}filtered.bam'
+        rna_bam = f'{output_prefix}selected_rna.bam'
+
+        rule = f"""
+rule rna:
+    input:
+        "{rna_bam}"
+
+rule star_{batch_id}:
+    input:
+        {trimmed_fastqs}
+    output:
+        temp("{output_prefix}Aligned.out.bam")
+    log:
+        "{output_prefix}Log.final.out"
+    threads:
+        {threads}
+    shell:
+        'STAR --runThreadN {{threads}} '
+        '--genomeDir {star_reference} '
+        '--alignEndsType EndToEnd '
+        '--genomeLoad LoadAndKeep '
+        '--outSAMstrandField intronMotif '
+        '--outSAMtype BAM Unsorted '
+        '--outSAMunmapped None '
+        '--outSAMattributes NH HI AS NM MD '
+        '--sjdbOverhang 100 '
+        '--outFilterType BySJout '
+        '--outFilterMultimapNmax 20 '
+        '--alignSJoverhangMin 8 '
+        '--alignSJDBoverhangMin 1 '
+        '--outFilterMismatchNmax 999 '
+        '--outFilterMismatchNoverLmax 0.04 '
+        '--alignIntronMin 20 '
+        '--alignIntronMax 1000000 '
+        '--alignMatesGapMax 1000000 '
+        '--outFileNamePrefix {output_prefix} '
+        '--readFilesIn {read_files_in_str} '
+        '--readFilesCommand gzip -cd '
+        '--outSAMattrRGline ID:{samples_str}'
+
+rule filter_bam_{batch_id}:
+    input:
+        "{output_prefix}Aligned.out.bam"
+    output:
+        "{filtered_bam}"
+    threads:
+        {threads}
+    shell:
+        "samtools sort -@ {{threads}} -m 2G {{input}} | samtools view -bh -q 10 -o {{output}} -"
+
+rule select_rna_{batch_id}:
+    input:
+        "{filtered_bam}"
+    output:
+        "{rna_bam}"
+    shell:
+        'yap-internal select-rna-reads ' \
+        '--input_bam {{input}} ' \
+        '--output_bam {{output}} ' \
+        '--mc_rate_min_threshold {mc_rate_min_threshold} ' \
+        '--cov_min_threshold {cov_min_threshold} '
+
+"""
+        with open(output_dir / f'snakemake/snakefile_star_mapping_{batch_id}', 'w') as f:
+            f.write(rule)
+    return
 
 
-def star_mapping(input_dir, output_dir, config):
-    """
-    STAR RNA reads mapping
-    """
+def _count_rna_reads_per_cell(bam_path, split=False):
+    bam = pysam.AlignmentFile(bam_path)
+    cell_read_counts = {cell['ID']: 0 for cell in bam.header['RG']}
+
+    for read in bam:
+        cell = read.get_tag('RG')
+        cell_read_counts[cell] += 1
+    read_count = pd.Series(cell_read_counts, name='Reads')
+    read_count.index.name = 'cell_id'
+    read_count.to_csv(str(bam_path) + '.cell_stats.csv', header=True)
+
+    if split:
+        output_dir = pathlib.Path(bam_path).parent
+        subprocess.run(shlex.split(f'samtools split {bam_path} -f {output_dir}/%\!.rna_reads.%.'),
+                       check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    return
+
+
+def _post_star_mapping_process(bam_dir):
+    if not pathlib.Path(f'{bam_dir}/Total_selected_rna.bam').exists():
+        return
+    _count_rna_reads_per_cell(f'{bam_dir}/Total_filtered.bam')
+    _count_rna_reads_per_cell(f'{bam_dir}/Total_selected_rna.bam', split=True)
+
+    file_names = [
+        'Total_filtered.bam', 'Total_Log.final.out', 'Total_Log.out',
+        'Total_Log.progress.out', 'Total_selected_rna.bam', 'Total_SJ.out.tab'
+    ]
+
+    subprocess.run(['rm', '-f'] + [f'{bam_dir}/{i}' for i in file_names], check=True)
+
+    bam_list = pathlib.Path(bam_dir).absolute().glob('*.rna_reads.bam')
+    bam_series = pd.Series({bam_path.name.split('.')[0]: str(bam_path) for bam_path in bam_list})
+    bam_series.to_csv(f'{bam_dir}/cell_rna_reads_bam.csv', header=False)
+    return
+
+
+def summary_rna_mapping(output_dir):
     output_dir = pathlib.Path(output_dir)
-    star_batch_command_dir = output_dir / 'batch_star_cmd'
-    star_batch_command_dir.mkdir(exist_ok=True)
+    batch_sub_dirs = [p for p in output_dir.glob('rna_bam/*') if (p.is_dir())]
+    for sub_dir in batch_sub_dirs:
+        _post_star_mapping_process(sub_dir)
 
-    input_dir = pathlib.Path(input_dir)
-    fastq_qc_records = pd.read_csv(input_dir / 'fastq_qc.records.csv',
-                                   index_col=['uid', 'index_name', 'read_type'], squeeze=True)
-    if isinstance(config, str):
-        config = get_configuration(config)
+    total_star_mapped_reads = pd.concat([pd.read_csv(path, index_col='cell_id')
+                                         for path in output_dir.glob('rna_bam/*/Total_filtered.bam.cell_stats.csv')])
+    total_star_mapped_reads.columns = ['RNAUniqueMapped']
 
-    star_reference = config['star']['star_reference']
-    read_min = int(config['star']['read_min'])
-    read_max = int(config['star']['read_max'])
+    total_rna_reads = pd.concat([pd.read_csv(path, index_col='cell_id')
+                                 for path in output_dir.glob('rna_bam/*/Total_selected_rna.bam.cell_stats.csv')])
+    total_rna_reads.columns = ['FinalRNAReads']
 
-    # Do not allow to change threads
-    # threads = int(config['star']['threads'])
-    threads = 6
+    total_rna_stat = pd.concat([total_star_mapped_reads, total_rna_reads], axis=1)
 
-    try:
-        fastq_qc_stats_path = input_dir / 'fastq_qc.stats.csv'
-        fastq_qc_stats = pd.read_csv(fastq_qc_stats_path, index_col=0)
-        # sort by total reads, map large sample first
-        sample_dict = {}
-        for (uid, index_name), sub_df in fastq_qc_stats.sort_values('out_reads').groupby(['uid', 'index_name']):
-            sample_dict[(uid, index_name)] = sub_df['out_reads'].astype(int).sum()
-        sorted_sample = sorted(sample_dict.items(), key=operator.itemgetter(1), reverse=True)
-    except FileNotFoundError:
-        # not stats means in dry run mode, will generate command for every record
-        sorted_sample = []
-        for (uid, index_name), _ in fastq_qc_records.groupby(['uid', 'index_name']):
-            sorted_sample.append([(uid, index_name), -1])
-
-    records = []
-    command_list = []
-    for (uid, index_name), total_reads in sorted_sample:
-        if index_name == 'unknown':
-            continue
-        elif total_reads == -1:
-            pass
-        elif total_reads < read_min:
-            log.info(f"Drop cell due to too less reads: {uid} {index_name}, total reads {total_reads}")
-            continue
-        elif total_reads > read_max:
-            log.info(f"Drop cell due to too many reads: {uid} {index_name}, total reads {total_reads}")
-            continue
-
-        # for RNA part, only map R1
-        # TODO Do pair end mapping...
-        r1_fastq = fastq_qc_records[(uid, index_name, 'R1')]
-        output_prefix = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.')
-        output_path = output_dir / (pathlib.Path(r1_fastq).name[:-6] + '.STAR.Aligned.out.bam')  # STAR convention
-        star_cmd = f'STAR --runThreadN {threads} ' \
-                   f'--genomeDir {star_reference} ' \
-                   f'--alignEndsType EndToEnd ' \
-                   f'--genomeLoad LoadAndKeep ' \
-                   f'--outSAMstrandField intronMotif ' \
-                   f'--outSAMtype BAM Unsorted ' \
-                   f'--outSAMunmapped Within ' \
-                   f'--outSAMattributes NH HI AS NM MD ' \
-                   f'--sjdbOverhang 100 ' \
-                   f'--outFilterType BySJout ' \
-                   f'--outFilterMultimapNmax 20 ' \
-                   f'--alignSJoverhangMin 8 ' \
-                   f'--alignSJDBoverhangMin 1 ' \
-                   f'--outFilterMismatchNmax 999 ' \
-                   f'--outFilterMismatchNoverLmax 0.04 ' \
-                   f'--alignIntronMin 20 ' \
-                   f'--alignIntronMax 1000000 ' \
-                   f'--alignMatesGapMax 1000000 ' \
-                   f'--outFileNamePrefix {output_prefix} ' \
-                   f'--readFilesIn {r1_fastq} ' \
-                   f'--readFilesCommand gzip -cd'
-        records.append([uid, index_name, output_path])
-        command_list.append(star_cmd)
-
-    fold_command_list = []
-    # fold STAR cmd and add genome load genome remove
-    command_per_script = 50
-    genome_load_cmd = f'STAR --genomeDir {star_reference} --genomeLoad LoadAndExit'
-    genome_remove_cmd = f'STAR --genomeDir {star_reference} --genomeLoad Remove'
-    for i in range(0, len(command_list), command_per_script):
-        commands_str = '\n'.join(command_list[i: i+command_per_script])
-        total_command = f'{genome_load_cmd}\n{commands_str}\n{genome_remove_cmd}'
-        star_command_script_path = star_batch_command_dir / f'{i}-{i+command_per_script}.sh'
-        with open(star_command_script_path, 'w') as f:
-            f.write(total_command)
-        fold_command_list.append(f'sh {star_command_script_path.absolute()}')
-
-    with open(output_dir / 'star_mapping.command.txt', 'w') as f:
-        f.write('\n'.join(fold_command_list))
-    record_df = pd.DataFrame(records,
-                             columns=['uid', 'index_name', 'bam_path'])
-    record_df.to_csv(output_dir / 'star_mapping.records.csv', index=None)
-    return record_df, fold_command_list
+    total_rna_stat['FinalRNAReadsRatio'] = total_rna_stat['FinalRNAReads'] / total_rna_stat['RNAUniqueMapped']
+    total_rna_stat.to_csv(output_dir / 'rna_bam/star_mapping_stats.csv')
+    return
 
 
-def _parse_star_log(log_path):
-    with open(log_path) as f:
-        record = {}
-        for line in f:
-            if '|' not in line:
-                continue
-            name, value = line.split('|')
-            name = name.strip(' ')
-            value = value.strip(' \t\n')
-            record[name] = value
-    return pd.Series(record)
 
-
-def summarize_star_mapping(bam_dir):
-    bam_dir = pathlib.Path(bam_dir)
-    output_path = bam_dir / 'star_mapping.stats.csv'
-    if output_path.exists():
-        return str(output_path)
-
-    records = []
-    star_stat_list = list(bam_dir.glob('*.Log.final.out'))
-    for path in star_stat_list:
-        report_series = _parse_star_log(path)
-
-        *uid, index_name, suffix = path.name.split('-')
-        uid = '-'.join(uid)
-        read_type = suffix.split('.')[0]
-        report_series['uid'] = uid
-        report_series['index_name'] = index_name
-        report_series['read_type'] = read_type
-        records.append(report_series)
-        path = str(path)
-        subprocess.run(['rm', '-f',
-                        path,
-                        path[:-10] + '.out',
-                        path[:-10] + '.progress.out',
-                        path[:-14] + '.SJ.out.tab'])
-    total_stats_df = pd.DataFrame(records)
-    total_stats_df.to_csv(output_path)
-    return str(output_path)

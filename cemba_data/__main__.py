@@ -157,7 +157,7 @@ def print_plate_info_register_subparser(subparser):
                                   help="Print out default plate info template.")
 
     parser.add_argument(
-        "--primer_version", '-v', '-V',
+        "--barcode_version", '-v', '-V',
         type=str,
         default='V2',
         choices=['V1', 'V2'],

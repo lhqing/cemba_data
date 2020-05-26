@@ -1,11 +1,10 @@
 import configparser
+import functools
+import itertools
 import logging
-import os
 import pathlib
 import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
-from ALLCools._open import open_bam
 
 # logger
 
@@ -21,7 +20,13 @@ def get_configuration(config_path):
         return config_path
     ref_path_config = configparser.ConfigParser()
     ref_path_config.read(config_path)
-    return ref_path_config
+
+    total_config = {}
+    for name, section in ref_path_config.items():
+        for k, v in section.items():
+            total_config[k] = v
+
+    return total_config
 
 
 def test_cmd(tool_name, cmd_list):
@@ -118,3 +123,69 @@ def command_runner(commands, runner=None, cpu=1):
                     print(e.stderr)
                     raise e
     return
+
+
+def snakemake(workdir, snakefile, cores):
+    try:
+        subprocess.run([
+            'snakemake', '-d', str(workdir), '--snakefile',
+            str(snakefile), '--cores',
+            str(cores)
+        ],
+            check=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            encoding='utf8')
+    except subprocess.CalledProcessError as e:
+        print(e.stdout)
+        print(e.stderr)
+        raise e
+    return
+
+
+def get_barcode_version(output_dir):
+    fastq_dir = pathlib.Path(output_dir) / 'fastq'
+    with open(fastq_dir / '.barcode_version') as f:
+        return f.read()
+
+
+def get_mode(output_dir):
+    fastq_dir = pathlib.Path(output_dir) / 'fastq'
+    with open(fastq_dir / '.mode') as f:
+        return f.read()
+
+
+IUPAC_TABLE = {
+    'A': 'A',
+    'T': 'T',
+    'C': 'C',
+    'G': 'G',
+    'R': 'AG',
+    'Y': 'CT',
+    'S': 'GC',
+    'W': 'AT',
+    'K': 'GT',
+    'M': 'AC',
+    'B': 'CGT',
+    'D': 'AGT',
+    'H': 'ATC',
+    'V': 'ACG',
+    'N': 'ATCG'
+}
+
+
+@functools.lru_cache(maxsize=100)
+def parse_mc_pattern(pattern: str) -> set:
+    """
+    parse mC context pattern
+    """
+    # IUPAC DNA abbr. table
+    all_pos_list = []
+    pattern = pattern.upper()
+    for base in pattern:
+        try:
+            all_pos_list.append(IUPAC_TABLE[base])
+        except KeyError:
+            raise KeyError(f'Base {base} is not in IUPAC table.')
+    context_set = set([''.join(i) for i in itertools.product(*all_pos_list)])
+    return context_set

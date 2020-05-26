@@ -51,12 +51,6 @@ def select_dna_reads_internal_subparser(subparser):
         type=int,
         default=5
     )
-
-    parser.add_argument(
-        "--remove_input",
-        dest='remove_input',
-        action='store_true')
-    parser.set_defaults(remove_input=False)
     return
 
 
@@ -89,12 +83,6 @@ def select_rna_reads_internal_subparser(subparser):
         type=int,
         default=5
     )
-
-    parser.add_argument(
-        "--remove_input",
-        dest='remove_input',
-        action='store_true')
-    parser.set_defaults(remove_input=False)
     return
 
 
