@@ -5,7 +5,6 @@ When adding new function:
 """
 
 import argparse
-import inspect
 import logging
 import sys
 
@@ -140,7 +139,7 @@ def print_default_config_register_subparser(subparser):
     parser = subparser.add_parser('default-mapping-config',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Print out default config of mapping pipeline")
-    from cemba_data.mapping.pipeline import MAPPING_MODE_CHOICES
+    from .mapping.utilities import MAPPING_MODE_CHOICES
     parser.add_argument(
         "--mode",
         type=str,
@@ -274,11 +273,58 @@ def mapping_summary_register_subparser(subparser):
     )
 
 
+def demultiplex_register_subparser(subparser):
+    parser = subparser.add_parser('demultiplex',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Demultiplex bcl2fastq results.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--fastq_pattern",
+        type=str,
+        required=True,
+        help="FASTQ files with wildcard to match all bcl2fastq results, pattern with wildcard must be quoted."
+    )
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Pipeline output directory, will be created recursively."
+    )
+
+    parser_req.add_argument(
+        "--barcode_version",
+        type=str,
+        required=True,
+        choices=['V1', 'V2'],
+        help="Barcode version of this library, V1 for the 8 random index, V2 for the 384 random index."
+    )
+
+    from .mapping.demultiplex import SUPPORTED_TECHNOLOGY
+
+    parser_req.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=SUPPORTED_TECHNOLOGY,
+        help="Technology used in this library."
+    )
+
+    parser_req.add_argument(
+        "--cpu",
+        type=int,
+        required=True,
+        help="Number of cores to use. Max is 12."
+    )
+    return
+
+
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     )
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(
         title="functions",
         dest="command",
@@ -286,11 +332,13 @@ def main():
     )
 
     # add subparsers
-    current_module = sys.modules[__name__]
-    # get all functions in parser
-    for name, register_subparser_func in inspect.getmembers(current_module, inspect.isfunction):
-        if 'register_subparser' in name:
-            register_subparser_func(subparsers)
+    qsub_register_subparser(subparsers)
+    print_default_config_register_subparser(subparsers)
+    print_plate_info_register_subparser(subparsers)
+    make_sample_sheet_register_subparser(subparsers)
+    pipeline_register_subparser(subparsers)
+    mapping_summary_register_subparser(subparsers)
+    demultiplex_register_subparser(subparsers)
 
     # initiate
     args = None
@@ -321,10 +369,12 @@ def main():
         from .mapping import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
         from .mapping import make_sample_sheet as func
-    elif cur_command == 'default-mapping-config':
-        from .mapping.pipeline import print_default_configuration as func
-    elif cur_command == 'mapping':
-        from .mapping.pipeline import pipeline as func
+    elif cur_command == 'demultiplex':
+        from .mapping import demultiplex_pipeline as func
+    #     elif cur_command == 'default-mapping-config':
+    #         from .mapping.pipeline import print_default_configuration as func
+    #     elif cur_command == 'mapping':
+    #         from .mapping.pipeline import pipeline as func
     elif cur_command == 'mapping-summary':
         from .mapping.summary import mapping_summary as func
     else:
@@ -333,9 +383,7 @@ def main():
         return
 
     # run the command
-    log.info(f"# Executing {cur_command}...")
     func(**args_vars)
-    log.info(f"# {cur_command} finished.")
     return
 
 

@@ -5,7 +5,7 @@ import pandas as pd
 
 from .utilities import parse_mc_pattern
 
-
+from .utilities import get_mode
 def generate_allc(
         output_dir,
         reference_fasta,
@@ -17,6 +17,7 @@ def generate_allc(
                             header=None, index_col=0, squeeze=True)
     allc_dir = output_dir / 'allc'
     allc_dir.mkdir(exist_ok=True)
+    mode = get_mode(output_dir)
 
     for batch_id, sub_series in bam_batch.groupby(bam_batch):
         bam_dict = {pathlib.Path(i).name.split('.')[0]: i
@@ -52,11 +53,22 @@ rule allc_{i}:
             total_rules += rule_template
             allc_paths.append(str(allc_path))
 
+        if mode == 'mc':
+            include_str = f'include: "{output_dir}/snakemake/snakefile_bismark_mapping_{batch_id}"'
+        elif mode == 'mct':
+            include_str = f'include: "{output_dir}/snakemake/snakefile_select_dna_{batch_id}"'
+        else:
+            raise ValueError(f'Unknown mode {mode}')
+
         with open(output_dir / f'snakemake/snakefile_generate_allc_{batch_id}', 'w') as f:
             f.write(f"""
+{include_str}
+
 rule allc:
     input:
         {allc_paths}
+    output:
+        touch("{output_dir}/snakemake/generate_allc_done_{batch_id}")
 
 {total_rules}
 """)

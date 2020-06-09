@@ -64,8 +64,7 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
                 PACKAGE_DIR / 'mapping/files/random_index_v2/'
                               f'random_index_v2.multiplex_group_{multiplex_group}.fa')
         else:
-            raise ValueError(
-                f'Unknown barcode version name: {barcode_version}.')
+            raise
 
         # create a directory for each uid, within this UID, do multiplex and lane merge
         uid_output_dir = output_dir / uid
@@ -196,14 +195,7 @@ rule final:
         f.write(final_rules)
 
     print('Merging lanes to get cell FASTQ')
-    subprocess.run(
-        ['snakemake', '--snakefile',
-         str(final_snake_path), '--cores',
-         str(cpu)],
-        check=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        encoding='utf8')
+    snakemake(workdir=output_dir, snakefile=final_snake_path, cores=cpu)
     return
 
 
@@ -308,7 +300,7 @@ def _summarize_demultiplex(output_dir, barcode_version):
         'uid': 'UID'
     },
         inplace=True)
-    cell_table['CellBarcodeRatio'] = cell_table[
+    cell_table['CellBarcodeRate'] = cell_table[
                                          'CellInputReadPairs'] / cell_table['MultiplexedTotalReadPairs']
     cell_table['BarcodeVersion'] = barcode_version
     cell_table.to_csv(output_path)
@@ -331,12 +323,19 @@ def _final_cleaning(output_dir):
     return
 
 
+SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'mc2t']
+
+
 def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
+    cpu = int(cpu)
+    if cpu > 12:
+        print('Changing CPU to 12.')
+        cpu = 12
+
     output_dir = pathlib.Path(output_dir).absolute() / 'fastq'
     if output_dir.exists():
-        print('Delete existing output_dir...')
-        subprocess.run(['rm', '-rf', str(output_dir)], check=True)
-        output_dir.mkdir()
+        raise FileExistsError('output_dir already exists, to prevent conflicts, '
+                              'use another output_dir or delete the existing output_dir first.')
     else:
         output_dir.mkdir(parents=True)
 
@@ -347,9 +346,8 @@ def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
         f.write(barcode_version)
 
     mode = mode.lower()
-    supported_tech = ['mc', 'mct', 'mc2t']
-    if mode not in supported_tech:
-        raise ValueError(f"Technologies should be in {supported_tech}, got {barcode_version}")
+    if mode not in SUPPORTED_TECHNOLOGY:
+        raise ValueError(f"Technologies should be in {SUPPORTED_TECHNOLOGY}, got {barcode_version}")
     with open(output_dir / '.mode', 'w') as f:
         f.write(mode)
 

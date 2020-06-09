@@ -74,7 +74,7 @@ def summarize_select_dna_reads(output_dir,
 
     selected_reads = selected_reads.groupby('cell_id')['count'].sum()
     selected_ratio = selected_reads / total_stats_df.groupby('cell_id')['count'].sum()
-    final_stat = pd.DataFrame({'FinalDNAReads': selected_reads, 'FinalDNAReadsRatio': selected_ratio})
+    final_stat = pd.DataFrame({'FinalDNAReads': selected_reads, 'SelectedDNAReadsRatio': selected_ratio})
     final_stat.index.name = 'cell_id'
     final_stat.to_csv(final_stat_path, header=True)
     return
@@ -122,9 +122,13 @@ rule select_dna_{i}:
 
         with open(output_dir / f'snakemake/snakefile_select_dna_{batch_id}', 'w') as f:
             f.write(f"""
+include: "{output_dir}/snakemake/snakefile_bismark_mapping_{batch_id}"
+
 rule dna:
     input:
         {dna_bam_paths}
+    output:
+        touch("{output_dir}/snakemake/select_dna_done_{batch_id}")
 
 {total_rules}
 """)

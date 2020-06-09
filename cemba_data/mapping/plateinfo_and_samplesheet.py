@@ -304,14 +304,14 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
     return
 
 
-def print_plate_info(primer_version):
-    if primer_version.upper() == 'V1':
+def print_plate_info(barcode_version):
+    if barcode_version.upper() == 'V1':
         with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v1.txt') as f:
             template = f.read()
-    elif primer_version.upper() == 'V2':
+    elif barcode_version.upper() == 'V2':
         with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v2.txt') as f:
             template = f.read()
     else:
-        raise ValueError(f'Primer Version can only be V1 or V2, got {primer_version}.')
+        raise ValueError(f'Primer Version can only be V1 or V2, got {barcode_version}.')
     print(template)
     return

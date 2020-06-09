@@ -65,7 +65,7 @@ def add_v2_plateinfo(total_stats):
     return total_data
 
 
-def basic_summary(output_dir):
+def basic_summary(output_dir, patterns=('CHN', 'CGN', 'CCC')):
     barcode_version = get_barcode_version(output_dir)
 
     output_dir = pathlib.Path(output_dir).absolute()
@@ -78,7 +78,7 @@ def basic_summary(output_dir):
                                index_col='cell_id')
 
     from .generate_allc import generate_allc_stats
-    generate_allc_stats(output_dir)
+    generate_allc_stats(output_dir, patterns=patterns)
     allc_stat = pd.read_csv(output_dir / 'allc/allc_stats.csv',
                             index_col='cell_id')
 
@@ -95,23 +95,23 @@ def basic_summary(output_dir):
     return total_stats
 
 
-def snmc_summary(output_dir):
-    total_stats = basic_summary(output_dir)
-    total_stats.to_csv('MappingSummary.csv.gz')
+def snmc_summary(output_dir, patterns=('CHN', 'CGN', 'CCC')):
+    total_stats = basic_summary(output_dir, patterns=patterns)
+    total_stats.to_csv(f'{output_dir}/MappingSummary.csv.gz')
 
 
-def snmct_summary(output_dir):
-    basic_stats = basic_summary(output_dir)
+def snmct_summary(output_dir, patterns=('CHN', 'CGN', 'CCC')):
+    basic_stats = basic_summary(output_dir, patterns=patterns)
     # summarize rna and dna reads selection
     from .star_mapping import summary_rna_mapping
     summary_rna_mapping(output_dir)
-    rna_stats = pd.read_csv(f'{output_dir}/rna_bam/star_mapping_stats.csv', index_col='cell_id')
+    rna_stats = pd.read_csv(f'{output_dir}/rna_bam/star_mapping_stats.csv', index_col=0)
 
     from .mct_bismark_bam_filter import summarize_select_dna_reads
     summarize_select_dna_reads(output_dir,
                                mc_rate_max_threshold=0.5,
                                cov_min_threshold=3)
-    dna_stats = pd.read_csv(f'{output_dir}/dna_bam/select_dna_reads.stats.csv', index_col='cell_id')
+    dna_stats = pd.read_csv(f'{output_dir}/dna_bam/select_dna_reads.stats.csv', index_col=0)
 
     final_stats = pd.concat([basic_stats, dna_stats, rna_stats], axis=1)
-    final_stats.to_csv('MappingSummary.csv.gz')
+    final_stats.to_csv(f'{output_dir}/MappingSummary.csv.gz')

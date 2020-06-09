@@ -27,6 +27,7 @@ def bismark_mapping(
         split_batch=True,
         batch_size=32,
         demultiplex_result=None,
+        unmapped_fastq=False,
         batch_id=None,
         testing=False):
     # setup directories
@@ -40,13 +41,16 @@ def bismark_mapping(
     bam_dir.mkdir(exist_ok=True)
     read_min = max(0, read_min)
 
+    unmapped_param_str = '--un' if unmapped_fastq else ''
+
     if demultiplex_result is None:
         demultiplex_result = pd.read_csv(fastq_dir / 'demultiplex.stats.csv',
                                          index_col='cell_id')
 
         # make sure snakemake_dir is empty
-        shutil.rmtree(snakemake_dir)
-        snakemake_dir.mkdir(exist_ok=True)
+        if snakemake_dir.exists():
+            shutil.rmtree(snakemake_dir)
+            snakemake_dir.mkdir(exist_ok=True)
 
         if testing:
             if not isinstance(testing, int):
@@ -71,6 +75,7 @@ def bismark_mapping(
                                 split_batch=split_batch,
                                 batch_size=batch_size,
                                 demultiplex_result=chunk,
+                                unmapped_fastq=unmapped_fastq,
                                 batch_id=i,
                                 testing=testing)
             return
@@ -126,6 +131,8 @@ rule trim_r1_{i}:
         "{r1_trimmed_fq}"
     log:
         "{r1_trim_stats}"
+    threads:
+        2
     shell:
         "cutadapt --report=minimal -a {r1_adapter} {{input}} 2> {{log}} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r1_left_cut} -u -{r1_right_cut} -m 30 "
@@ -143,7 +150,7 @@ rule bismark_r1_{i}:
     log:
         "{r1_bismark_stats}"
     shell:
-        "bismark {bismark_reference} --bowtie2 {{input}} --pbat -o {this_dir} --temp_dir {this_dir}"
+        "bismark {bismark_reference} {unmapped_param_str} --bowtie2 {{input}} --pbat -o {this_dir} --temp_dir {this_dir}"
 
 rule filter_r1_bam_{i}:
     input:
@@ -178,6 +185,8 @@ rule trim_r2_{i}:
         temp("{r2_trimmed_fq}")
     log:
         "{r2_trim_stats}"
+    threads:
+        2
     shell:
         "cutadapt --report=minimal -a {r2_adapter} {{input}} 2> {{log}} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r2_left_cut} -u -{r2_right_cut} -m 30 "
@@ -195,7 +204,7 @@ rule bismark_r2_{i}:
     log:
         "{r2_bismark_stats}"
     shell:
-        "bismark {bismark_reference} --bowtie2 {{input}} -o {this_dir} --temp_dir {this_dir}"
+        "bismark {bismark_reference} {unmapped_param_str} --bowtie2 {{input}} -o {this_dir} --temp_dir {this_dir}"
 
 rule filter_r2_bam_{i}:
     input:
@@ -241,6 +250,8 @@ rule merge_bam_{i}:
 rule final:
     input:
         {final_bams}
+    output:
+        touch("{output_dir}/snakemake/bismark_mapping_done_{batch_id}")
 
 {total_rule}
 """)
@@ -266,11 +277,12 @@ status	in_reads	in_bp	too_short	too_long	too_many_n	out_reads	w/adapters	qualtri
 
     data = pd.Series({
         f'{read_type}InputReads': trim_stats['in_reads'][0],
-        f'{read_type}InputBasePair': trim_stats['in_bp'][0],
-        f'{read_type}TrimmedReads': trim_stats['out_reads'][1],
+        f'{read_type}InputReadsBP': trim_stats['in_bp'][0],
         f'{read_type}WithAdapters': trim_stats['w/adapters'][0],
         f'{read_type}QualTrimBP': trim_stats['qualtrim_bp'][1],
-        f'{read_type}TrimmedReadsBP': trim_stats['out_bp'][1]
+        f'{read_type}TrimmedReads': trim_stats['out_reads'][1],
+        f'{read_type}TrimmedReadsBP': trim_stats['out_bp'][1],
+        f'{read_type}TrimmedReadsRate': int(trim_stats['out_reads'][1]) / int(trim_stats['in_reads'][0])
     }, name=cell_id)
     return data
 
@@ -316,14 +328,20 @@ def _parse_deduplicate_stat(stat_path):
         dedup_result_series = pd.read_csv(stat_path, comment='#', sep='\t').T[0]
         rename_dict = {
             'UNPAIRED_READS_EXAMINED': f'{read_type}MAPQFilteredReads',
-            'UNPAIRED_READ_DUPLICATES': f'{read_type}FinalReads'
+            'UNPAIRED_READ_DUPLICATES': f'{read_type}DuplicatedReads',
+            'PERCENT_DUPLICATION': f'{read_type}DuplicationRate'
         }
         dedup_result_series = dedup_result_series.loc[rename_dict.keys()].rename(rename_dict)
+
+        dedup_result_series[f'{read_type}FinalBismarkReads'] = dedup_result_series[f'{read_type}MAPQFilteredReads'] - \
+                                                               dedup_result_series[f'{read_type}DuplicatedReads']
         dedup_result_series.name = cell_id
     except pd.errors.EmptyDataError:
         # if a BAM file is empty, picard matrix is also empty
         dedup_result_series = pd.Series({f'{read_type}MAPQFilteredReads': 0,
-                                         f'{read_type}FinalReads': 0}, name=cell_id)
+                                         f'{read_type}DuplicatedReads': 0,
+                                         f'{read_type}FinalBismarkReads': 0,
+                                         f'{read_type}DuplicationRate': 0}, name=cell_id)
     return dedup_result_series
 
 
@@ -332,7 +350,7 @@ def bismark_mapping_stats(output_dir):
     bam_dir = output_dir / 'bam'
     cell_stats = []
     cell_ids = [path.name.split('.')[0]
-                for path in bam_dir.glob('**/*.final.bam')]
+                for path in bam_dir.glob('*/*.final.bam')]
 
     for cell_id in cell_ids:
         print(f'Parsing stats of {cell_id}.')
