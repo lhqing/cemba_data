@@ -147,6 +147,50 @@ def print_default_config_register_subparser(subparser):
         choices=MAPPING_MODE_CHOICES,
         help="Library mode"
     )
+
+    parser.add_argument(
+        "--barcode_version",
+        type=str,
+        required=True,
+        choices=['V1', 'V2'],
+        help="Barcode version, V1 for 8 random index, V2 for 384 random index"
+    )
+
+    parser.add_argument(
+        "--bismark_ref",
+        type=str,
+        required=True,
+        help="Path to the bismark reference"
+    )
+
+    parser.add_argument(
+        "--genome_fasta",
+        type=str,
+        required=True,
+        help="Path to the genome fasta file"
+    )
+
+    parser.add_argument(
+        "--star_ref",
+        type=str,
+        required=True,
+        help="Path to the STAR reference"
+    )
+
+    parser.add_argument(
+        "--gtf",
+        type=str,
+        required=True,
+        help="Path to the GTF annotation file"
+    )
+
+    parser.add_argument(
+        "--nome",
+        dest='nome',
+        action='store_true',
+        help='Does this library have NOMe treatment?'
+    )
+    parser.set_defaults(nome=False)
     return
 
 
@@ -371,8 +415,8 @@ def main():
         from .mapping import make_sample_sheet as func
     elif cur_command == 'demultiplex':
         from .mapping import demultiplex_pipeline as func
-    #     elif cur_command == 'default-mapping-config':
-    #         from .mapping.pipeline import print_default_configuration as func
+    elif cur_command == 'default-mapping-config':
+        from .mapping.config import print_default_mapping_config as func
     #     elif cur_command == 'mapping':
     #         from .mapping.pipeline import pipeline as func
     elif cur_command == 'mapping-summary':

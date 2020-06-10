@@ -237,10 +237,6 @@ def internal_main():
         from .mapping import select_dna_reads as func
     elif cur_command == 'select-rna-reads':
         from .mapping import select_rna_reads as func
-    elif cur_command == 'featurecount':
-        from .mapping.feature_count import batch_feature_count as func
-    elif cur_command == 'atac-bulk-pipeline':
-        from .atac.bulk_pipeline import atac_bulk_pipeline as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

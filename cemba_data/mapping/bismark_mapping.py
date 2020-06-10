@@ -1,16 +1,7 @@
-import logging
 import pathlib
 import shutil
 
 import pandas as pd
-
-import cemba_data
-
-# logger
-log = logging.getLogger(__name__)
-log.addHandler(logging.NullHandler())
-
-PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 
 def bismark_mapping(

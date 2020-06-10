@@ -132,7 +132,7 @@ rule rna:
     return
 
 
-def _count_rna_reads_per_cell(bam_path):
+def _count_reads_by_rg_in_star_bam(bam_path):
     try:
         bam = pysam.AlignmentFile(bam_path)
     except ValueError:
@@ -155,7 +155,7 @@ def summary_rna_mapping(output_dir):
 
     # summarize read counts for each cell before filter by mC rate
     for path in output_dir.glob('rna_bam/*/Total*filtered.bam'):
-        _count_rna_reads_per_cell(path)
+        _count_reads_by_rg_in_star_bam(path)
     total_star_mapped_reads = pd.concat([pd.read_csv(path, index_col='cell_id')
                                          for path in output_dir.glob('rna_bam/*/Total*filtered.bam.cell_stats.csv')])
     total_star_mapped_reads.columns = ['RNAUniqueMapped']
