@@ -119,7 +119,7 @@ rule trim_r1_{i}:
     input:
         "{r1_raw_fq}"
     output:
-        "{r1_trimmed_fq}"
+        temp("{r1_trimmed_fq}")
     log:
         "{r1_trim_stats}"
     threads:

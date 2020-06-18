@@ -51,11 +51,11 @@ def print_default_mapping_config(mode, barcode_version, bismark_ref, genome_fast
             config_path = PACKAGE_DIR / 'mapping/files/default_config/mapping_config_mct.ini'
         with open(config_path) as f:
             config_content = f.read()
-        config_content.replace('CHANGE_THIS_TO_YOUR_STAR_REFERENCE_DIR', star_ref)
-        config_content.replace('CHANGE_THIS_TO_YOUR_GENE_ANNOTATION_GTF', gtf)
+        config_content = config_content.replace('CHANGE_THIS_TO_YOUR_STAR_REFERENCE_DIR', str(star_ref))
+        config_content = config_content.replace('CHANGE_THIS_TO_YOUR_GENE_ANNOTATION_GTF', str(gtf))
 
-    config_content.replace('USE_CORRECT_BARCODE_VERSION_HERE', barcode_version)
-    config_content.replace('CHANGE_THIS_TO_YOUR_BISMARK_REFERENCE_DIR', bismark_ref)
-    config_content.replace('CHANGE_THIS_TO_YOUR_REFERENCE_FASTA', genome_fasta)
+    config_content = config_content.replace('USE_CORRECT_BARCODE_VERSION_HERE', barcode_version)
+    config_content = config_content.replace('CHANGE_THIS_TO_YOUR_BISMARK_REFERENCE_DIR', str(bismark_ref))
+    config_content = config_content.replace('CHANGE_THIS_TO_YOUR_REFERENCE_FASTA', str(genome_fasta))
     print(config_content)
     return

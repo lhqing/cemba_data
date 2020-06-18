@@ -1,9 +1,5 @@
 """
 SGE qsub system auto-submitter
-# TODO add option to profile (qacct) several jobs as reference for next submission
-# TODO add test_run parameter to run N command and profile each and give report
-# TODO support other qsub command system
-# TODO qsub parameter validation
 """
 
 import datetime
@@ -572,6 +568,7 @@ def qsub(command_file_path,
          merge_jobs=300):
     """
     TODO write doc
+    TODO fix error problem
 
     Parameters
     ----------

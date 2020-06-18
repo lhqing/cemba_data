@@ -4,6 +4,7 @@ import pandas as pd
 
 from .utilities import get_barcode_version
 
+from .utilities import get_configuration
 
 def add_v1_plateinfo(total_stats):
     total_plate_pos_records = {}
@@ -115,3 +116,16 @@ def snmct_summary(output_dir, patterns=('CHN', 'CGN', 'CCC')):
 
     final_stats = pd.concat([basic_stats, dna_stats, rna_stats], axis=1)
     final_stats.to_csv(f'{output_dir}/MappingSummary.csv.gz')
+
+
+def summary(output_dir):
+    config = get_configuration(config_path=f'{output_dir}/snakemake/mapping_config.ini')
+    mode = config['mode'].lower()
+
+    if mode == 'mc':
+        snmc_summary(output_dir, patterns=config['mc_stat_feature'])
+    elif mode == 'mct':
+        snmct_summary(output_dir)
+
+    # TODO add cleaning function
+    return
