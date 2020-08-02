@@ -3,9 +3,10 @@ import warnings
 
 import pandas as pd
 
+from .utilities import get_mode
 from .utilities import parse_mc_pattern
 
-from .utilities import get_mode
+
 def generate_allc(
         output_dir,
         reference_fasta,

@@ -44,7 +44,10 @@ def _clean_str_for_path(str_in):
 def _get_kv_pair(line):
     try:
         k, v = line.split('=')
-        return _clean_str_for_path(k), _clean_str_for_path(v)
+        if k == 'email':
+            return k, v
+        else:
+            return _clean_str_for_path(k), _clean_str_for_path(v)
     except ValueError:
         raise ValueError(f'Each key=value line must contain a "=" to separate key and value. Got {line}')
 

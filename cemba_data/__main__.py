@@ -268,15 +268,15 @@ def print_default_config_register_subparser(subparser):
     parser.add_argument(
         "--star_ref",
         type=str,
-        required=True,
-        help="[mct only] Path to the STAR reference"
+        required=False,
+        help="[mct only] Path to the STAR reference, required if mode is mct"
     )
 
     parser.add_argument(
         "--gtf",
         type=str,
-        required=True,
-        help="[mct only] Path to the GTF annotation file"
+        required=False,
+        help="[mct only] Path to the GTF annotation file, required if mode is mct"
     )
 
     parser.add_argument(
