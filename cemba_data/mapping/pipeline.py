@@ -1,4 +1,3 @@
-from .bismark_mapping import bismark_mapping
 import pathlib
 
 import pandas as pd
@@ -7,7 +6,7 @@ from .bismark_mapping import bismark_mapping
 from .generate_allc import generate_allc
 from .mct_bismark_bam_filter import dna_reads_selection
 from .star_mapping import star_mapping
-from .utilities import get_configuration
+from cemba_data.utilities import get_configuration
 
 
 def write_batch_snakefiles(output_dir, mode, cpu=20):

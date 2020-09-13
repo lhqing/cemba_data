@@ -14,6 +14,11 @@ log = logging.getLogger()
 
 
 def _parse_v1_fastq_path(path):
+    """
+    UID pattern of V1 {sample_id_prefix}-{plate1}-{plate2}-{plate_pos}
+    FASTQ name pattern of V1:
+    {sample_id_prefix}-{plate1}-{plate2}-{plate_pos}_{internal_info}_{lane}_{read_type}_{internal_info}.fastq.gz
+    """
     path = pathlib.Path(path)
     try:
         *_, plate1, plate2, multi_field = path.name.split('-')
@@ -40,6 +45,11 @@ def _parse_v1_fastq_path(path):
 
 
 def _parse_v2_fastq_path(path):
+    """
+    UID pattern of V2 {sample_id_prefix}-{plate}-{multiplex_group}-{barcode_name}
+    FASTQ name pattern of V1:
+    {sample_id_prefix}-{plate}-{multiplex_group}-{barcode_name}_{internal_info}_{lane}_{read_type}_{internal_info}.fastq.gz
+    """
     path = pathlib.Path(path)
     try:
         *_, plate, multiplex_group, multi_field = path.name.split('-')
@@ -113,5 +123,5 @@ def make_fastq_dataframe(file_path, barcode_version, output_path=None):
         if df['uid'].unique().size != df['uid'].size:
             raise ValueError(f'UID column is not unique.')
     if output_path is not None:
-        fastq_df.to_csv(output_path, index=None)
+        fastq_df.to_csv(output_path, index=False)
     return fastq_df

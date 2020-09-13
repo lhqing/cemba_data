@@ -3,8 +3,8 @@ import warnings
 
 import pandas as pd
 
-from .utilities import get_mode
-from .utilities import parse_mc_pattern
+from cemba_data.utilities import get_mode
+from cemba_data.utilities import parse_mc_pattern
 
 
 def generate_allc(

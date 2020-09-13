@@ -12,10 +12,9 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
-from .utilities import snakemake
+from ..utilities import snakemake
 
 # logger
-
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
@@ -43,6 +42,8 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
 
     """
     output_dir = pathlib.Path(output_dir).absolute()
+    # use 12 cores in maximum
+    cpu = min(12, cpu)
 
     # make fastq dataframe
     fastq_df = make_fastq_dataframe(fastq_pattern,
@@ -57,14 +58,14 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
         # determine index file path
         if barcode_version == 'V1':
             random_index_fasta_path = str(PACKAGE_DIR /
-                                          'mapping/files/random_index_v1.fa')
+                                          'files/random_index_v1.fa')
         elif barcode_version == 'V2':
             multiplex_group = uid.split('-')[-2]
             random_index_fasta_path = str(
-                PACKAGE_DIR / 'mapping/files/random_index_v2/'
+                PACKAGE_DIR / 'files/random_index_v2/'
                               f'random_index_v2.multiplex_group_{multiplex_group}.fa')
         else:
-            raise
+            raise ValueError(f'Got unknown barcode version {barcode_version}.')
 
         # create a directory for each uid, within this UID, do multiplex and lane merge
         uid_output_dir = output_dir / uid
@@ -98,14 +99,13 @@ rule demultiplex_{rule_count}:
         r1_in = f'{raw_dir}/{uid}+{lane}+R1.fq.gz',
         r2_in = f'{raw_dir}/{uid}+{lane}+R2.fq.gz'
     params:
-        r1_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R1.fq.gz',
-        r2_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R2.fq.gz'
+        r1_out = f'{lane_files_dir}/{uid}-{lane}-{name_str}-R1.fq.gz',
+        r2_out = f'{lane_files_dir}/{uid}-{lane}-{name_str}-R2.fq.gz'
     output:
         stats_out = '{lane_files_dir}/{uid}-{lane}.demultiplex.stats.txt'
     shell:
         "cutadapt -Z -e 0.01 --no-indels -g file:{random_index_fasta_path} "
         "-o {{params.r1_out}} -p {{params.r2_out}} {{input.r1_in}} {{input.r2_in}} > {{output.stats_out}}"
-
     """
             rule_count += 1
             rules += snake_file_template
@@ -253,13 +253,13 @@ def _summarize_demultiplex(output_dir, barcode_version):
     # get index info
     if barcode_version == 'V1':
         random_index_fasta_path = str(PACKAGE_DIR /
-                                      'mapping/files/random_index_v1.fa')
+                                      'files/random_index_v1.fa')
     elif barcode_version == 'V2':
         # here we don't need to worry about the multiplex_group issue,
         # because we just need a index_name to index_seq map
         # we've considered this during demultiplex
         random_index_fasta_path = str(
-            PACKAGE_DIR / 'mapping/files/random_index_v2/random_index_v2.fa')
+            PACKAGE_DIR / 'files/random_index_v2/random_index_v2.fa')
     else:
         raise ValueError(
             f'Unknown version name {barcode_version} in multiplexIndex section of the config file.'
@@ -323,7 +323,7 @@ def _final_cleaning(output_dir):
     return
 
 
-SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'mc2t']
+SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'mc2t', 'm3c']
 
 
 def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
@@ -347,7 +347,7 @@ def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
 
     mode = mode.lower()
     if mode not in SUPPORTED_TECHNOLOGY:
-        raise ValueError(f"Technologies should be in {SUPPORTED_TECHNOLOGY}, got {barcode_version}")
+        raise ValueError(f"Technologies should be in {SUPPORTED_TECHNOLOGY}, got {mode}")
     with open(output_dir / '.mode', 'w') as f:
         f.write(mode)
 

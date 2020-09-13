@@ -1,4 +1,2 @@
 from .mct_bismark_bam_filter import select_dna_reads
 from .mct_star_bam_filter import select_rna_reads
-from .plateinfo_and_samplesheet import print_plate_info, make_sample_sheet
-from .demultiplex import demultiplex_pipeline

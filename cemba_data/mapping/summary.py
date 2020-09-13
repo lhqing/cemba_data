@@ -2,9 +2,9 @@ import pathlib
 
 import pandas as pd
 
-from .utilities import get_barcode_version
+from cemba_data.utilities import get_barcode_version
 
-from .utilities import get_configuration
+from cemba_data.utilities import get_configuration
 
 def add_v1_plateinfo(total_stats):
     total_plate_pos_records = {}

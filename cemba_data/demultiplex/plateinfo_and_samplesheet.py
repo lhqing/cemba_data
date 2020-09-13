@@ -14,7 +14,7 @@ import cemba_data
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
 
 # the Illumina sample sheet header used by Ecker Lab
-with open(PACKAGE_DIR / 'mapping/files/sample_sheet_header.txt') as _f:
+with open(PACKAGE_DIR / 'files/sample_sheet_header.txt') as _f:
     SAMPLESHEET_DEFAULT_HEADER = _f.read()
 
 SECTIONS = ['[CriticalInfo]', '[LibraryInfo]', '[PlateInfo]']
@@ -30,8 +30,8 @@ CRITICAL_INFO_KEYS = ['n_random_index', 'input_plate_size',
 
 # key (n_random_index, input_plate_size)
 BARCODE_TABLE = {
-    ('8', '384'): PACKAGE_DIR / 'mapping/files/V1_i7_i5_index.tsv',
-    ('384', '384'): PACKAGE_DIR / 'mapping/files/V2_i7_i5_index.tsv'
+    ('8', '384'): PACKAGE_DIR / 'files/V1_i7_i5_index.tsv',  # V1 can use both Set1 and SetB i5 i7 primer
+    ('384', '384'): PACKAGE_DIR / 'files/V2_i7_i5_index.tsv'  # V2 only use SetB primer
 }
 
 
@@ -53,6 +53,7 @@ def _get_kv_pair(line):
 
 
 def _read_plate_info(plate_info_path):
+    """Parse the plate info file"""
     cur_section = ''
     cur_section_id = -1
 
@@ -132,6 +133,7 @@ def _read_plate_info(plate_info_path):
 
 
 def _plate_384_random_index_8(plate_info, barcode_table):
+    """UID pattern of V1 {sample_id_prefix}-{plate1}-{plate2}-{plate_pos}"""
     records = []
 
     # check plate_info primer compatibility
@@ -161,9 +163,10 @@ def _plate_384_random_index_8(plate_info, barcode_table):
                     print(f'{col_name} contains different information between {plate1} and {plate2}, '
                           f'Will put {plate1} prefix into sample_id. This should not happen normally.')
 
-        # remove all the '-' with '_' in plate names
-        plate1 = plate1.replace('-', '_')
-        plate2 = plate2.replace('-', '_')
+        # remove all the special char with '_' in plate names
+        # I use '-' to separate sample parts
+        plate1 = _clean_str_for_path(plate1)
+        plate2 = _clean_str_for_path(plate2)
 
         for col in 'ABCDEFGH':
             for row in range(1, 13):
@@ -186,6 +189,7 @@ def _plate_384_random_index_8(plate_info, barcode_table):
 
 
 def _plate_384_random_index_384(plate_info, barcode_table):
+    """UID pattern of V2 {sample_id_prefix}-{plate}-{multiplex_group}-{barcode_name}"""
     records = []
 
     # check plate_info primer compatibility
@@ -196,7 +200,7 @@ def _plate_384_random_index_384(plate_info, barcode_table):
     for _, row in plate_info.iterrows():
         plate = row['plate_id']
         # remove all the '-' with '_' in plate names
-        plate = plate.replace('-', '_')
+        plate = _clean_str_for_path(plate)
 
         barcode_name = row['primer_name']
         cur_row = barcode_table.loc[barcode_name]
@@ -246,6 +250,19 @@ def _make_final_samplesheet(records):
 
 
 def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None):
+    """
+    make two sample sheets for bcl2fastq based on the plate info file: one for miseq, one for novaseq
+
+    Parameters
+    ----------
+    plate_info_path
+    output_prefix
+    header_path
+
+    Returns
+    -------
+
+    """
     # read plate info
     critical_info, plate_info = _read_plate_info(plate_info_path)
 
@@ -309,10 +326,10 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
 
 def print_plate_info(barcode_version):
     if barcode_version.upper() == 'V1':
-        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v1.txt') as f:
+        with open(PACKAGE_DIR / 'files/plate_info_template_v1.txt') as f:
             template = f.read()
     elif barcode_version.upper() == 'V2':
-        with open(PACKAGE_DIR / 'mapping/files/plate_info_template_v2.txt') as f:
+        with open(PACKAGE_DIR / 'files/plate_info_template_v2.txt') as f:
             template = f.read()
     else:
         raise ValueError(f'Primer Version can only be V1 or V2, got {barcode_version}.')

@@ -7,7 +7,6 @@ import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # logger
-
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
@@ -190,4 +189,3 @@ def parse_mc_pattern(pattern: str) -> set:
             raise KeyError(f'Base {base} is not in IUPAC table.')
     context_set = set([''.join(i) for i in itertools.product(*all_pos_list)])
     return context_set
-

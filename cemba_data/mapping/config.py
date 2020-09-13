@@ -1,7 +1,7 @@
 import pathlib
 
 import cemba_data
-from .utilities import MAPPING_MODE_CHOICES
+from cemba_data.utilities import MAPPING_MODE_CHOICES
 
 # Load defaults
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
@@ -39,16 +39,16 @@ def print_default_mapping_config(mode, barcode_version, bismark_ref, genome_fast
 
     if mode == 'mc':
         if nome:
-            config_path = PACKAGE_DIR / 'mapping/files/default_config/mapping_config_nome.ini'
+            config_path = PACKAGE_DIR / 'files/default_config/mapping_config_nome.ini'
         else:
-            config_path = PACKAGE_DIR / 'mapping/files/default_config/mapping_config_mc.ini'
+            config_path = PACKAGE_DIR / 'files/default_config/mapping_config_mc.ini'
         with open(config_path) as f:
             config_content = f.read()
     elif mode == 'mct':
         if nome:
-            config_path = PACKAGE_DIR / 'mapping/files/default_config/mapping_config_mct-nome.ini'
+            config_path = PACKAGE_DIR / 'files/default_config/mapping_config_mct-nome.ini'
         else:
-            config_path = PACKAGE_DIR / 'mapping/files/default_config/mapping_config_mct.ini'
+            config_path = PACKAGE_DIR / 'files/default_config/mapping_config_mct.ini'
         with open(config_path) as f:
             config_content = f.read()
         config_content = config_content.replace('CHANGE_THIS_TO_YOUR_STAR_REFERENCE_DIR', str(star_ref))

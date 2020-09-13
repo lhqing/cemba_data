@@ -161,6 +161,7 @@ def make_sample_sheet_register_subparser(subparser):
 
     parser_req.add_argument(
         "--plate_info_path",
+        "-p",
         type=str,
         required=True,
         help="Path of the plate information file."
@@ -168,6 +169,7 @@ def make_sample_sheet_register_subparser(subparser):
 
     parser_req.add_argument(
         "--output_prefix",
+        "-o",
         type=str,
         required=True,
         help="Output prefix, will generate 2 sample sheets, 1 for miseq, 1 for novaseq"
@@ -211,7 +213,7 @@ def demultiplex_register_subparser(subparser):
         help="Barcode version of this library, V1 for the 8 random index, V2 for the 384 random index."
     )
 
-    from .mapping.demultiplex import SUPPORTED_TECHNOLOGY
+    from cemba_data.demultiplex.demultiplex import SUPPORTED_TECHNOLOGY
 
     parser_req.add_argument(
         "--mode",
@@ -234,7 +236,7 @@ def print_default_config_register_subparser(subparser):
     parser = subparser.add_parser('default-mapping-config',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Print out default config of mapping pipeline")
-    from .mapping.utilities import MAPPING_MODE_CHOICES
+    from cemba_data.utilities import MAPPING_MODE_CHOICES
     parser.add_argument(
         "--mode",
         type=str,
@@ -400,11 +402,11 @@ def main():
     if cur_command == 'qsub':
         from cemba_data.qsub import qsub as func
     elif cur_command == 'default-plate-info':
-        from .mapping import print_plate_info as func
+        from .demultiplex import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
-        from .mapping import make_sample_sheet as func
+        from .demultiplex import make_sample_sheet as func
     elif cur_command == 'demultiplex':
-        from .mapping import demultiplex_pipeline as func
+        from .demultiplex import demultiplex_pipeline as func
     elif cur_command == 'default-mapping-config':
         from .mapping.config import print_default_mapping_config as func
     elif cur_command == 'mapping':
