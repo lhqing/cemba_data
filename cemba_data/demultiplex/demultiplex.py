@@ -48,7 +48,7 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
     # make fastq dataframe
     fastq_df = make_fastq_dataframe(fastq_pattern,
                                     barcode_version=barcode_version,
-                                    output_path=output_dir / 'fastq_dataframe.csv')
+                                    output_path=output_dir / 'stats' / 'fastq_dataframe.csv')
 
     # prepare UID sub dir
     snakefile_list = []
@@ -138,7 +138,7 @@ rule final:
 
 def _merge_lane(output_dir, cpu):
     output_dir = pathlib.Path(output_dir).absolute()
-    fastq_df = pd.read_csv(output_dir / 'fastq_dataframe.csv')
+    fastq_df = pd.read_csv(output_dir / 'stats' / 'fastq_dataframe.csv')
     snakefile_list = []
     total_output_list = []
     rule_uid = 0
@@ -146,6 +146,8 @@ def _merge_lane(output_dir, cpu):
     for uid in fastq_df['uid'].unique():
         uid_output_dir = output_dir / uid
         lanes_dir = uid_output_dir / 'lanes'
+        fastq_dir = uid_output_dir / 'fastq'
+        fastq_dir.mkdir(exist_ok=True)
 
         # prepare demultiplex results cell_fastq_df
         records = []
@@ -162,7 +164,7 @@ def _merge_lane(output_dir, cpu):
         output_paths = []
         for (cell_id, read_type), sub_df in cell_fastq_df.groupby(['cell_id', 'read_type']):
             input_paths = list(sub_df['fastq_path'])
-            output_path = uid_output_dir / f'{cell_id}-{read_type}.fq.gz'
+            output_path = fastq_dir / f'{cell_id}-{read_type}.fq.gz'
 
             snake_file_template = f"""
 rule merge_{rule_uid}:
@@ -250,7 +252,7 @@ def _read_cutadapt_result(stat_path):
 
 def _summarize_demultiplex(output_dir, barcode_version):
     output_dir = pathlib.Path(output_dir).absolute()
-    output_path = output_dir / 'demultiplex.stats.csv'
+    output_path = output_dir / 'stats' / 'demultiplex.stats.csv'
     barcode_version = barcode_version.upper()
 
     # get index info
@@ -316,7 +318,7 @@ def _final_cleaning(output_dir):
     """
     output_dir = pathlib.Path(output_dir)
 
-    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/*-unknown-R*.fq.gz', '.snakemake']
+    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/fastq/*-unknown-R*.fq.gz', '.snakemake']
 
     total_paths = []
     for pattern in delete_patterns:
@@ -333,15 +335,16 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     cpu = int(cpu)
     demultiplex_cpu = min(16, cpu)
 
-    output_dir = pathlib.Path(output_dir).absolute() / 'fastq'
+    output_dir = pathlib.Path(output_dir).absolute()
     if output_dir.exists():
         raise FileExistsError('output_dir already exists, to prevent conflicts, '
                               'use another output_dir or delete the existing output_dir first.')
     else:
         output_dir.mkdir(parents=True)
+        (output_dir / 'stats').mkdir()
 
     config = get_configuration(config_path)
-    new_config_path = output_dir.parent / 'mapping_config.ini'
+    new_config_path = output_dir / 'mapping_config.ini'
     subprocess.run(f'cp {config_path} {new_config_path}', shell=True, check=True)
     barcode_version = config['barcode_version']
 
