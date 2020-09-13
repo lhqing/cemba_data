@@ -12,7 +12,7 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
-from ..utilities import snakemake
+from ..utilities import snakemake, get_configuration
 
 # logger
 log = logging.getLogger(__name__)
@@ -99,8 +99,11 @@ rule demultiplex_{rule_count}:
         r1_in = f'{raw_dir}/{uid}+{lane}+R1.fq.gz',
         r2_in = f'{raw_dir}/{uid}+{lane}+R2.fq.gz'
     params:
-        r1_out = f'{lane_files_dir}/{uid}-{lane}-{name_str}-R1.fq.gz',
-        r2_out = f'{lane_files_dir}/{uid}-{lane}-{name_str}-R2.fq.gz'
+        # Note that you have to use a function to deactivate automatic wildcard expansion 
+        # in params strings, e.g., `lambda wildcards: ...`.
+        # here the r1/2_out have to have the name_str
+        r1_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R1.fq.gz',
+        r2_out = lambda wildcards: f'{lane_files_dir}/{uid}-{lane}-{name_str}-R2.fq.gz'
     output:
         stats_out = '{lane_files_dir}/{uid}-{lane}.demultiplex.stats.txt'
     shell:
@@ -313,7 +316,7 @@ def _final_cleaning(output_dir):
     """
     output_dir = pathlib.Path(output_dir)
 
-    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/*-unknown-R*.fq.gz']
+    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/*-unknown-R*.fq.gz', '.snakemake']
 
     total_paths = []
     for pattern in delete_patterns:
@@ -326,11 +329,9 @@ def _final_cleaning(output_dir):
 SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'mc2t', 'm3c']
 
 
-def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
+def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     cpu = int(cpu)
-    if cpu > 12:
-        print('Changing CPU to 12.')
-        cpu = 12
+    demultiplex_cpu = min(16, cpu)
 
     output_dir = pathlib.Path(output_dir).absolute() / 'fastq'
     if output_dir.exists():
@@ -339,23 +340,16 @@ def demultiplex_pipeline(fastq_pattern, output_dir, barcode_version, mode, cpu):
     else:
         output_dir.mkdir(parents=True)
 
-    barcode_version = barcode_version.upper()
-    if barcode_version not in ['V1', 'V2']:
-        raise ValueError(f'Barcode version can only be V1 or V2, got {barcode_version}')
-    with open(output_dir / '.barcode_version', 'w') as f:
-        f.write(barcode_version)
-
-    mode = mode.lower()
-    if mode not in SUPPORTED_TECHNOLOGY:
-        raise ValueError(f"Technologies should be in {SUPPORTED_TECHNOLOGY}, got {mode}")
-    with open(output_dir / '.mode', 'w') as f:
-        f.write(mode)
+    config = get_configuration(config_path)
+    new_config_path = output_dir.parent / 'mapping_config.ini'
+    subprocess.run(f'cp {config_path} {new_config_path}', shell=True, check=True)
+    barcode_version = config['barcode_version']
 
     _demultiplex(
         fastq_pattern=fastq_pattern,
         output_dir=output_dir,
         barcode_version=barcode_version,
-        cpu=cpu)
+        cpu=demultiplex_cpu)
     _merge_lane(output_dir=output_dir, cpu=cpu)
     _summarize_demultiplex(output_dir=output_dir, barcode_version=barcode_version)
     _final_cleaning(output_dir=output_dir)

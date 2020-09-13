@@ -206,28 +206,17 @@ def demultiplex_register_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--barcode_version",
+        "--config_path",
         type=str,
         required=True,
-        choices=['V1', 'V2'],
-        help="Barcode version of this library, V1 for the 8 random index, V2 for the 384 random index."
-    )
-
-    from cemba_data.demultiplex.demultiplex import SUPPORTED_TECHNOLOGY
-
-    parser_req.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        choices=SUPPORTED_TECHNOLOGY,
-        help="Technology used in this library."
+        help="Path to the mapping config, see 'yap default-mapping-config' about how to generate this file."
     )
 
     parser_req.add_argument(
         "--cpu",
         type=int,
         required=True,
-        help="Number of cores to use. Max is 12."
+        help="Number of cores to use. Note that the demultiplex step will only use at most 16 cores."
     )
     return
 
