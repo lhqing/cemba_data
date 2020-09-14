@@ -193,6 +193,21 @@ def atac_bulk_pipeline_internal_subparser(subparser):
     )
 
 
+def mapping_summary_internal_subparser(subparser):
+    parser = subparser.add_parser('summary',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="mapping summary CLI for internal ues")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="output_dir of each UID"
+    )
+
+
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -237,6 +252,8 @@ def internal_main():
         from .mapping import select_dna_reads as func
     elif cur_command == 'select-rna-reads':
         from .mapping import select_rna_reads as func
+    elif cur_command == 'summary':
+        from .mapping.stats import mapping_stats as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

@@ -24,7 +24,6 @@ def get_configuration(config_path):
     for name, section in ref_path_config.items():
         for k, v in section.items():
             total_config[k] = v
-
     return total_config
 
 

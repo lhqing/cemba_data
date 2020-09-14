@@ -12,6 +12,7 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
+from ..mapping.pipelines import make_snakefile
 from ..utilities import snakemake, get_configuration
 
 # logger
@@ -306,7 +307,7 @@ def _summarize_demultiplex(output_dir, barcode_version):
     },
         inplace=True)
     cell_table['CellBarcodeRate'] = cell_table[
-                                         'CellInputReadPairs'] / cell_table['MultiplexedTotalReadPairs']
+                                        'CellInputReadPairs'] / cell_table['MultiplexedTotalReadPairs']
     cell_table['BarcodeVersion'] = barcode_version
     cell_table.to_csv(output_path)
     return
@@ -328,7 +329,33 @@ def _final_cleaning(output_dir):
     return
 
 
-SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'mc2t', 'm3c']
+def _skip_abnormal_fastq_pairs(output_dir):
+    demultiplex_df = pd.read_csv(output_dir / 'stats/demultiplex.stats.csv', index_col=0)
+    config = get_configuration(output_dir / 'mapping_config.ini')
+    total_read_pairs_min = int(config['total_read_pairs_min'])
+    total_read_pairs_max = int(config['total_read_pairs_max'])
+
+    too_large = demultiplex_df['CellInputReadPairs'] > total_read_pairs_max
+    too_small = demultiplex_df['CellInputReadPairs'] < total_read_pairs_min
+    judge = too_small | too_large
+    unmapped_cells = demultiplex_df[judge]
+    print(f'Skip {too_small.sum()} cells due to too less input read pairs (< {total_read_pairs_min})')
+    print(f'Skip {too_large.sum()} cells due to too large input read pairs (> {total_read_pairs_max})')
+
+    for cell_id, row in unmapped_cells.iterrows():
+        uid = row['UID']
+        skipped_dir = output_dir / uid / 'fastq/skipped/'
+        skipped_dir.mkdir(exist_ok=True)
+
+        # move both R1 R2 to skipped files, it will not be included in Snakefile
+        for read_type in ['R1', 'R2']:
+            fastq_path = output_dir / uid / f'fastq/{cell_id}-{read_type}.fq.gz'
+            new_path = skipped_dir / f'{cell_id}-{read_type}.fq.gz'
+            subprocess.run(['mv', fastq_path, new_path], check=True)
+    return
+
+
+SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'm3c']
 
 
 def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
@@ -356,4 +383,6 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     _merge_lane(output_dir=output_dir, cpu=cpu)
     _summarize_demultiplex(output_dir=output_dir, barcode_version=barcode_version)
     _final_cleaning(output_dir=output_dir)
+    _skip_abnormal_fastq_pairs(output_dir=output_dir)
+    make_snakefile(output_dir=output_dir)
     return
