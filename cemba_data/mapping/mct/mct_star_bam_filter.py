@@ -5,7 +5,7 @@ from collections import defaultdict
 import pandas as pd
 import pysam
 
-from cemba_data.utilities import get_configuration
+from ...utilities import get_configuration
 
 REVERSE_READ_MCH_CONTEXT = {'CA', 'CC', 'CT'}
 FORWARD_READ_MCH_CONTEXT = {'AG', 'TG', 'GG'}

@@ -18,16 +18,18 @@ rule summary:
         expand("bam/{cell_id}-R1.trimmed_bismark_bt2_SE_report.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.trimmed_bismark_bt2_SE_report.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.dna_reads.bam.reads_profile.csv", cell_id=CELL_IDS),
-        'rna_bam/TotalRNAAligned.filtered.bam'  # needed for count star mapped reads by RG
+        'rna_bam/TotalRNAAligned.filtered.bam',  # needed for count star mapped reads by RG
+        'rna_bam/TotalRNALog.final.out',
+        'rna_bam/TotalRNALog.out',
+        'rna_bam/TotalRNALog.progress.out',
         'rna_bam/TotalRNAAligned.rna_reads.bam',
         'rna_bam/TotalRNAAligned.rna_reads.bam.reads_profile.csv',
-        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
+        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv',
         'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary'
-        # TODO
     output:
         "MappingSummary.csv.gz"
     shell:
-        # TODO
+        "yap-internal summary --output_dir ./"
 
 # Trim reads
 rule trim_r1:
@@ -158,7 +160,7 @@ rule select_dna:
         "bam/{cell_id}.final.bam"
     output:
         bam="bam/{cell_id}.dna_reads.bam",
-        stats='bam/{cell_id}.dna_reads.bam.reads_profile.csv'
+        stats=temp('bam/{cell_id}.dna_reads.bam.reads_profile.csv')
     shell:
         'yap-internal select-dna-reads --input_bam {input} '
         '--output_bam {output.bam} --mc_rate_max_threshold {mc_rate_max_threshold} '
@@ -186,9 +188,9 @@ rule allc:
 
 
 # RNA mapping, also start from trimmed fastq
-cell_ids_str = ', ID:'.join(CELL_IDS)
+cell_ids_str = ' , ID:'.join(CELL_IDS)
 # star separate multiple input by ,
-star_input_str = ','.join(["fastq/{cell_id}-R1.trimmed.fq.gz" for cell_id in CELL_IDS])
+star_input_str = ','.join([f"fastq/{cell_id}-R1.trimmed.fq.gz" for cell_id in CELL_IDS])
 rule star:
     input:
         # here we only use R1 SE for RNA,
@@ -200,7 +202,8 @@ rule star:
         temp('rna_bam/TotalRNAAligned.out.bam'),
         temp('rna_bam/TotalRNALog.final.out'),
         temp('rna_bam/TotalRNALog.out'),
-        temp('rna_bam/TotalRNALog.progress.out')
+        temp('rna_bam/TotalRNALog.progress.out'),
+        temp('rna_bam/TotalRNASJ.out.tab')
     threads:
         workflow.cores * 0.8  # workflow.cores is user provided cores for snakemake
     shell:
@@ -241,11 +244,12 @@ rule select_rna:
     input:
         'rna_bam/TotalRNAAligned.filtered.bam'
     output:
-        temp('rna_bam/TotalRNAAligned.rna_reads.bam')
+        bam='rna_bam/TotalRNAAligned.rna_reads.bam',
+        stats=temp('rna_bam/TotalRNAAligned.rna_reads.bam.reads_profile.csv')
     shell:
         'yap-internal select-rna-reads ' \
         '--input_bam {input} ' \
-        '--output_bam {output} ' \
+        '--output_bam {output.bam} ' \
         '--mc_rate_min_threshold {mc_rate_min_threshold} ' \
         '--cov_min_threshold {rna_cov_min_threshold} '
 
@@ -253,9 +257,10 @@ rule feature_count:
     input:
         'rna_bam/TotalRNAAligned.rna_reads.bam'
     output:
-        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
+        count='rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv',
+        stats=temp('rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary')
     threads:
         workflow.cores * 0.8
     shell:
         'featureCounts -t {feature_type} -g {id_type} ' \
-        '-a {gtf_path} -o {output} --byReadGroup -T {threads} {input}'
+        '-a {gtf_path} -o {output.count} --byReadGroup -T {threads} {input}'

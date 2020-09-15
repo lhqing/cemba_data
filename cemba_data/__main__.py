@@ -193,6 +193,7 @@ def demultiplex_register_subparser(subparser):
 
     parser_req.add_argument(
         "--fastq_pattern",
+        "-fq",
         type=str,
         required=True,
         help="FASTQ files with wildcard to match all bcl2fastq results, pattern with wildcard must be quoted."
@@ -200,6 +201,7 @@ def demultiplex_register_subparser(subparser):
 
     parser_req.add_argument(
         "--output_dir",
+        "-o",
         type=str,
         required=True,
         help="Pipeline output directory, will be created recursively."
@@ -207,6 +209,7 @@ def demultiplex_register_subparser(subparser):
 
     parser_req.add_argument(
         "--config_path",
+        "-config",
         type=str,
         required=True,
         help="Path to the mapping config, see 'yap default-mapping-config' about how to generate this file."
@@ -214,6 +217,7 @@ def demultiplex_register_subparser(subparser):
 
     parser_req.add_argument(
         "--cpu",
+        '-j',
         type=int,
         required=True,
         help="Number of cores to use. Note that the demultiplex step will only use at most 16 cores."
@@ -236,6 +240,8 @@ def print_default_config_register_subparser(subparser):
 
     parser.add_argument(
         "--barcode_version",
+        '-v',
+        '-V',
         type=str,
         required=True,
         choices=['V1', 'V2'],
@@ -280,54 +286,53 @@ def print_default_config_register_subparser(subparser):
     return
 
 
-def pipeline_register_subparser(subparser):
-    parser = subparser.add_parser('mapping',
+def prepare_register_subparser(subparser):
+    parser = subparser.add_parser('prepare',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Batch mapping pipeline from bcl2fastq multiplexed FASTQ file to ALLC file. ")
+                                  help="Prepare batch jobs.")
 
     parser_req = parser.add_argument_group("Required inputs")
 
     parser_req.add_argument(
         "--output_dir",
+        '-o',
         type=str,
         required=True,
         help="Pipeline output directory, if not exist, will create recursively."
     )
 
-    parser_req.add_argument(
-        "--config_path",
+    parser.add_argument(
+        "--name",
         type=str,
-        required=True,
         default=None,
-        help="Pipeline configuration (.ini) file path. "
-             "You can use 'yap default-mapping-config' to print out default config can modify it."
+        help="Name of the project, if None, will use the output_dir name."
     )
 
     parser.add_argument(
-        "--batch_size",
+        "--total_jobs",
+        "-j",
         type=int,
-        default=96,
-        help="Number of cells to run together in a single snakemake command."
+        default=20,
+        help="Total number of jobs run in parallel."
     )
 
     parser.add_argument(
-        "--cpu",
+        "--cores_per_job",
+        "-c",
         type=int,
         default=5,
-        help="Number of cores to use in different steps, the effect depending on --mode: "
-             "if --mode command_only, --cpu has no effect; "
-             "if --mode qsub, --cpu is the sum of the slots active qsub job occupy; "
-             "if --mode local, --cpu is the number of process to use in current machine"
+        help="Number of cores used by each job, total number of cores is (cores_per_job * total_jobs)."
     )
 
     parser.add_argument(
-        "--unmapped_fastq",
-        dest='nome',
-        action='store_true',
-        help='If appear in the command, will save unmapped FASTQ from bismark for debugging. '
-             'Do not add this for normal libraries.'
+        "--memory_per_core",
+        "-m",
+        type=str,
+        default='5G',
+        help="Memory assigned to each core, "
+             "the total memory of each job is (cores_per_job * memory_per_core); "
+             "the total memory of all jobs is (cores_per_job * memory_per_core * total_jobs)"
     )
-    parser.set_defaults(nome=False)
     return
 
 
@@ -397,11 +402,11 @@ def main():
     elif cur_command == 'demultiplex':
         from .demultiplex import demultiplex_pipeline as func
     elif cur_command == 'default-mapping-config':
-        from .mapping.config import print_default_mapping_config as func
-    elif cur_command == 'mapping':
-        from .mapping.pipeline import pipeline as func
+        from .mapping import print_default_mapping_config as func
+    elif cur_command == 'prepare':
+        from .mapping import prepare_run as func
     elif cur_command == 'summary':
-        from .mapping.summary import mapping_summary as func
+        from .mapping import final_summary as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

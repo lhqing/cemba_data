@@ -53,7 +53,8 @@ def make_snakefile(output_dir):
     return
 
 
-def prepare_run(output_dir, total_jobs, cores_per_job, memory_per_core, name=None):
+def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G', name=None):
+    # TODO test what parameter works best in real nova-seq data
     config = get_configuration(output_dir / 'mapping_config.ini')
     mode = config['mode']
     if mode == 'mc' and cores_per_job < 4:
@@ -74,6 +75,8 @@ def prepare_run(output_dir, total_jobs, cores_per_job, memory_per_core, name=Non
         cmds.append(cmd)
     with open(snakemake_dir / 'snakemake_cmd.txt', 'w') as f:
         f.write('\n'.join(cmds))
+
+    # TODO sort the commands based on total reads before write into files
 
     # this is only some automatic code for ecker lab...
     # so conditioned by the host name
@@ -110,3 +113,7 @@ def prepare_run(output_dir, total_jobs, cores_per_job, memory_per_core, name=Non
 
     print(f"Once all commands are executed successfully, use 'yap summary' to generate final mapping summary.")
     return
+
+
+def final_summary():
+    raise NotImplementedError

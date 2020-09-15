@@ -14,12 +14,14 @@ def mct_config_str(config):
         'num_upstr_bases': 0,
         'num_downstr_bases': 2,
         'compress_level': 5,
-        'mc_rate_max_threshold': 0.5,
         'dna_cov_min_threshold': 3,
-        'mc_rate_min_threshold': 0.9,
         'rna_cov_min_threshold': 3
     }
 
+    float_parameters = {
+        'mc_rate_max_threshold': 0.5,
+        'mc_rate_min_threshold': 0.9
+    }
     bool_parameters = {'unmapped_fastq': False}
 
     str_parameters = {
@@ -39,6 +41,15 @@ def mct_config_str(config):
     for k, default in int_parameters.items():
         if k in config:
             typed_config[k] = int(config[k])
+        else:
+            if default != 'required':
+                typed_config[k] = default
+            else:
+                raise ValueError(f'Required parameter {k} not found in config.')
+
+    for k, default in float_parameters.items():
+        if k in config:
+            typed_config[k] = float(config[k])
         else:
             if default != 'required':
                 typed_config[k] = default

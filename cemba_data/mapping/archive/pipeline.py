@@ -2,10 +2,10 @@ import pathlib
 
 import pandas as pd
 import subprocess
-from .bismark_mapping import bismark_mapping
-from .generate_allc import generate_allc
-from .mct_bismark_bam_filter import dna_reads_selection
-from .star_mapping import star_mapping
+from cemba_data.mapping.archive.bismark_mapping import bismark_mapping
+from cemba_data.mapping.archive.generate_allc import generate_allc
+from cemba_data.mapping.mct.mct_bismark_bam_filter import dna_reads_selection
+from cemba_data.mapping.archive.star_mapping import star_mapping
 from cemba_data.utilities import get_configuration
 
 

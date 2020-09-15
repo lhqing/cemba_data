@@ -73,12 +73,12 @@ def basic_summary(output_dir, patterns=('CHN', 'CGN', 'CCC')):
     demultiplex_stat = pd.read_csv(output_dir / 'fastq/demultiplex.stats.csv',
                                    index_col='cell_id')
 
-    from .bismark_mapping import bismark_mapping_stats
+    from cemba_data.mapping.archive.bismark_mapping import bismark_mapping_stats
     bismark_mapping_stats(output_dir)
     mapping_stat = pd.read_csv(output_dir / 'bam/bismark_mapping_stats.csv',
                                index_col='cell_id')
 
-    from .generate_allc import generate_allc_stats
+    from cemba_data.mapping.archive.generate_allc import generate_allc_stats
     generate_allc_stats(output_dir, patterns=patterns)
     allc_stat = pd.read_csv(output_dir / 'allc/allc_stats.csv',
                             index_col='cell_id')

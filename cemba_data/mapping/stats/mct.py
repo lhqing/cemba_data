@@ -46,15 +46,12 @@ def summary_rna_mapping(output_dir):
 
 def summarize_select_dna_reads(output_dir,
                                config):
-    bam_dir = pathlib.Path(output_dir) / 'dna_bam'
-    all_profile_path = bam_dir / 'select_dna_reads.all_profile.csv'
-    final_stat_path = bam_dir / 'select_dna_reads.stats.csv'
-
-    mc_rate_max_threshold = config['mc_rate_max_threshold']
-    cov_min_threshold = config['dna_cov_min_threshold']
+    bam_dir = pathlib.Path(output_dir) / 'bam'
+    mc_rate_max_threshold = float(config['mc_rate_max_threshold'])
+    cov_min_threshold = float(config['dna_cov_min_threshold'])
 
     records = []
-    select_dna_reads_stat_list = list(bam_dir.glob('*/*.reads_profile.csv'))
+    select_dna_reads_stat_list = list(bam_dir.glob('*.reads_profile.csv'))
     for path in select_dna_reads_stat_list:
         try:
             _df = pd.read_csv(path)
@@ -85,5 +82,5 @@ def mct_mapping_stats(output_dir, config):
     mc_stats_df = mc_mapping_stats(output_dir, config)
     select_dna_stats = summarize_select_dna_reads(output_dir, config)
     rna_stats_df = summary_rna_mapping(output_dir)
-    final_df = pd.concat([mc_stats_df, select_dna_stats, rna_stats_df])
+    final_df = pd.concat([mc_stats_df, select_dna_stats, rna_stats_df], axis=1)
     return final_df
