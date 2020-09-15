@@ -3,6 +3,7 @@ import pathlib
 
 import cemba_data
 from .mc import mc_config_str
+from .mct import mct_config_str
 from ...utilities import get_configuration
 
 # Load defaults
@@ -33,6 +34,8 @@ def make_snakefile(output_dir):
 
     if mode == 'mc':
         config_str = mc_config_str(config)
+    elif mode == 'mct':
+        config_str = mct_config_str(config)
     else:
         raise ValueError(f'Unknown mode {mode}')
     print('Making Snakefile based on mapping config INI file. The parameters are:')
@@ -51,8 +54,13 @@ def make_snakefile(output_dir):
 
 
 def prepare_run(output_dir, total_jobs, cores_per_job, memory_per_core, name=None):
-    if cores_per_job < 4:
+    config = get_configuration(output_dir / 'mapping_config.ini')
+    mode = config['mode']
+    if mode == 'mc' and cores_per_job < 4:
         raise ValueError(f'cores must >= 4 to run this pipeline.')
+    elif mode == 'mct' and cores_per_job < 10:
+        raise ValueError(f'cores must >= 10 to run this pipeline.')
+
     output_dir = pathlib.Path(output_dir).absolute()
     if name is None:
         name = output_dir.name

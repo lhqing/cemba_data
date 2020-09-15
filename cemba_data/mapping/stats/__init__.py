@@ -1,6 +1,6 @@
 import pathlib
 
-from .snmc import snmc_mapping_stats
+from .mc import snmc_mapping_stats
 from ...utilities import get_configuration
 
 

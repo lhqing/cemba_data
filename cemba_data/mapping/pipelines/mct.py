@@ -1,4 +1,4 @@
-def mc_config_str(config):
+def mct_config_str(config):
     """Change the dtype of parameters and make a appropriate string"""
     int_parameters = {
         'overlap': 6,
@@ -13,7 +13,11 @@ def mc_config_str(config):
         'mapq_threshold': 10,
         'num_upstr_bases': 0,
         'num_downstr_bases': 2,
-        'compress_level': 5
+        'compress_level': 5,
+        'mc_rate_max_threshold': 0.5,
+        'dna_cov_min_threshold': 3,
+        'mc_rate_min_threshold': 0.9,
+        'rna_cov_min_threshold': 3
     }
 
     bool_parameters = {'unmapped_fastq': False}
@@ -25,8 +29,10 @@ def mc_config_str(config):
         'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
         'bismark_reference': 'required',
         'reference_fasta': 'required',
-        'mc_stat_feature': 'CHN CGN CCC',
-        'mc_stat_alias': 'mCH mCG mCCC'
+        'star_reference': 'required',
+        'gtf_path': 'required',
+        'feature_type': 'gene',
+        'id_type': 'gene_id'
     }
 
     typed_config = {}
