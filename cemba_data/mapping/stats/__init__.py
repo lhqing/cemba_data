@@ -1,6 +1,7 @@
 import pathlib
 
-from .mc import snmc_mapping_stats
+from .mc import mc_mapping_stats
+from .mct import mct_mapping_stats
 from ...utilities import get_configuration
 
 
@@ -11,7 +12,9 @@ def mapping_stats(output_dir):
     mode = config['mode']
 
     if mode == 'mc':
-        final_df = snmc_mapping_stats(output_dir, config)
+        final_df = mc_mapping_stats(output_dir, config)
+    elif mode == 'mct':
+        final_df = mct_mapping_stats(output_dir, config)
     else:
         raise ValueError
 

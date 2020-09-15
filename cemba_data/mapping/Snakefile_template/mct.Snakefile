@@ -17,8 +17,12 @@ rule summary:
         expand("bam/{cell_id}-R2.trimmed_bismark_bt2.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R1.trimmed_bismark_bt2_SE_report.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.trimmed_bismark_bt2_SE_report.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.dna_reads.bam.reads_profile.csv", cell_id=CELL_IDS),
+        'rna_bam/TotalRNAAligned.filtered.bam'  # needed for count star mapped reads by RG
         'rna_bam/TotalRNAAligned.rna_reads.bam',
+        'rna_bam/TotalRNAAligned.rna_reads.bam.reads_profile.csv',
         'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
+        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary'
         # TODO
     output:
         "MappingSummary.csv.gz"

@@ -5,7 +5,7 @@ import pandas as pd
 from .utilities import parse_trim_fastq_stats, parse_bismark_report, parse_deduplicate_stat, generate_allc_stats
 
 
-def snmc_mapping_stats(output_dir, config):
+def mc_mapping_stats(output_dir, config):
     """this may apply to single UID dir, so config is provided as parameter"""
     output_dir = pathlib.Path(output_dir).absolute()
     fastq_dir = output_dir / 'fastq'
