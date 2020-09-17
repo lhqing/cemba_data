@@ -366,9 +366,10 @@ def main():
     print_default_config_register_subparser(subparsers)
     print_plate_info_register_subparser(subparsers)
     make_sample_sheet_register_subparser(subparsers)
-    pipeline_register_subparser(subparsers)
     mapping_summary_register_subparser(subparsers)
     demultiplex_register_subparser(subparsers)
+    prepare_register_subparser(subparsers)
+
 
     # initiate
     args = None

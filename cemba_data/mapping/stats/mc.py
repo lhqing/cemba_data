@@ -10,9 +10,10 @@ def mc_mapping_stats(output_dir, config):
     output_dir = pathlib.Path(output_dir).absolute()
     fastq_dir = output_dir / 'fastq'
     bam_dir = output_dir / 'bam'
+    allc_dir = output_dir / 'allc'
     cell_stats = []
     cell_ids = [path.name.split('.')[0]
-                for path in bam_dir.glob('*.final.bam')]
+                for path in allc_dir.glob(f'*.allc.tsv.gz')]
 
     for cell_id in cell_ids:
         print(f'Parsing stats of {cell_id}.')

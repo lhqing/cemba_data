@@ -80,7 +80,7 @@ def summarize_select_dna_reads(output_dir,
 def mct_mapping_stats(output_dir, config):
     """this may apply to single UID dir, so config is provided as parameter"""
     mc_stats_df = mc_mapping_stats(output_dir, config)
-    select_dna_stats = summarize_select_dna_reads(output_dir, config)
+    select_dna_stats_df = summarize_select_dna_reads(output_dir, config)
     rna_stats_df = summary_rna_mapping(output_dir)
-    final_df = pd.concat([mc_stats_df, select_dna_stats, rna_stats_df], axis=1)
+    final_df = pd.concat([mc_stats_df, select_dna_stats_df, rna_stats_df], axis=1)
     return final_df

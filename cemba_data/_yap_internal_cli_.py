@@ -208,6 +208,85 @@ def mapping_summary_internal_subparser(subparser):
     )
 
 
+def split_read_internal_subparser(subparser):
+    parser = subparser.add_parser('m3c-split-reads',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Split unmapped reads for remap in snm3C-seq data")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--fastq_path",
+        type=str,
+        required=True,
+        help="Input fastq path"
+    )
+
+    parser_req.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="Output fastq path"
+    )
+
+    parser_req.add_argument(
+        "--size_l",
+        type=int,
+        default=40,
+        help="Size to slice on the left part"
+    )
+
+    parser_req.add_argument(
+        "--size_r",
+        type=int,
+        default=40,
+        help="Size to slice on the right part"
+    )
+
+    parser_req.add_argument(
+        "--size_m",
+        type=int,
+        default=30,
+        help="Minimum size of the middle part"
+    )
+
+
+def generate_contacts_internal_subparser(subparser):
+    parser = subparser.add_parser('generate-contacts',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="parse ")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--bam_path",
+        type=str,
+        required=True,
+        help="Input bam path"
+    )
+
+    parser_req.add_argument(
+        "--output_path",
+        type=str,
+        required=True,
+        help="Output contact file path"
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="Chrom size path"
+    )
+
+    parser_req.add_argument(
+        "--min_gap",
+        type=int,
+        default=1000,
+        help="Minimum gap distance to be considered as contact"
+    )
+
+
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -254,6 +333,10 @@ def internal_main():
         from .mapping import select_rna_reads as func
     elif cur_command == 'summary':
         from .mapping.stats import mapping_stats as func
+    elif cur_command == 'm3c-split-reads':
+        from .mapping.m3c import split_fastq_reads as func
+    elif cur_command == 'generate-contacts':
+        from .mapping.m3c import generate_contacts as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

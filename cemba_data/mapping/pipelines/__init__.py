@@ -4,6 +4,7 @@ import pathlib
 import cemba_data
 from .mc import mc_config_str
 from .mct import mct_config_str
+from .m3c import m3c_config_str
 from ...utilities import get_configuration
 
 # Load defaults
@@ -36,6 +37,8 @@ def make_snakefile(output_dir):
         config_str = mc_config_str(config)
     elif mode == 'mct':
         config_str = mct_config_str(config)
+    elif mode == 'm3c':
+        config_str = m3c_config_str(config)
     else:
         raise ValueError(f'Unknown mode {mode}')
     print('Making Snakefile based on mapping config INI file. The parameters are:')
@@ -57,7 +60,7 @@ def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G'
     # TODO test what parameter works best in real nova-seq data
     config = get_configuration(output_dir / 'mapping_config.ini')
     mode = config['mode']
-    if mode == 'mc' and cores_per_job < 4:
+    if mode in ['mc', 'm3c'] and cores_per_job < 4:
         raise ValueError(f'cores must >= 4 to run this pipeline.')
     elif mode == 'mct' and cores_per_job < 10:
         raise ValueError(f'cores must >= 10 to run this pipeline.')
@@ -116,4 +119,5 @@ def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G'
 
 
 def final_summary():
+    # TODO
     raise NotImplementedError
