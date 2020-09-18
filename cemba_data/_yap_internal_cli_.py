@@ -328,9 +328,9 @@ def internal_main():
     cur_command = args_vars.pop('command')
     # Do real import here:
     if cur_command == 'select-dna-reads':
-        from .mapping import select_dna_reads as func
+        from .mapping.mct import select_dna_reads as func
     elif cur_command == 'select-rna-reads':
-        from .mapping import select_rna_reads as func
+        from .mapping.mct import select_rna_reads as func
     elif cur_command == 'summary':
         from .mapping.stats import mapping_stats as func
     elif cur_command == 'm3c-split-reads':

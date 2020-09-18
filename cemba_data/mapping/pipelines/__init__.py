@@ -84,7 +84,7 @@ def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G'
     # this is only some automatic code for ecker lab...
     # so conditioned by the host name
     host_name = os.environ['HOSTNAME']
-    if host_name[:4] in ['bpho', 'gale']:
+    if host_name[:4] in ['bpho', 'gale', 'cemba', 'oberon']:
         qsub_str = f"""
         #!/bin/bash
         #$ -N {name}
@@ -109,6 +109,8 @@ def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G'
             f.write(qsub_str)
         print(f"All snakemake commands need to be executed were summarized in {snakemake_dir / 'qsub.sh'}")
         print(f'You just need to qsub this script to map the whole library in {output_dir}')
+
+        # TODO generate sbatch script automatically
     else:
         print(f"All snakemake commands need to be executed were summarized in {snakemake_dir / 'snakemake_cmd.txt'}")
         print(f"You need to execute them based on the computational environment you have "
