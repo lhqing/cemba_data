@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# Notes from TACC:
+#
+#   -- Launch this script by executing
+#   -- Copy/edit this script as desired.  Launch by executing
+#      "sbatch knl.openmp.slurm" on a Stampede2 login node.
+#
+#   -- OpenMP codes run on a single node (upper case N = 1).
+#        OpenMP ignores the value of lower case n,
+#        but slurm needs a plausible value to schedule the job.
+#
+#   -- Default value of OMP_NUM_THREADS is 1; be sure to change it!
+#
+#   -- Increase thread count gradually while looking for optimal setting.
+#        If there is sufficient memory available, the optimal setting
+#        is often 68 (1 thread per core) or 136 (2 threads per core).
+#
+#----------------------------------------------------
+
+#SBATCH -J {job_name}           # Job name
+#SBATCH -o {job_name}.o%j       # Name of stdout output file
+#SBATCH -e {job_name}.e%j       # Name of stderr error file
+#SBATCH -p {queue}              # Queue (partition) name
+#SBATCH -N 1                    # Total # of nodes (must be 1 for OpenMP)
+#SBATCH -n 1                    # Total # of mpi tasks (should be 1 for OpenMP)
+#SBATCH -t {time_str}           # Run time (hh:mm:ss)
+{email_str}
+{email_type_str}
+
+# By default, send email when job fails
+
+# Other commands must follow all #SBATCH directives...
+date
+hostname
+module list
+which python
+pwd
+
+# Set thread count (default value is 1)...
+export OMP_NUM_THREADS=96
+
+{commands}
+
+date
+# ---------------------------------------------------
