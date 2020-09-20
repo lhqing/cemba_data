@@ -1,7 +1,5 @@
-import pathlib
 from collections import defaultdict
 
-import pandas as pd
 import pysam
 
 METHYLATED_CHAR = 'H'
@@ -42,4 +40,3 @@ def select_dna_reads(input_bam,
         for (mc_rate, cov), count in read_profile_dict.items():
             stat_f.write(f'{mc_rate},{cov},{count}\n')
     return
-

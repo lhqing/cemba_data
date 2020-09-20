@@ -1,7 +1,7 @@
 import pathlib
 
 import cemba_data
-from cemba_data.utilities import MAPPING_MODE_CHOICES
+from ..utilities import MAPPING_MODE_CHOICES
 
 # Load defaults
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])

@@ -1,11 +1,6 @@
-import pathlib
-import subprocess
 from collections import defaultdict
 
-import pandas as pd
 import pysam
-
-from ...utilities import get_configuration
 
 REVERSE_READ_MCH_CONTEXT = {'CA', 'CC', 'CT'}
 FORWARD_READ_MCH_CONTEXT = {'AG', 'TG', 'GG'}
@@ -98,4 +93,3 @@ def select_rna_reads(input_bam,
         for (mc_rate, cov), count in read_profile_dict.items():
             stat_f.write(f'{mc_rate},{cov},{count}\n')
     return
-

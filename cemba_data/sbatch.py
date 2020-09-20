@@ -4,7 +4,6 @@ See stampede2 doc:
 https://portal.tacc.utexas.edu/user-guides/stampede2#running-sbatch
 """
 
-import json
 import pathlib
 import re
 import shlex

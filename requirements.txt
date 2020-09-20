@@ -1,4 +1,3 @@
-pandas
 ipykernel
 nbsphinx
 sphinx>=3
