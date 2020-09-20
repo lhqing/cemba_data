@@ -12,7 +12,7 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
-from ..mapping.pipelines import make_snakefile
+from ..mapping.pipelines import make_snakefile, prepare_run
 from ..utilities import snakemake, get_configuration
 
 # logger
@@ -315,7 +315,7 @@ def _summarize_demultiplex(output_dir, barcode_version):
 
 def _final_cleaning(output_dir):
     """
-    remove intermediate files
+    remove intermediate files from demultiplex
     """
     output_dir = pathlib.Path(output_dir)
 
@@ -351,7 +351,15 @@ def _skip_abnormal_fastq_pairs(output_dir):
         for read_type in ['R1', 'R2']:
             fastq_path = output_dir / uid / f'fastq/{cell_id}-{read_type}.fq.gz'
             new_path = skipped_dir / f'{cell_id}-{read_type}.fq.gz'
-            subprocess.run(['mv', fastq_path, new_path], check=True)
+            # if CellInputReadPairs = 0, the FASTQ file do not actually exist, but it does have a row in metadata.
+            if fastq_path.exists():
+                subprocess.run(['mv', str(fastq_path), str(new_path)], check=True)
+
+    # save UID total input reads, for command order
+    uid_order = demultiplex_df[~judge].groupby(
+        'UID')['CellInputReadPairs'].sum().sort_values(
+        ascending=False)
+    uid_order.to_csv(output_dir / 'stats/UIDTotalCellInputReadPairs.csv', header=False)
     return
 
 
@@ -385,4 +393,13 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     _final_cleaning(output_dir=output_dir)
     _skip_abnormal_fastq_pairs(output_dir=output_dir)
     make_snakefile(output_dir=output_dir)
+
+    # this is just a convenient step, so I fix the parameters here
+    # users should change the resulting batch submission
+    # or generate by themselves if they want different setting.
+    if config['mode'] == 'mct':
+        cores_per_job = 10
+    else:
+        cores_per_job = 8
+    prepare_run(output_dir, total_jobs=12, cores_per_job=cores_per_job, memory_per_core='5G', name=None)
     return

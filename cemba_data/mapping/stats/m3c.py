@@ -1,16 +1,17 @@
 import pathlib
-import subprocess
 
 import pandas as pd
+from pysam import AlignmentFile
 
 from .utilities import parse_trim_fastq_stats, generate_allc_stats
 
 
-def _m3c_bam_unique_read_counts(bam_path):
-    command = f"samtools view {bam_path} | awk -F ':N:0' '{{print $1}}' | sort | wc -l"
-    p = subprocess.run(command, shell=True, check=True, encoding='utf8', stdout=subprocess.PIPE)
-    unique_reads = p.stdout.strip()
-    return unique_reads
+def _m3c_bam_unique_read_counts(bam_path, read_type_int):
+    unique_reads = set()
+    with AlignmentFile(bam_path) as bam:
+        for read in bam:
+            unique_reads.add(read.query_name.split(f'_{read_type_int}:N:0:')[0])
+    return len(unique_reads)
 
 
 def _m3c_count_bams(bam_dir, cell_id, read_type):
@@ -18,7 +19,7 @@ def _m3c_count_bams(bam_dir, cell_id, read_type):
         f'{read_type}UniqueMapped': bam_dir / f'{cell_id}-{read_type}.two_mapping.filter.bam',
         f'{read_type}Dedupped': bam_dir / f'{cell_id}-{read_type}.two_mapping.deduped.bam',
     }
-    read_counts = {name: _m3c_bam_unique_read_counts(path)
+    read_counts = {name: _m3c_bam_unique_read_counts(path, 1 if read_type == 'R1' else 2)
                    for name, path in bam_path_dict.items()}
     return pd.Series(read_counts, name=cell_id)
 
@@ -56,4 +57,25 @@ def m3c_mapping_stats(output_dir, config):
     # add allc stats
     allc_df = generate_allc_stats(output_dir, config)
     final_df = pd.concat([total_df, allc_df], sort=True, axis=1)
+    return final_df
+
+
+def m3c_additional_cols(final_df):
+    final_df['FinalmCReads'] = final_df['R1Dedupped'] + final_df['R2Dedupped']
+    final_df['CellInputReadPairs'] = final_df['R1InputReads']
+    # use % to be consistent with others
+    final_df['R1MappingRate'] = final_df['R1UniqueMapped'] / final_df['R1TrimmedReads'] * 100
+    final_df['R2MappingRate'] = final_df['R2UniqueMapped'] / final_df['R2TrimmedReads'] * 100
+    final_df['R1DuplicationRate'] = (1 - final_df['R1Dedupped'] / final_df['R1UniqueMapped']) * 100
+    final_df['R2DuplicationRate'] = (1 - final_df['R2Dedupped'] / final_df['R2UniqueMapped']) * 100
+
+    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                    for _, i in final_df.groupby('PCRIndex')])
+    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+
+    final_df['TotalContacts'] = final_df[
+        ['CisShortContact', 'CisLongContact', 'TransContact']].sum(axis=1)
+    final_df['CisShortRatio'] = final_df['CisShortContact'] / final_df['TotalContacts']
+    final_df['CisLongRatio'] = final_df['CisLongContact'] / final_df['TotalContacts']
+    final_df['TransRatio'] = final_df['TransContact'] / final_df['TotalContacts']
     return final_df

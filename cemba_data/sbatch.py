@@ -111,24 +111,6 @@ def squeue():
     return squeue_df
 
 
-def check_targets(targets):
-    """
-    Check whether all target file paths exist, return bool
-
-    Parameters
-    ----------
-    targets
-
-    Returns
-    -------
-    True or False
-    """
-    for path in targets:
-        if not pathlib.Path(path).exists():
-            return False
-    return True
-
-
 def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str, email, email_type):
     """See stampede2 doc: https://portal.tacc.utexas.edu/user-guides/stampede2#running-sbatch"""
     with open(PACKAGE_DIR / 'files/sbatch_template.txt') as f:
@@ -197,12 +179,16 @@ def sacct(jobs):
     return sacct_data
 
 
-def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx-normal',
+def sbatch_submitter(project_name, command_file_path, working_dir, time_str, queue='skx-normal',
                      email=None, email_type='fail', max_jobs=None):
-    with open(commands_to_targets) as f:
-        commands_to_targets = json.load(commands_to_targets)
+    # read commands
+    with open(command_file_path) as f:
+        # I always assume the command is ordered with descending priority.
+        # But sbatch will submit last job first (list.pop), so reverse the order here.
+        commands = [line.rstrip('\n') for line in f][::-1]
+
     # set name
-    name = name.replace(' ', '_')
+    project_name = project_name.replace(' ', '_')
 
     # check queue
     queue = queue.lower()
@@ -218,13 +204,23 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
         max_jobs = min(max_jobs, _max_jobs)
     print(f'Max concurrent sbatch jobs {max_jobs}, stampede2 allows {STAMPEDE2_QUEUES[queue]}.')
 
-    # create job script files
-    sbatch_dir = pathlib.Path(output_dir) / f'{name}_sbatch'
+    # make sbatch_dir
+    sbatch_dir = pathlib.Path(working_dir) / f'{project_name}_sbatch'
     sbatch_dir.mkdir(exist_ok=True)
+
+    # check if sacct file exists, which could from previous submission.
+    # I only keep successful items, and skip them in this submission.
+    sacct_path = sbatch_dir / 'sacct.csv.gz'
+    previous_sacct_df_success = None
+    if sacct_path.exists():
+        previous_sacct_df = pd.read_csv(sacct_path, index_col=0)
+        previous_sacct_df_success = previous_sacct_df[previous_sacct_df['Success']]
+
+    # create job script files
     command_to_job_script_paths = make_sbatch_script_files(
-        commands=commands_to_targets.keys(),
+        commands=commands,
         sbatch_dir=sbatch_dir,
-        name_prefix=name,
+        name_prefix=project_name,
         queue=queue,
         time_str=time_str,
         email=email,
@@ -232,15 +228,16 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
 
     # prepare submission
     running_job_id_set = set()  # sbatch_id
-    finished_job_and_targets = {}  # {job_id: target status}
-    job_script_path_to_targets = {script_path: commands_to_targets[command]  # {job_script_path: target_paths}
-                                  for command, script_path in command_to_job_script_paths.items()}
-    queue_job_path_list = list(job_script_path_to_targets.keys()).copy()
+    finished_job_id_set = set()  # job_id
+    queue_job_path_list = list(command_to_job_script_paths.values()).copy()
     job_id_to_script_path = {}
 
     # start submission
     sleepy = 30
     flag_path = sbatch_dir / 'RUNNING_SIGNAL'
+    if flag_path.exists():
+        raise FileExistsError(f'Running signal exists {flag_path}. '
+                              f'Make sure you do not have sbatch submitter running and (if so) delete that flag file.')
     with open(flag_path, 'w') as f:
         f.write('')
     while (len(queue_job_path_list) != 0) or (len(running_job_id_set) != 0):
@@ -251,6 +248,7 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
         # squeue and update running job status
         squeue_df = squeue()
         remaining_slots = max_jobs - squeue_df.shape[0]
+        # TODO diff queue has diff limit, so here actually need to determine queue type
         # the max_jobs is apply to user level, not to the current submitter level
         if remaining_slots > 0:
             # things are getting done, weak up
@@ -262,7 +260,7 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
                 if job_id not in squeue_df.index:
                     # running job finished
                     script_path = job_id_to_script_path[job_id]
-                    finished_job_and_targets[job_id] = check_targets(job_script_path_to_targets[script_path])
+                    finished_job_id_set.add(job_id)
                     # status will be judged in the end
                 else:
                     # still running
@@ -275,16 +273,15 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
             print(f'Going to submit {min(len(queue_job_path_list), remaining_slots)} new jobs')
             while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
                 script_path = queue_job_path_list.pop()
-                # skip if target already exist
-                targets = job_script_path_to_targets[script_path]
-                if check_targets(targets):
-                    print(f'Target file exist for script {script_path}')
-                    continue
-                else:
-                    job_id = submit_sbatch(script_path)
-                    running_job_id_set.add(job_id)
-                    job_id_to_script_path[job_id] = script_path
-                    remaining_slots -= 1
+                # skip if job already submitted and are successful before
+                if previous_sacct_df_success is not None:
+                    if script_path in previous_sacct_df_success['ScriptPath']:
+                        print(f'Already successful in previous submission: {script_path}')
+                        continue
+                job_id = submit_sbatch(script_path)
+                running_job_id_set.add(job_id)
+                job_id_to_script_path[job_id] = script_path
+                remaining_slots -= 1
 
         # sleep
         sleepy += 30
@@ -292,26 +289,20 @@ def sbatch_submitter(name, commands_to_targets, output_dir, time_str, queue='skx
         time.sleep(sleepy)
 
     # only check status if something has finished
-    if len(finished_job_and_targets) > 0:
+    if len(finished_job_id_set) > 0:
         # check status
         chunk_size = 100
-        finished_job_ids = list(finished_job_and_targets.keys())
         stats = []
+        finished_job_ids = list(finished_job_id_set)
         for i in range(0, len(finished_job_ids), chunk_size):
             job_chunk = finished_job_ids[i: i + chunk_size]
             stats.append(sacct(job_chunk))
         sacct_df = pd.concat(stats)
-        sacct_df['TargetExist'] = sacct_df.index.map(finished_job_and_targets)
         sacct_df['ScriptPath'] = sacct_df.index.map(job_id_to_script_path)
-        sacct_df['Success'] = sacct_df['Success'] & sacct_df['TargetExist']  # recheck success
 
-        # append old status if exist
-        sacct_path = sbatch_dir / 'sacct.csv.gz'
-        if sacct_path.exists():
-            df = pd.read_csv(sacct_path, index_col=0)
-            # remove resubmitted jobs, so each ScriptPath only has one row
-            df = df[~df['ScriptPath'].isin(set(sacct_df['ScriptPath']))]
-            sacct_df = pd.concat([df, sacct_df])
+        # add previous sacct records here
+        if previous_sacct_df_success is not None:
+            sacct_df = pd.concat([previous_sacct_df_success, sacct_df], sort=True)
         sacct_df.to_csv(sacct_path)
 
         # print time elapsed

@@ -13,7 +13,7 @@ setup(
     include_package_data=True,
     install_requires=['pandas>=1.0'],
     package_data={
-        '': ['*.txt', '*.tsv', '*.csv', '*.fa', '*Snakefile']
+        '': ['*.txt', '*.tsv', '*.csv', '*.fa', '*Snakefile', '*ipynb']
     },
     entry_points={
         'console_scripts': ['yap=cemba_data.__main__:main',

@@ -84,3 +84,40 @@ def mct_mapping_stats(output_dir, config):
     rna_stats_df = summary_rna_mapping(output_dir)
     final_df = pd.concat([mc_stats_df, select_dna_stats_df, rna_stats_df], axis=1)
     return final_df
+
+
+def aggregate_feature_counts(output_dir):
+    output_dir = pathlib.Path(output_dir)
+    cell_data = []
+
+    count_paths = list(output_dir.glob('*/rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'))
+    if len(count_paths) == 0:
+        return
+
+    data = None
+    for path in count_paths:
+        data = pd.read_csv(path, sep='\t', index_col=0, comment='#')
+        cell_data.append(data.iloc[:, 5:])
+    cell_data = pd.concat(cell_data, axis=1, sort=True)
+    cell_data.columns = cell_data.columns.str.split(':').str[1]
+
+    # all count table should have the same info, so read the last one
+    # chr, start, end, strand, length
+    gene_info = data.iloc[:, :5]
+    with pd.HDFStore(output_dir / 'TotalRNAData.h5', mode='w', complevel=5) as hdf:
+        hdf['data'] = cell_data.T  # cell by gene
+        hdf['gene'] = gene_info
+        hdf['stats'] = pd.DataFrame({'GenesDetected': (cell_data > 0).sum()})
+    return
+
+
+def mct_additional_cols(final_df, output_dir):
+    final_df = final_df.copy()
+    final_df['CellInputReadPairs'] = final_df['R1InputReads'].astype(int)  # == final_df['R2InputReads']
+    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                    for _, i in final_df.groupby('PCRIndex')])
+    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+
+    stats = pd.read_hdf(output_dir / 'TotalRNAData.h5', key='stats')
+    final_df['GenesDetected'] = stats['GenesDetected']
+    return final_df

@@ -135,6 +135,78 @@ def qsub_register_subparser(subparser):
     return
 
 
+def sbatch_register_subparser(subparser):
+    parser = subparser.add_parser('sbatch',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="General sbatch helper, "
+                                       "need to prepare a command dict file where key is a command, "
+                                       "value is a list of target files.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--project_name",
+        type=str,
+        required=True,
+        help="Name of the qsub project"
+    )
+
+    parser_req.add_argument(
+        "--command_file_path",
+        type=str,
+        required=True,
+        nargs='+',
+        help="Each row is a command."
+    )
+
+    parser_req.add_argument(
+        "--working_dir",
+        type=str,
+        required=True,
+        help="Working directory of the qsub project"
+    )
+
+    parser_req.add_argument(
+        "--time_str",
+        type=str,
+        required=True,
+        help="Time estimate (upper limit) of Sbatch Jobs."  # TODO provide a time estimate here
+    )
+
+    parser_req.add_argument(
+        "--queue",
+        type=str,
+        default='skx-normal',
+        choices=['skx-normal'],
+        help="Queue partition of stampede2. Right now only support skx-normal, "
+             "which is large memory nodes suitable for mapping jobs. "
+    )
+
+    parser_req.add_argument(
+        "--email",
+        type=str,
+        default=None,
+        help="If you want to get notice about job status, put your email here."
+    )
+
+    parser_req.add_argument(
+        "--email_type",
+        type=str,
+        default='fail',
+        help="Type of status you want to get notice, default is fail, means only get notice when job failed."
+    )
+
+    parser.add_argument(
+        "--max_jobs",
+        type=int,
+        required=False,
+        default=None,
+        help="Max number of jobs for the same user (not for the same sbatch command). "
+             "If not provided, will determine automatically based on stampede2 limits."
+    )
+    return
+
+
 def print_plate_info_register_subparser(subparser):
     parser = subparser.add_parser('default-plate-info',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -336,7 +408,7 @@ def prepare_register_subparser(subparser):
     return
 
 
-def mapping_summary_register_subparser(subparser):
+def summary_register_subparser(subparser):
     parser = subparser.add_parser('summary',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Mapping summary after the pipeline finished.")
@@ -345,10 +417,12 @@ def mapping_summary_register_subparser(subparser):
 
     parser_req.add_argument(
         "--output_dir",
+        '-o',
         type=str,
         required=True,
-        help="Pipeline output directory, if not exist, will create recursively."
+        help="Pipeline output directory."
     )
+    return
 
 
 def main():
@@ -363,13 +437,13 @@ def main():
 
     # add subparsers
     qsub_register_subparser(subparsers)
+    sbatch_register_subparser(subparsers)
     print_default_config_register_subparser(subparsers)
     print_plate_info_register_subparser(subparsers)
     make_sample_sheet_register_subparser(subparsers)
-    mapping_summary_register_subparser(subparsers)
     demultiplex_register_subparser(subparsers)
     prepare_register_subparser(subparsers)
-
+    summary_register_subparser(subparsers)
 
     # initiate
     args = None
@@ -396,6 +470,8 @@ def main():
     # Do real import here:
     if cur_command == 'qsub':
         from cemba_data.qsub import qsub as func
+    elif cur_command == 'sbatch':
+        from cemba_data.sbatch import sbatch_submitter as func
     elif cur_command == 'default-plate-info':
         from .demultiplex import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
@@ -407,7 +483,7 @@ def main():
     elif cur_command == 'prepare':
         from .mapping import prepare_run as func
     elif cur_command == 'summary':
-        from .mapping import final_summary as func
+        from cemba_data.mapping import final_summary as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])

@@ -1,14 +1,17 @@
 import os
 import pathlib
 
+import pandas as pd
+
 import cemba_data
+from .m3c import m3c_config_str
 from .mc import mc_config_str
 from .mct import mct_config_str
-from .m3c import m3c_config_str
 from ...utilities import get_configuration
 
 # Load defaults
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
+INHOUSE_SERVERS = ['bpho', 'gale', 'cemba', 'oberon']
 
 
 def prepare_uid_snakefile(uid_dir, config_str, snake_template):
@@ -56,7 +59,109 @@ def make_snakefile(output_dir):
     return
 
 
-def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G', name=None):
+def write_commands(output_dir, cores_per_job, script_dir):
+    cmds = {}
+    snake_files = list(output_dir.glob('*/Snakefile'))
+    for snake_file in snake_files:
+        uid = snake_file.parent.name
+        cmd = f'snakemake -d {snake_file.parent} --snakefile {snake_file} -j {cores_per_job}'
+        cmds[uid] = cmd
+    uid_order = pd.read_csv(
+        output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
+    ).sort_values(ascending=False)
+    script_path = script_dir / 'snakemake_cmd.txt'
+    with open(script_path, 'w') as f:
+        for uid in uid_order.index:
+            if uid in cmds:
+                f.write(cmds.pop(uid) + '\n')
+        try:
+            assert len(cmds) == 0
+        except AssertionError as e:
+            print(cmds)
+            print(uid_order)
+            raise e
+    return script_path
+
+
+def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core):
+    output_dir = snakemake_dir.parent
+    qsub_dir = snakemake_dir / 'qsub'
+    qsub_dir.mkdir(exist_ok=True)
+    script_path = write_commands(output_dir, cores_per_job, script_dir=qsub_dir)
+    qsub_str = f"""
+#!/bin/bash
+#$ -N {name}
+#$ -V
+#$ -l h_rt=999:99:99
+#$ -l s_rt=999:99:99
+#$ -wd {qsub_dir}
+#$ -e {qsub_dir}/qsub.error.log
+#$ -o {qsub_dir}/qsub.output.log
+#$ -pe smp 1
+#$ -l h_vmem=3G
+
+yap qsub \
+--command_file_path {script_path} \
+--working_dir {qsub_dir} \
+--project_name {name} \
+--total_cpu {int(cores_per_job * total_jobs)} \
+--qsub_global_parms "-pe smp={cores_per_job};-l h_vmem={memory_per_core}"
+"""
+    qsub_total_path = qsub_dir / 'qsub.sh'
+    with open(qsub_total_path, 'w') as f:
+        f.write(qsub_str)
+    print('#' * 60)
+    print(f"IF YOU USE QSUB ON GALE: ")
+    print(f"All snakemake commands need to be executed "
+          f"were included in {qsub_total_path}")
+    print(f"You just need to qsub this script to "
+          f"map the whole library in {output_dir}")
+    print(f"You can also change the per job parameters in {script_path} "
+          f"or change the global parameters in {qsub_total_path}")
+    print(f"Read 'yap qsub -h' if you want to have more options about sbatch. "
+          f"Alternatively, you can sbatch the commands in {script_path} by yourself, "
+          f"as long as they all get successfully executed.")
+    print('#' * 60 + '\n')
+    return
+
+
+def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
+    output_dir = snakemake_dir.parent
+    mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
+    if mode == 'm3c':
+        print('Decrease cores_per_job to 29 for m3C library.')
+        sbatch_cores_per_job = 29
+    sbatch_dir = snakemake_dir / 'sbatch'
+    sbatch_dir.mkdir(exist_ok=True)
+
+    script_path = write_commands(output_dir, cores_per_job=sbatch_cores_per_job, script_dir=sbatch_dir)
+
+    sbatch_cmd = f'yap sbatch ' \
+                 f'--project_name {name} ' \
+                 f'--command_file_path {script_path} ' \
+                 f'--working_dir {sbatch_dir} --time_str 12:00:00'  # TODO better estimate time based on total reads
+    sbatch_total_path = sbatch_dir / 'sbatch.sh'
+    with open(sbatch_total_path, 'w') as f:
+        f.write(sbatch_cmd)
+    print('#' * 60)
+    print(f"IF YOU USE SBATCH ON STAMPEDE2:")
+    print(f"All snakemake commands need to be executed "
+          f"were included in {sbatch_total_path}")
+    print(f"You just need to run this script to "
+          f"map the whole library in {output_dir}. "
+          f"Note that this script will not return until all the mapping job finished. "
+          f"So you better run this script with nohup or in a screen.")
+    print(f"You can also change "
+          f"the per job parameters in {script_path} "
+          f"or change the global parameters in {sbatch_total_path}")
+    print(f"Read 'yap sbatch -h' if you want to have more options about sbatch. "
+          f"Alternatively, you can sbatch the commands in {script_path} by yourself, "
+          f"as long as they all get successfully executed.")
+    print('#' * 60 + '\n')
+    return
+
+
+def prepare_run(output_dir, total_jobs=12, cores_per_job=8, memory_per_core='5G', name=None):
     # TODO test what parameter works best in real nova-seq data
     config = get_configuration(output_dir / 'mapping_config.ini')
     mode = config['mode']
@@ -71,55 +176,21 @@ def prepare_run(output_dir, total_jobs=20, cores_per_job=5, memory_per_core='5G'
     snakemake_dir = output_dir / 'snakemake'
     snakemake_dir.mkdir(exist_ok=True)
 
-    cmds = []
-    snake_files = list(output_dir.glob('*/Snakefile'))
-    for snake_file in snake_files:
-        cmd = f'snakemake -d {snake_file.parent} --snakefile {snake_file} -j {cores_per_job}'
-        cmds.append(cmd)
-    with open(snakemake_dir / 'snakemake_cmd.txt', 'w') as f:
-        f.write('\n'.join(cmds))
-
-    # TODO sort the commands based on total reads before write into files
-
     # this is only some automatic code for ecker lab...
     # so conditioned by the host name
     host_name = os.environ['HOSTNAME']
-    if host_name[:4] in ['bpho', 'gale', 'cemba', 'oberon']:
-        qsub_str = f"""
-        #!/bin/bash
-        #$ -N {name}
-        #$ -V
-        #$ -l h_rt=999:99:99
-        #$ -l s_rt=999:99:99
-        #$ -wd {snakemake_dir}
-        #$ -e {snakemake_dir}/qsub.error.log
-        #$ -o {snakemake_dir}/qsub.output.log
-        #$ -pe smp 1
-        #$ -l h_vmem=3G
-
-        yap qsub \
-        --command_file_path {snakemake_dir}/snakemake_cmd.txt \
-        --working_dir {snakemake_dir} \
-        --project_name {name} \
-        --total_cpu {int(cores_per_job * total_jobs)} \
-        --qsub_global_parms "-pe smp={cores_per_job};-l h_vmem={memory_per_core}"
-        """
-
-        with open(snakemake_dir / 'qsub.sh', 'w') as f:
-            f.write(qsub_str)
-        print(f"All snakemake commands need to be executed were summarized in {snakemake_dir / 'qsub.sh'}")
-        print(f'You just need to qsub this script to map the whole library in {output_dir}')
-
-        # TODO generate sbatch script automatically
+    if any([host_name.startswith(s) for s in INHOUSE_SERVERS]):
+        prepare_qsub(name=name,
+                     snakemake_dir=snakemake_dir,
+                     total_jobs=total_jobs,
+                     cores_per_job=cores_per_job,
+                     memory_per_core=memory_per_core)
+        prepare_sbatch(name=name, snakemake_dir=snakemake_dir)
     else:
-        print(f"All snakemake commands need to be executed were summarized in {snakemake_dir / 'snakemake_cmd.txt'}")
+        script_path = write_commands(output_dir, cores_per_job, script_dir=snakemake_dir)
+        print(f"All snakemake commands need to be executed were summarized in {script_path}")
         print(f"You need to execute them based on the computational environment you have "
               f"(e.g., use a job scheduler or run locally).")
 
     print(f"Once all commands are executed successfully, use 'yap summary' to generate final mapping summary.")
     return
-
-
-def final_summary():
-    # TODO
-    raise NotImplementedError

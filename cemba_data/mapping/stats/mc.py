@@ -37,3 +37,15 @@ def mc_mapping_stats(output_dir, config):
     allc_df = generate_allc_stats(output_dir, config)
     final_df = pd.concat([mapping_df, allc_df], sort=True, axis=1)
     return final_df
+
+
+def mc_additional_cols(final_df):
+    """Additional columns for mC mapping summary"""
+    final_df = final_df.copy()
+    final_df['CellInputReadPairs'] = final_df['R1InputReads'].astype(int)  # == final_df['R2InputReads']
+    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                    for _, i in final_df.groupby('PCRIndex')])
+    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+
+    final_df['FinalmCReads'] = final_df['R1FinalBismarkReads'] + final_df['R2FinalBismarkReads']
+    return final_df

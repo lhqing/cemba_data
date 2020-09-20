@@ -218,20 +218,20 @@ rule dedup_r2_bam:
         "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
 
 # merge R1 and R2, get final bam for mC calling
-rule merge_bam:
+rule merge_mc_bam:
     input:
         "bam/{cell_id}-R1.two_mapping.deduped.bam",
         "bam/{cell_id}-R2.two_mapping.deduped.bam"
     output:
-        temp("bam/{cell_id}.mC.bam"),
-        temp("bam/{cell_id}.mC.bam.bai")
+        bam=temp("bam/{cell_id}.mC.bam"),
+        bai=temp("bam/{cell_id}.mC.bam.bai")
     shell:
-        "samtools merge -f {output} {input} && samtools index {output}"
+        "samtools merge -f {output.bam} {input} && samtools index {output.bam}"
 
 # generate ALLC
 rule allc:
     input:
-        bam="bam/{cell_id}.mC.bam"
+        bam="bam/{cell_id}.mC.bam",
         index="bam/{cell_id}.mC.bam.bai"
     output:
         allc="allc/{cell_id}.allc.tsv.gz",
@@ -252,7 +252,7 @@ rule allc:
 
 # merge and sort (by read name) bam before dedup for generating contact
 # contact dedup happen within generate contact
-rule merge_bam_for_contact:
+rule merge_3c_bam_for_contact:
     input:
         "bam/{cell_id}-R1.two_mapping.sorted.bam",
         "bam/{cell_id}-R2.two_mapping.sorted.bam"

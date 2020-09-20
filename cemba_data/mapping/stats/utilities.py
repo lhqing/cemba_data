@@ -109,13 +109,17 @@ def generate_allc_stats(output_dir, config):
     for pattern in pattern_translate.keys():
         contexts = parse_mc_pattern(pattern)
         pattern_stats = total_stats[total_stats.index.isin(contexts)]
-        cell_sum = pattern_stats.groupby('cell_id')[['mc', 'cov']].sum()
-        cell_record = cell_sum['mc'] / cell_sum['cov']
+        cell_level_data = pattern_stats.groupby('cell_id')[['mc', 'cov']].sum()
+        cell_level_data['frac'] = cell_level_data['mc'] / cell_level_data['cov']
 
+        # prettify col name
         _pattern = pattern_translate[pattern]
-        cell_record.name = f'{_pattern}Rate'
-        cell_records.append(cell_record)
-    final_df = pd.DataFrame(cell_records).T.reindex(allc_stats_dict.keys())
+        cell_level_data = cell_level_data.rename(
+            columns={'frac': f'{_pattern}Frac',
+                     'mc': f'{_pattern}mC',
+                     'cov': f'{_pattern}Cov'})
+        cell_records.append(cell_level_data)
+    final_df = pd.concat(cell_records, axis=1, sort=True).reindex(allc_stats_dict.keys())
     final_df['GenomeCov'] = cell_genome_cov
     final_df.index.name = 'cell_id'
     return final_df

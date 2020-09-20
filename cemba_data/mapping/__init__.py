@@ -1,2 +1,4 @@
-from .pipelines import prepare_run, final_summary
+from .pipelines import prepare_run
+from .stats import final_summary
 from .config import print_default_mapping_config
+from .stats.plot import *
