@@ -105,7 +105,7 @@ def squeue():
 
     sep_pattern = re.compile(r' +')
     contents = [sep_pattern.split(line.strip())
-                for line in squeue_result.split('\n')]
+                for line in squeue_result.rstrip('\n').split('\n')]
     squeue_df = pd.DataFrame(contents[1:],
                              columns=contents[0])
     squeue_df = squeue_df.set_index('JOBID')
@@ -154,8 +154,7 @@ def sacct(jobs):
     lines = []
     header = ''
     col_starts = []
-    for i, line in enumerate(sacct_result.split('\n')):
-        line = line.rstrip('\n')
+    for i, line in enumerate(sacct_result.rstrip('\n').split('\n')):
         if i == 0:
             header = line
         elif i == 1:
