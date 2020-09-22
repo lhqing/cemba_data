@@ -125,7 +125,7 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
         email_str = ''
         email_type_str = ''
 
-    command_to_job_script_paths = {}
+    script_path_to_command = {}
     for i, command in enumerate(commands):
         job_name = f'{name_prefix}_{i}'
         sbatch_script = sbatch_template.format(
@@ -134,13 +134,14 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
             time_str=time_str,
             email_str=email_str,
             email_type_str=email_type_str,
-            command=command
+            command=command,
+            log_dir=sbatch_dir
         )
         job_script_path = sbatch_dir / f'{job_name}.sh'
         with open(job_script_path, 'w') as f:
             f.write(sbatch_script)
-        command_to_job_script_paths[command] = job_script_path
-    return command_to_job_script_paths
+        script_path_to_command[job_script_path] = command
+    return script_path_to_command
 
 
 def sacct(jobs):
@@ -217,7 +218,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
         previous_sacct_df_success = previous_sacct_df[previous_sacct_df['Success']]
 
     # create job script files
-    command_to_job_script_paths = make_sbatch_script_files(
+    script_path_to_command = make_sbatch_script_files(
         commands=commands,
         sbatch_dir=sbatch_dir,
         name_prefix=project_name,
@@ -229,7 +230,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
     # prepare submission
     running_job_id_set = set()  # sbatch_id
     finished_job_id_set = set()  # job_id
-    queue_job_path_list = list(command_to_job_script_paths.values()).copy()
+    queue_job_path_list = list(script_path_to_command.keys()).copy()
     job_id_to_script_path = {}
 
     # start submission
@@ -259,7 +260,6 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
             for job_id in running_job_id_set:
                 if job_id not in squeue_df.index:
                     # running job finished
-                    script_path = job_id_to_script_path[job_id]
                     finished_job_id_set.add(job_id)
                     # status will be judged in the end
                 else:
@@ -291,7 +291,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
     # only check status if something has finished
     if len(finished_job_id_set) > 0:
         # check status
-        chunk_size = 100
+        chunk_size = 50
         stats = []
         finished_job_ids = list(finished_job_id_set)
         for i in range(0, len(finished_job_ids), chunk_size):
