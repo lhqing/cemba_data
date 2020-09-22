@@ -277,10 +277,9 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
             while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
                 script_path = queue_job_path_list.pop()
                 # skip if job already submitted and are successful before
-                if previous_sacct_df_success is not None:
-                    if script_path in successful_script_paths:
-                        print(f'Already successful in previous submission: {script_path}')
-                        continue
+                if script_path in successful_script_paths:
+                    print(f'Already successful in previous submission: {script_path}')
+                    continue
                 job_id = submit_sbatch(script_path)
                 running_job_id_set.add(job_id)
                 job_id_to_script_path[job_id] = script_path
