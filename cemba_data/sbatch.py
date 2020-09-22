@@ -43,7 +43,7 @@ def get_job_id(sbatch_result):
     sbatch job_id
     """
     job_id = None
-    for line in sbatch_result:
+    for line in sbatch_result.split('\n'):
         line = line.strip()
         if line.startswith('-->'):
             # status line
@@ -104,10 +104,10 @@ def squeue():
     print(squeue_result, end='\n\n')
 
     sep_pattern = re.compile(r' +')
-    contents = [sep_pattern.split(line.strip()) for line in squeue_result]
+    contents = [sep_pattern.split(line.strip())
+                for line in squeue_result.split('\n')]
     squeue_df = pd.DataFrame(contents[1:],
                              columns=contents[0])
-    print(squeue_df)
     squeue_df = squeue_df.set_index('JOBID')
     return squeue_df
 
@@ -154,7 +154,7 @@ def sacct(jobs):
     lines = []
     header = ''
     col_starts = []
-    for i, line in enumerate(sacct_result):
+    for i, line in enumerate(sacct_result.split('\n')):
         line = line.rstrip('\n')
         if i == 0:
             header = line
