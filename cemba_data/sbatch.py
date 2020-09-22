@@ -213,9 +213,12 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
     # I only keep successful items, and skip them in this submission.
     sacct_path = sbatch_dir / 'sacct.csv.gz'
     previous_sacct_df_success = None
+    successful_script_paths = set()
     if sacct_path.exists():
+        print('Found previous submission records, successful jobs will not be submit again.')
         previous_sacct_df = pd.read_csv(sacct_path, index_col=0)
         previous_sacct_df_success = previous_sacct_df[previous_sacct_df['Success']]
+        successful_script_paths = set(previous_sacct_df_success['ScriptPath'].tolist())
 
     # create job script files
     script_path_to_command = make_sbatch_script_files(
@@ -275,7 +278,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                 script_path = queue_job_path_list.pop()
                 # skip if job already submitted and are successful before
                 if previous_sacct_df_success is not None:
-                    if script_path in previous_sacct_df_success['ScriptPath']:
+                    if script_path in successful_script_paths:
                         print(f'Already successful in previous submission: {script_path}')
                         continue
                 job_id = submit_sbatch(script_path)
