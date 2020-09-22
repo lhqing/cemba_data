@@ -205,7 +205,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
 
     # make sbatch_dir
     sbatch_dir = pathlib.Path(working_dir) / f'{project_name}_sbatch'
-    sbatch_dir.mkdir(exist_ok=True)
+    sbatch_dir.mkdir(exist_ok=True, parents=True)
 
     # check if sacct file exists, which could from previous submission.
     # I only keep successful items, and skip them in this submission.
