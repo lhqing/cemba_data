@@ -60,11 +60,16 @@ def make_snakefile(output_dir):
 
 
 def write_commands(output_dir, cores_per_job, script_dir):
+    output_dir_name = output_dir.name
+    stampede2_scratch = '$SCRATCH'  # I assume output dir is located in $SCRATCH of stampede
     cmds = {}
     snake_files = list(output_dir.glob('*/Snakefile'))
     for snake_file in snake_files:
         uid = snake_file.parent.name
-        cmd = f'snakemake -d {snake_file.parent} --snakefile {snake_file} -j {cores_per_job}'
+        # I assume output dir is located in $SCRATCH of stampede. If not, user should make command list by themselves
+        cmd = f'snakemake -d {stampede2_scratch}/{output_dir_name}/{snake_file.parent.name} ' \
+              f'--snakefile {stampede2_scratch}/{output_dir_name}/{snake_file.parent.name}/{snake_file} ' \
+              f'-j {cores_per_job}'
         cmds[uid] = cmd
     uid_order = pd.read_csv(
         output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
@@ -80,7 +85,8 @@ def write_commands(output_dir, cores_per_job, script_dir):
             print(cmds)
             print(uid_order)
             raise e
-    return script_path
+    stampede2_script_path = f'{stampede2_scratch}/{output_dir_name}/snakemake/sbatch/snakemake_cmd.txt'
+    return stampede2_script_path
 
 
 def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core):
@@ -133,13 +139,16 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
         sbatch_cores_per_job = 29
     sbatch_dir = snakemake_dir / 'sbatch'
     sbatch_dir.mkdir(exist_ok=True)
+    output_dir_name = output_dir.name
+    stampede2_scratch = '$SCRATCH'  # I assume output dir is located in $SCRATCH of stampede
 
     script_path = write_commands(output_dir, cores_per_job=sbatch_cores_per_job, script_dir=sbatch_dir)
-
+    # the path here is using stampede path
     sbatch_cmd = f'yap sbatch ' \
                  f'--project_name {name} ' \
                  f'--command_file_path {script_path} ' \
-                 f'--working_dir {sbatch_dir} --time_str 12:00:00'  # TODO better estimate time based on total reads
+                 f'--working_dir {stampede2_scratch}/{output_dir_name}/snakemake/sbatch ' \
+                 f'--time_str 12:00:00'  # TODO better estimate time based on total reads
     sbatch_total_path = sbatch_dir / 'sbatch.sh'
     with open(sbatch_total_path, 'w') as f:
         f.write(sbatch_cmd)
