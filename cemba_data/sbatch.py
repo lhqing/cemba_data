@@ -140,7 +140,7 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
         job_script_path = sbatch_dir / f'{job_name}.sh'
         with open(job_script_path, 'w') as f:
             f.write(sbatch_script)
-        script_path_to_command[job_script_path] = command
+        script_path_to_command[str(job_script_path)] = command
     return script_path_to_command
 
 
@@ -278,8 +278,6 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
             while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
                 script_path = queue_job_path_list.pop()
                 # skip if job already submitted and are successful before
-                print(script_path)
-                print(successful_script_paths)
                 if script_path in successful_script_paths:
                     print(f'Already successful in previous submission: {script_path}')
                     continue
