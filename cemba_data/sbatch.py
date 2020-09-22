@@ -100,13 +100,15 @@ def squeue():
                                    check=True,
                                    encoding='utf8',
                                    stdout=subprocess.PIPE).stdout
+    print('Current squeue output:')
+    print(squeue_result, end='\n\n')
 
     sep_pattern = re.compile(r' +')
     contents = [sep_pattern.split(line.strip()) for line in squeue_result]
     squeue_df = pd.DataFrame(contents[1:],
-                             columns=contents[0]).set_index('JOBID')
-    print('Current squeue output:')
-    print(squeue_result, end='\n\n')
+                             columns=contents[0])
+    print(squeue_df)
+    squeue_df = squeue_df.set_index('JOBID')
     return squeue_df
 
 
