@@ -219,6 +219,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
         previous_sacct_df = pd.read_csv(sacct_path, index_col=0)
         previous_sacct_df_success = previous_sacct_df[previous_sacct_df['Success']]
         successful_script_paths = set(previous_sacct_df_success['ScriptPath'].tolist())
+        print(f'Successful script paths: {", ".join(successful_script_paths)}')
 
     # create job script files
     script_path_to_command = make_sbatch_script_files(
