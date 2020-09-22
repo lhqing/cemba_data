@@ -155,7 +155,6 @@ def sbatch_register_subparser(subparser):
         "--command_file_path",
         type=str,
         required=True,
-        nargs='+',
         help="Each row is a command."
     )
 

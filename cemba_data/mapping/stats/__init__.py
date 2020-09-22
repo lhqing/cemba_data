@@ -96,7 +96,7 @@ def final_summary(output_dir, cleanup=True):
             parameters=dict(output_dir=str(output_dir))
         )
         print('Summary notebook successfully executed. Exporting HTML...')
-        subprocess.run(['jupyter', 'nbconvert', str(nb_path)])
+        subprocess.run(['jupyter', 'nbconvert', '--to', 'html', str(nb_path)])
         print(f'See the summary plots here: {str(nb_path)[:-5]}html')
         print(f'Or customize the summary plots here: {nb_path}')
     except PapermillExecutionError:

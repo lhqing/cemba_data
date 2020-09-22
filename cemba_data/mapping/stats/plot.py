@@ -1,3 +1,5 @@
+import copy
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -86,7 +88,7 @@ def plot_on_plate(data,
     fig = plt.figure(figsize=((6.2 * ncols) * (1 + cbar_frac) * figsize_scale,
                               4 * nrows * figsize_scale))
     gs = fig.add_gridspec(nrows, ncols, wspace=0.1)
-    cmap = plt.cm.viridis
+    cmap = copy.copy(mpl.cm.get_cmap("viridis"))
     cmap.set_under(color='#440154')
     cmap.set_over(color='#FDE725')
     cmap.set_bad(color='#FFFFFF')
