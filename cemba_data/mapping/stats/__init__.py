@@ -36,7 +36,7 @@ def mapping_stats(output_dir):
     return
 
 
-def final_summary(output_dir, cleanup=True):
+def final_summary(output_dir, cleanup=True, notebook=None):
     output_dir = pathlib.Path(output_dir).absolute()
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
     path_to_remove = []
@@ -88,7 +88,11 @@ def final_summary(output_dir, cleanup=True):
     nb_path = output_dir / 'stats/MappingSummary.ipynb'
     try:
         mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
-        template_notebook = PACKAGE_DIR / f'files/mapping_summary_template/{mode}_template.ipynb'
+        if notebook is None:
+            template_notebook = PACKAGE_DIR / f'files/mapping_summary_template/{mode}_template.ipynb'
+        else:
+            template_notebook = str(notebook)
+        print(f'Using notebook template from {template_notebook}')
         print('Executing summary plotting notebook...')
         execute_notebook(
             input_path=str(template_notebook),

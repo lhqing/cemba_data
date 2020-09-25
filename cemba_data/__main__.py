@@ -421,6 +421,15 @@ def summary_register_subparser(subparser):
         required=True,
         help="Pipeline output directory."
     )
+
+    parser_req.add_argument(
+        "--notebook",
+        '-nb',
+        type=str,
+        required=False,
+        default=None,
+        help="Notebook template for mapping summary, if not provided, will use yap default template."
+    )
     return
 
 
