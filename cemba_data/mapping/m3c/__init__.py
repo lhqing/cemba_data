@@ -145,29 +145,36 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=1000):
         for chunk in data:
             for _, row in chunk.iterrows():
                 total += 1
-                pos = row.dropna().tolist()
-                if len(pos) < 2:
+                pos_to_chr = {p: p.split(':')[1]
+                              for p in row.dropna()
+                              if p.split(':')[1] in chrom_set}
+                if len(pos_to_chr) < 2:
+                    # only one frag mapped, not contact
                     continue
                 else:
-                    read1, *_, read2 = pos
-                    _, chr1, pos1 = read1.split(':')
-                    _, chr2, pos2 = read2.split(':')
-                    if (chr1 in chrom_set) and (chr2 in chrom_set):
-                        chr1_int = chrom_list.index(chr1)
-                        chr2_int = chrom_list.index(chr2)
-                        pos1 = int(pos1)
-                        pos2 = int(pos2)
-                        if (chr1_int > chr2_int) or ((chr1_int == chr2_int) and (pos1 > pos2)):
-                            read1, read2 = read2, read1
-                        if chr1_int == chr2_int:
-                            if abs(pos1 - pos2) > min_gap:
-                                cis_long += 1
-                                f.write(f'{read1}\t0\t{read2}\t1\n'.replace(':', '\t'))
-                            else:
-                                cis_short += 1
-                        else:
-                            trans += 1
+                    # first check if chrom is unique, if not, this is trans
+                    unique_chroms = set(pos_to_chr.values())
+                    if len(unique_chroms) > 2:
+                        # more than two chr is abnormal
+                        continue
+                    elif len(unique_chroms) == 2:
+                        trans += 1
+                        # order pos by chrom list, take one from each side/chrom
+                        (read1, _), *_, (read2, _) = sorted(pos_to_chr.items(),
+                                                            key=lambda i: chrom_list.index(i[1]))
+                        f.write(f'{read1}\t0\t{read2}\t1\n'.replace(':', '\t'))
+                    else:
+                        # cis
+                        # order the pos, take left or right most
+                        read1, *_, read2 = sorted(pos_to_chr.keys(),
+                                                  key=lambda i: int(i.split(':')[-1]))
+                        pos1 = int(read1.split(':')[-1])
+                        pos2 = int(read2.split(':')[-1])
+                        if abs(pos1 - pos2) > min_gap:
+                            cis_long += 1
                             f.write(f'{read1}\t0\t{read2}\t1\n'.replace(':', '\t'))
+                        else:
+                            cis_short += 1
     counts = {'CisShortContact': cis_short,
               'CisLongContact': cis_long,
               'TransContact': trans,

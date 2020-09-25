@@ -161,7 +161,8 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
           f"the per job parameters in {script_path} "
           f"or change the global parameters in {sbatch_total_path}")
     print(f"Read 'yap sbatch -h' if you want to have more options about sbatch. "
-          f"Alternatively, you can sbatch the commands in {script_path} by yourself, "
+          f"Alternatively, you can sbatch the commands in "
+          f"$SCRATCH/{output_dir_name}/snakemake/sbatch/sbatch.sh by yourself, "
           f"as long as they all get successfully executed.")
     print('#' * 60 + '\n')
     return

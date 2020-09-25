@@ -274,8 +274,8 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
             print(f'{len(running_job_id_set)} running job IDs: {", ".join(running_job_id_set)}')
 
             # submit new jobs
-            print(f'Going to submit {min(len(queue_job_path_list), remaining_slots)} new jobs')
             while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
+                print(f'Going to submit {min(len(queue_job_path_list), remaining_slots)} new jobs')
                 script_path = queue_job_path_list.pop()
                 # skip if job already submitted and are successful before
                 if script_path in successful_script_paths:
