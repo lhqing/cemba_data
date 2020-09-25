@@ -59,7 +59,34 @@ def make_snakefile(output_dir):
     return
 
 
-def write_commands(output_dir, cores_per_job, script_dir):
+def write_qsub_commands(output_dir, cores_per_job, script_dir):
+    cmds = {}
+    snake_files = list(output_dir.glob('*/Snakefile'))
+    for snake_file in snake_files:
+        uid = snake_file.parent.name
+        cmd = f'snakemake ' \
+              f'-d {snake_file.parent} ' \
+              f'--snakefile {snake_file} ' \
+              f'-j {cores_per_job}'
+        cmds[uid] = cmd
+    uid_order = pd.read_csv(
+        output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
+    ).sort_values(ascending=False)
+    script_path = script_dir / 'snakemake_cmd.txt'
+    with open(script_path, 'w') as f:
+        for uid in uid_order.index:
+            if uid in cmds:
+                f.write(cmds.pop(uid) + '\n')
+        try:
+            assert len(cmds) == 0
+        except AssertionError as e:
+            print(cmds)
+            print(uid_order)
+            raise e
+    return script_path
+
+
+def write_sbatch_commands(output_dir, cores_per_job, script_dir):
     output_dir_name = output_dir.name
     cmds = {}
     snake_files = list(output_dir.glob('*/Snakefile'))
@@ -91,7 +118,7 @@ def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core
     output_dir = snakemake_dir.parent
     qsub_dir = snakemake_dir / 'qsub'
     qsub_dir.mkdir(exist_ok=True)
-    script_path = write_commands(output_dir, cores_per_job, script_dir=qsub_dir)
+    script_path = write_qsub_commands(output_dir, cores_per_job, script_dir=qsub_dir)
     qsub_str = f"""
 #!/bin/bash
 #$ -N {name}
@@ -139,13 +166,13 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
     sbatch_dir = snakemake_dir / 'sbatch'
     sbatch_dir.mkdir(exist_ok=True)
 
-    script_path = write_commands(output_dir, cores_per_job=sbatch_cores_per_job, script_dir=sbatch_dir)
+    script_path = write_sbatch_commands(output_dir, cores_per_job=sbatch_cores_per_job, script_dir=sbatch_dir)
     # the path here is using stampede path
     sbatch_cmd = f'yap sbatch ' \
                  f'--project_name {name} ' \
                  f'--command_file_path {script_path} ' \
                  f'--working_dir $SCRATCH/{output_dir_name}/snakemake/sbatch ' \
-                 f'--time_str 12:00:00'  # TODO better estimate time based on total reads
+                 f'--time_str 8:00:00'  # TODO better estimate time based on total reads
     sbatch_total_path = sbatch_dir / 'sbatch.sh'
     with open(sbatch_total_path, 'w') as f:
         f.write(sbatch_cmd)
@@ -169,7 +196,6 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
 
 
 def prepare_run(output_dir, total_jobs=12, cores_per_job=8, memory_per_core='5G', name=None):
-    # TODO test what parameter works best in real nova-seq data
     config = get_configuration(output_dir / 'mapping_config.ini')
     mode = config['mode']
     if mode in ['mc', 'm3c'] and cores_per_job < 4:
@@ -194,7 +220,7 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=8, memory_per_core='5G'
                      memory_per_core=memory_per_core)
         prepare_sbatch(name=name, snakemake_dir=snakemake_dir)
     else:
-        script_path = write_commands(output_dir, cores_per_job, script_dir=snakemake_dir)
+        script_path = write_qsub_commands(output_dir, cores_per_job, script_dir=snakemake_dir)
         print(f"All snakemake commands need to be executed were summarized in {script_path}")
         print(f"You need to execute them based on the computational environment you have "
               f"(e.g., use a job scheduler or run locally).")

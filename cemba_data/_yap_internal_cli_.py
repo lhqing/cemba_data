@@ -230,6 +230,13 @@ def split_read_internal_subparser(subparser):
     )
 
     parser_req.add_argument(
+        "--trim_b",
+        type=int,
+        default=0,
+        help="Whether trim on both ends before splitting reads. Default is not trim."
+    )
+
+    parser_req.add_argument(
         "--size_l",
         type=int,
         default=40,

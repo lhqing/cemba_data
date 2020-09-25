@@ -97,7 +97,7 @@ rule split_um_fastq_r1:
     shell:
         "yap-internal m3c-split-reads --fastq_path {input} --output_path {output} "
         "--size_l {split_left_size} --size_r {split_right_size} "
-        "--size_m {split_middle_min_size}"
+        "--size_m {split_middle_min_size} --trim_b {trim_on_both_end}"
 
 rule split_um_fastq_r2:
     input:
@@ -109,7 +109,7 @@ rule split_um_fastq_r2:
     shell:
         "yap-internal m3c-split-reads --fastq_path {input} --output_path {output} "
         "--size_l {split_left_size} --size_r {split_right_size} "
-        "--size_m {split_middle_min_size}"
+        "--size_m {split_middle_min_size} --trim_b {trim_on_both_end}"
 
 # map split fastq again
 rule bismark_split_r1:

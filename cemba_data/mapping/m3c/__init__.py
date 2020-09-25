@@ -7,7 +7,7 @@ import pandas as pd
 import pysam
 
 
-def split_fastq_reads(fastq_path, output_path, size_l=40, size_r=40, size_m=30):
+def split_fastq_reads(fastq_path, output_path, trim_b=0, size_l=40, size_r=40, size_m=30):
     """
     Split reads in the fastq file into three parts for remapping.
     Depending on the read length, reads may be
@@ -23,6 +23,7 @@ def split_fastq_reads(fastq_path, output_path, size_l=40, size_r=40, size_m=30):
     ----------
     fastq_path
     output_path
+    trim_b
     size_l
     size_r
     size_m
@@ -31,10 +32,13 @@ def split_fastq_reads(fastq_path, output_path, size_l=40, size_r=40, size_m=30):
     -------
 
     """
+    trim_b = int(trim_b)
     size_max = max(size_l, size_r)
     with dnaio.open(fastq_path) as f, \
             dnaio.open(output_path, mode='w') as out_f:
         for read in f:
+            if trim_b > 0:
+                read = read[trim_b:-trim_b]
             read_length = len(read)
             if read_length <= size_max:
                 continue
