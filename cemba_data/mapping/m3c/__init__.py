@@ -156,19 +156,19 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=1000):
                     # only one frag mapped, not contact
                     continue
                 else:
-                    # first check if chrom is unique, if not, this is trans
                     unique_chroms = set(pos_to_chr.values())
                     if len(unique_chroms) > 2:
                         # more than two chr is abnormal
                         continue
                     elif len(unique_chroms) == 2:
+                        # trans contact
                         trans += 1
                         # order pos by chrom list, take one from each side/chrom
                         (read1, _), *_, (read2, _) = sorted(pos_to_chr.items(),
                                                             key=lambda i: chrom_list.index(i[1]))
                         f.write(f'{read1}\t0\t{read2}\t1\n'.replace(':', '\t'))
                     else:
-                        # cis
+                        # cis contact
                         # order the pos, take left or right most
                         read1, *_, read2 = sorted(pos_to_chr.keys(),
                                                   key=lambda i: int(i.split(':')[-1]))
