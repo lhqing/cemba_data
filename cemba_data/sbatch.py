@@ -103,12 +103,27 @@ def squeue():
     print('Current squeue output:')
     print(squeue_result, end='\n\n')
 
-    sep_pattern = re.compile(r' +')
-    contents = [sep_pattern.split(line.strip())
-                for line in squeue_result.rstrip('\n').split('\n')]
-    squeue_df = pd.DataFrame(contents[1:],
-                             columns=contents[0])
-    squeue_df = squeue_df.set_index('JOBID')
+    records = []
+    for i, line in enumerate(squeue_result.split('\n')):
+        col_names = []
+        col_end_pos = []
+        if i == 0:
+            sep_pattern = re.compile(r' +')
+            col_names = sep_pattern.split(line.strip())
+            col_end_pos = [0] + [line.index(col_name) + len(col_name) for col_name in col_names]
+        if line == '':
+            continue
+        record = []
+        for j in range(len(col_end_pos) - 1):
+            if j != len(col_names) - 1:
+                col_data = line[col_end_pos[j]:col_end_pos[j + 1]]
+            else:
+                # for last column, take all the rest chr
+                col_data = line[col_end_pos[j]:]
+            record.append(col_data.strip())
+        records.append(record)
+    squeue_df = pd.DataFrame(records[1:],
+                             columns=records[0]).set_index('JOBID')
     return squeue_df
 
 
