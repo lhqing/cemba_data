@@ -121,7 +121,7 @@ def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core
     script_path = write_qsub_commands(output_dir, cores_per_job, script_dir=qsub_dir)
     qsub_str = f"""
 #!/bin/bash
-#$ -N {name}
+#$ -N yap{name}
 #$ -V
 #$ -l h_rt=999:99:99
 #$ -l s_rt=999:99:99
@@ -134,7 +134,7 @@ def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core
 yap qsub \
 --command_file_path {script_path} \
 --working_dir {qsub_dir} \
---project_name {name} \
+--project_name y{name} \
 --total_cpu {int(cores_per_job * total_jobs)} \
 --qsub_global_parms "-pe smp={cores_per_job};-l h_vmem={memory_per_core}"
 """

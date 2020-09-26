@@ -181,7 +181,6 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=1000):
                             cis_short += 1
     counts = {'CisShortContact': cis_short,
               'CisLongContact': cis_long,
-              'TransContact': trans,
-              'TotalReadsIn3CBAM': total}
+              'TransContact': trans}
     pd.Series(counts).to_csv(f'{output_path}.counts.txt', header=False)
     return

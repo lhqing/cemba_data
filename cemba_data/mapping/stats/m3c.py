@@ -16,8 +16,8 @@ def _m3c_bam_unique_read_counts(bam_path, read_type_int):
 
 def _m3c_count_bams(bam_dir, cell_id, read_type):
     bam_path_dict = {
-        f'{read_type}UniqueMapped': bam_dir / f'{cell_id}-{read_type}.two_mapping.filter.bam',
-        f'{read_type}Dedupped': bam_dir / f'{cell_id}-{read_type}.two_mapping.deduped.bam',
+        f'{read_type}UniqueMappedReads': bam_dir / f'{cell_id}-{read_type}.two_mapping.filter.bam',
+        f'{read_type}DeduppedReads': bam_dir / f'{cell_id}-{read_type}.two_mapping.deduped.bam',
     }
     read_counts = {name: _m3c_bam_unique_read_counts(path, 1 if read_type == 'R1' else 2)
                    for name, path in bam_path_dict.items()}
@@ -61,13 +61,13 @@ def m3c_mapping_stats(output_dir, config):
 
 
 def m3c_additional_cols(final_df):
-    final_df['FinalmCReads'] = final_df['R1Dedupped'] + final_df['R2Dedupped']
+    final_df['FinalmCReads'] = final_df['R1DeduppedReads'] + final_df['R2DeduppedReads']
     final_df['CellInputReadPairs'] = final_df['R1InputReads']
     # use % to be consistent with others
-    final_df['R1MappingRate'] = final_df['R1UniqueMapped'] / final_df['R1TrimmedReads'] * 100
-    final_df['R2MappingRate'] = final_df['R2UniqueMapped'] / final_df['R2TrimmedReads'] * 100
-    final_df['R1DuplicationRate'] = (1 - final_df['R1Dedupped'] / final_df['R1UniqueMapped']) * 100
-    final_df['R2DuplicationRate'] = (1 - final_df['R2Dedupped'] / final_df['R2UniqueMapped']) * 100
+    final_df['R1MappingRate'] = final_df['R1UniqueMappedReads'] / final_df['R1TrimmedReads'] * 100
+    final_df['R2MappingRate'] = final_df['R2UniqueMappedReads'] / final_df['R2TrimmedReads'] * 100
+    final_df['R1DuplicationRate'] = (1 - final_df['R1DeduppedReads'] / final_df['R1UniqueMappedReads']) * 100
+    final_df['R2DuplicationRate'] = (1 - final_df['R2DeduppedReads'] / final_df['R2UniqueMappedReads']) * 100
 
     cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
                                     for _, i in final_df.groupby('PCRIndex')])

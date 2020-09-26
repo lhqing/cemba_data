@@ -38,8 +38,8 @@ def summary_rna_mapping(output_dir):
     feature_count_summary.columns = ['FinalCountedReads', 'FinalRNAReads']
 
     total_rna_stat = feature_count_summary.copy()
-    total_rna_stat['RNAUniqueMapped'] = total_star_mapped_reads
-    total_rna_stat['SelectedRNAReadsRatio'] = total_rna_stat['FinalRNAReads'] / total_rna_stat['RNAUniqueMapped']
+    total_rna_stat['RNAUniqueMappedReads'] = total_star_mapped_reads
+    total_rna_stat['SelectedRNAReadsRatio'] = total_rna_stat['FinalRNAReads'] / total_rna_stat['RNAUniqueMappedReads']
     total_rna_stat.index.name = 'cell_id'
     return total_rna_stat
 
