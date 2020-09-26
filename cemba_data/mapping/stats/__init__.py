@@ -109,7 +109,7 @@ def final_summary(output_dir, cleanup=True, notebook=None):
 
     # delete
     if cleanup:
-        print('Clean up snakemake log...')
+        print('Clean up snakemake log (might take several minutes) ...')
         for path in path_to_remove:
             subprocess.run(['rm', '-rf', str(path)], check=True)
     return
