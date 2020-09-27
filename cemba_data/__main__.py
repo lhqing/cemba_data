@@ -169,7 +169,7 @@ def sbatch_register_subparser(subparser):
         "--time_str",
         type=str,
         required=True,
-        help="Time estimate (upper limit) of Sbatch Jobs."  # TODO provide a time estimate here
+        help="Time estimate (upper limit) of Sbatch Jobs."
     )
 
     parser_req.add_argument(
@@ -396,11 +396,11 @@ def prepare_register_subparser(subparser):
     )
 
     parser.add_argument(
-        "--memory_per_core",
+        "--memory_gb_per_core",
         "-m",
         type=str,
         default='5G',
-        help="Memory assigned to each core, "
+        help="Memory (GB) assigned to each core, "
              "the total memory of each job is (cores_per_job * memory_per_core); "
              "the total memory of all jobs is (cores_per_job * memory_per_core * total_jobs)"
     )

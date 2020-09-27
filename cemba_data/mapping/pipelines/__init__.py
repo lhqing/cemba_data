@@ -59,7 +59,8 @@ def make_snakefile(output_dir):
     return
 
 
-def write_qsub_commands(output_dir, cores_per_job, script_dir):
+def write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_dir):
+    memory_per_core = int(memory_gb_per_core[:-1]) * 1000
     cmds = {}
     snake_files = list(output_dir.glob('*/Snakefile'))
     for snake_file in snake_files:
@@ -67,7 +68,9 @@ def write_qsub_commands(output_dir, cores_per_job, script_dir):
         cmd = f'snakemake ' \
               f'-d {snake_file.parent} ' \
               f'--snakefile {snake_file} ' \
-              f'-j {cores_per_job}'
+              f'-j {cores_per_job} ' \
+              f'--default_resources mem_mb=100 ' \
+              f'--resources mem_mb={int(cores_per_job * memory_per_core)} '
         cmds[uid] = cmd
     uid_order = pd.read_csv(
         output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
@@ -86,7 +89,7 @@ def write_qsub_commands(output_dir, cores_per_job, script_dir):
     return script_path
 
 
-def write_sbatch_commands(output_dir, cores_per_job, script_dir):
+def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
     output_dir_name = output_dir.name
     cmds = {}
     snake_files = list(output_dir.glob('*/Snakefile'))
@@ -95,7 +98,9 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir):
         cmd = f'snakemake ' \
               f'-d $SCRATCH/{output_dir_name}/{snake_file.parent.name} ' \
               f'--snakefile $SCRATCH/{output_dir_name}/{snake_file.parent.name}/Snakefile ' \
-              f'-j {cores_per_job}'
+              f'-j {cores_per_job}' \
+              f'--default_resources mem_mb=100 ' \
+              f'--resources mem_mb={total_mem_mb} '
         cmds[uid] = cmd
     uid_order = pd.read_csv(
         output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
@@ -114,11 +119,11 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir):
     return f'$SCRATCH/{output_dir_name}/snakemake/sbatch/snakemake_cmd.txt'
 
 
-def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_per_core):
+def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_gb_per_core):
     output_dir = snakemake_dir.parent
     qsub_dir = snakemake_dir / 'qsub'
     qsub_dir.mkdir(exist_ok=True)
-    script_path = write_qsub_commands(output_dir, cores_per_job, script_dir=qsub_dir)
+    script_path = write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_dir=qsub_dir)
     qsub_str = f"""
 #!/bin/bash
 #$ -N yap{name}
@@ -136,7 +141,7 @@ yap qsub \
 --working_dir {qsub_dir} \
 --project_name y{name} \
 --total_cpu {int(cores_per_job * total_jobs)} \
---qsub_global_parms "-pe smp={cores_per_job};-l h_vmem={memory_per_core}"
+--qsub_global_parms "-pe smp={cores_per_job};-l h_vmem={memory_gb_per_core}"
 """
     qsub_total_path = qsub_dir / 'qsub.sh'
     with open(qsub_total_path, 'w') as f:
@@ -156,23 +161,30 @@ yap qsub \
     return
 
 
-def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
+def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=96, total_mem_mb=192000):
     output_dir = snakemake_dir.parent
     output_dir_name = output_dir.name
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
+    time_str = "8:00:00"
     if mode == 'm3c':
-        print('Decrease cores_per_job to 29 for m3C library.')
-        sbatch_cores_per_job = 29
+        time_str = "10:00:00"
+    elif mode == 'mc':
+        time_str = "7:00:00"
+    elif mode == 'mct':
+        time_str = "8:00:00"
     sbatch_dir = snakemake_dir / 'sbatch'
     sbatch_dir.mkdir(exist_ok=True)
 
-    script_path = write_sbatch_commands(output_dir, cores_per_job=sbatch_cores_per_job, script_dir=sbatch_dir)
+    script_path = write_sbatch_commands(output_dir,
+                                        cores_per_job=sbatch_cores_per_job,
+                                        script_dir=sbatch_dir,
+                                        total_mem_mb=total_mem_mb)
     # the path here is using stampede path
     sbatch_cmd = f'yap sbatch ' \
                  f'--project_name {name} ' \
                  f'--command_file_path {script_path} ' \
                  f'--working_dir $SCRATCH/{output_dir_name}/snakemake/sbatch ' \
-                 f'--time_str 8:00:00'  # TODO better estimate time based on total reads
+                 f'--time_str {time_str}'
     sbatch_total_path = sbatch_dir / 'sbatch.sh'
     with open(sbatch_total_path, 'w') as f:
         f.write(sbatch_cmd)
@@ -195,7 +207,7 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=38):
     return
 
 
-def prepare_run(output_dir, total_jobs=12, cores_per_job=8, memory_per_core='5G', name=None):
+def prepare_run(output_dir, total_jobs=12, cores_per_job=10, memory_gb_per_core='5G', name=None):
     config = get_configuration(output_dir / 'mapping_config.ini')
     mode = config['mode']
     if mode in ['mc', 'm3c'] and cores_per_job < 4:
@@ -217,10 +229,10 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=8, memory_per_core='5G'
                      snakemake_dir=snakemake_dir,
                      total_jobs=total_jobs,
                      cores_per_job=cores_per_job,
-                     memory_per_core=memory_per_core)
+                     memory_gb_per_core=memory_gb_per_core)
         prepare_sbatch(name=name, snakemake_dir=snakemake_dir)
     else:
-        script_path = write_qsub_commands(output_dir, cores_per_job, script_dir=snakemake_dir)
+        script_path = write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_dir=snakemake_dir)
         print(f"All snakemake commands need to be executed were summarized in {script_path}")
         print(f"You need to execute them based on the computational environment you have "
               f"(e.g., use a job scheduler or run locally).")

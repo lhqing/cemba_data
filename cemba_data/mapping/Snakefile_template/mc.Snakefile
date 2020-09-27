@@ -76,7 +76,7 @@ rule bismark_r1:
     threads:
         3
     resources:
-        mem_mb=16000
+        mem_mb=14000
     shell:
         # map R1 with --pbat mode
         "bismark {bismark_reference} {unmapped_param_str} --bowtie2 {input} "
@@ -91,7 +91,7 @@ rule bismark_r2:
     threads:
         3
     resources:
-        mem_mb=16000
+        mem_mb=14000
     shell:
         # map R2 with normal SE mode
         "bismark {bismark_reference} {unmapped_param_str} --bowtie2 {input} "
@@ -120,6 +120,8 @@ rule sort_r1_bam:
         "bam/{cell_id}-R1.trimmed_bismark_bt2.filter.bam"
     output:
         temp("bam/{cell_id}-R1.trimmed_bismark_bt2.sorted.bam")
+    resources:
+        mem_mb=1000
     shell:
         "samtools sort -o {output} {input}"
 
@@ -128,6 +130,8 @@ rule sort_r2_bam:
         "bam/{cell_id}-R2.trimmed_bismark_bt2.filter.bam"
     output:
         temp("bam/{cell_id}-R2.trimmed_bismark_bt2.sorted.bam")
+    resources:
+        mem_mb=1000
     shell:
         "samtools sort -o {output} {input}"
 
@@ -138,6 +142,8 @@ rule dedup_r1_bam:
     output:
         bam=temp("bam/{cell_id}-R1.trimmed_bismark_bt2.deduped.bam"),
         stats=temp("bam/{cell_id}-R1.trimmed_bismark_bt2.deduped.matrix.txt")
+    resources:
+        mem_mb=1000
     shell:
         "picard MarkDuplicates I={input} O={output.bam} M={output.stats} "
         "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
@@ -148,6 +154,8 @@ rule dedup_r2_bam:
     output:
         bam=temp("bam/{cell_id}-R2.trimmed_bismark_bt2.deduped.bam"),
         stats=temp("bam/{cell_id}-R2.trimmed_bismark_bt2.deduped.matrix.txt")
+    resources:
+        mem_mb=1000
     shell:
         "picard MarkDuplicates I={input} O={output.bam} M={output.stats} "
         "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
@@ -171,6 +179,8 @@ rule allc:
         stats=temp("allc/{cell_id}.allc.tsv.gz.count.csv")
     threads:
         2
+    resources:
+        mem_mb=500
     shell:
         'allcools bam-to-allc '
         '--bam_path {input} '

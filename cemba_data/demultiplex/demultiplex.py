@@ -43,8 +43,6 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
 
     """
     output_dir = pathlib.Path(output_dir).absolute()
-    # use 12 cores in maximum
-    cpu = min(12, cpu)
 
     # make fastq dataframe
     fastq_df = make_fastq_dataframe(fastq_pattern,
@@ -368,7 +366,8 @@ SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'm3c']
 
 def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     cpu = int(cpu)
-    demultiplex_cpu = min(16, cpu)
+    merge_cpu = min(48, cpu)
+    demultiplex_cpu = min(32, cpu)
 
     output_dir = pathlib.Path(output_dir).absolute()
     if output_dir.exists():
@@ -388,7 +387,7 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
         output_dir=output_dir,
         barcode_version=barcode_version,
         cpu=demultiplex_cpu)
-    _merge_lane(output_dir=output_dir, cpu=cpu)
+    _merge_lane(output_dir=output_dir, cpu=merge_cpu)
     _summarize_demultiplex(output_dir=output_dir, barcode_version=barcode_version)
     _final_cleaning(output_dir=output_dir)
     _skip_abnormal_fastq_pairs(output_dir=output_dir)
@@ -397,9 +396,5 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     # this is just a convenient step, so I fix the parameters here
     # users should change the resulting batch submission
     # or generate by themselves if they want different setting.
-    if config['mode'] == 'mct':
-        cores_per_job = 10
-    else:
-        cores_per_job = 8
-    prepare_run(output_dir, total_jobs=12, cores_per_job=cores_per_job, memory_per_core='5G', name=None)
+    prepare_run(output_dir)
     return
