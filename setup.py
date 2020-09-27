@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-yap_version = '0.2'
+yap_version = '1.0.0'
 
 setup(
     name='yap',
