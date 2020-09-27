@@ -104,9 +104,9 @@ def squeue():
     print(squeue_result, end='\n\n')
 
     records = []
+    col_names = []
+    col_end_pos = []
     for i, line in enumerate(squeue_result.rstrip().split('\n')):
-        col_names = []
-        col_end_pos = []
         if i == 0:
             sep_pattern = re.compile(r' +')
             col_names = sep_pattern.split(line.strip())
@@ -122,8 +122,6 @@ def squeue():
                 col_data = line[col_end_pos[j]:]
             record.append(col_data.strip())
         records.append(record)
-    print(records[1:])
-    print(records[0])
     squeue_df = pd.DataFrame(records[1:],
                              columns=records[0]).set_index('JOBID')
     return squeue_df
