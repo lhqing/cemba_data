@@ -104,7 +104,7 @@ def squeue():
     print(squeue_result, end='\n\n')
 
     records = []
-    for i, line in enumerate(squeue_result.split('\n')):
+    for i, line in enumerate(squeue_result.rstrip().split('\n')):
         col_names = []
         col_end_pos = []
         if i == 0:
