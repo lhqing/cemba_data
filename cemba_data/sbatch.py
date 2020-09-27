@@ -122,6 +122,8 @@ def squeue():
                 col_data = line[col_end_pos[j]:]
             record.append(col_data.strip())
         records.append(record)
+    print(records[1:])
+    print(records[0])
     squeue_df = pd.DataFrame(records[1:],
                              columns=records[0]).set_index('JOBID')
     return squeue_df
