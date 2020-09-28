@@ -348,7 +348,7 @@ def print_default_config_register_subparser(subparser):
     )
 
     parser.add_argument(
-        "chrom_size_path",
+        "--chrom_size_path",
         type=str,
         required=False,
         help="[m3c only] Path to the chrom size file, "
