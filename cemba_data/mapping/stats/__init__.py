@@ -84,6 +84,15 @@ def final_summary(output_dir, cleanup=True, notebook=None):
     snakemake_hiding_dirs = list(output_dir.glob('*/.snakemake'))
     path_to_remove += snakemake_hiding_dirs
 
+    # add temp dir in the bam dirs to deletion
+    mapping_temp_dirs = list(output_dir.glob('*/bam/temp'))
+    path_to_remove += mapping_temp_dirs
+
+    # write a ALLC path file for generating MCDS
+    allc_paths = pd.Series({path.name.split('.')[0]: str(path)
+                            for path in output_dir.glob('*/allc/*tsv.gz')})
+    allc_paths.to_csv(output_dir / 'stats/AllcPaths.tsv', sep='\t', header=False)
+
     # run summary notebook
     nb_path = output_dir / 'stats/MappingSummary.ipynb'
     try:
