@@ -69,7 +69,7 @@ def write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_di
               f'-d {snake_file.parent} ' \
               f'--snakefile {snake_file} ' \
               f'-j {cores_per_job} ' \
-              f'--default_resources mem_mb=100 ' \
+              f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={int(cores_per_job * memory_per_core)} '
         cmds[uid] = cmd
     uid_order = pd.read_csv(
@@ -99,7 +99,7 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
               f'-d $SCRATCH/{output_dir_name}/{snake_file.parent.name} ' \
               f'--snakefile $SCRATCH/{output_dir_name}/{snake_file.parent.name}/Snakefile ' \
               f'-j {cores_per_job}' \
-              f'--default_resources mem_mb=100 ' \
+              f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={total_mem_mb} '
         cmds[uid] = cmd
     uid_order = pd.read_csv(
