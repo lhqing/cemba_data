@@ -157,7 +157,7 @@ def get_mode(output_dir):
         return f.read()
 
 
-MAPPING_MODE_CHOICES = ['mct', 'mc']
+MAPPING_MODE_CHOICES = ['mct', 'mc', 'm3c']
 IUPAC_TABLE = {
     'A': 'A',
     'T': 'T',
