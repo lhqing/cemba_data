@@ -21,7 +21,13 @@ setup(
     package_data={
         '': ['*.txt', '*.tsv', '*.csv', '*.fa', '*Snakefile', '*ipynb']
     },
-    install_requires=['pandas>=1.0', 'numpy', 'seaborn', 'matplotlib', 'papermill', 'dnaio', 'pysam'],
+    install_requires=['pandas>=1.0',
+                      'numpy',
+                      'seaborn==0.10',
+                      'matplotlib',
+                      'papermill',
+                      'dnaio',
+                      'pysam'],
     entry_points={
         'console_scripts': ['yap=cemba_data.__main__:main',
                             'yap-internal=cemba_data._yap_internal_cli_:internal_main'],
