@@ -14,10 +14,10 @@ from cemba_data import __version__
 log = logging.getLogger()
 
 DESCRIPTION = """
-YAP (Yet Another Pipeline) is an in-house mapping pipeline for 
-snmC-seq, NOMe-seq, snmCT-seq mapping and preprocessing.
+YAP (Yet Another Pipeline) is a mapping pipeline for multiple
+snmC-seq based single-cell sequencing technologies.
 
-See documentation at https://cemba-data.readthedocs.io
+See documentation at https://hq-1.gitbook.io/mc/
 """
 
 EPILOG = """
