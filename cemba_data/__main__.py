@@ -9,6 +9,7 @@ import logging
 import sys
 
 import cemba_data
+from cemba_data import __version__
 
 log = logging.getLogger()
 
@@ -446,6 +447,8 @@ def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", help="Show version number and exit",
+                        version=__version__)
     subparsers = parser.add_subparsers(
         title="functions",
         dest="command",
