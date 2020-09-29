@@ -5,20 +5,9 @@
 
 YAP documentation
 ===============================
-YAP (Yet Another Pipeline) is a versatile mapping pipeline for snmC-seq, NOMe-seq, snmCT-seq.
+Please read the new documentation of YAP here:
+
+https://hq-1.gitbook.io/mc/
 
 - Code: https://github.com/lhqing/cemba_data
 - Author: Hanqing Liu, hanliu@salk.edu
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-   :glob:
-   
-   installation
-   TechBasic
-   PlateInfoAndSampleSheet
-   PipelineInput
-   MakeFastqDataframe
-   RunMappingFULL
-   MappingSummary

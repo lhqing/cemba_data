@@ -17,5 +17,4 @@ Technologies supported:
 - snmCT-seq (mC + RNA)
 - any NOMe treated version of the above
 
-[See Documentation](https://cemba-data.readthedocs.io/en/latest/?)
-[![Documentation Status](https://readthedocs.org/projects/cemba-data/badge/?version=latest)](https://cemba-data.readthedocs.io/en/latest/?badge=latest)
+[See Documentation](https://hq-1.gitbook.io/mc/)
