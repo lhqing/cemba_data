@@ -17,7 +17,8 @@ def m3c_config_str(config):
         'split_left_size': 40,
         'split_right_size': 40,
         'split_middle_min_size': 30,
-        'min_gap': 1000
+        'min_gap': 1000,
+        'trim_on_both_end': 5
     }
 
     str_parameters = {

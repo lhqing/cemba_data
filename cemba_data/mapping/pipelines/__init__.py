@@ -128,8 +128,8 @@ def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_gb_per_c
 #!/bin/bash
 #$ -N yap{name}
 #$ -V
-#$ -l h_rt=999:99:99
-#$ -l s_rt=999:99:99
+#$ -l h_rt=99:99:99
+#$ -l s_rt=99:99:99
 #$ -wd {qsub_dir}
 #$ -e {qsub_dir}/qsub.error.log
 #$ -o {qsub_dir}/qsub.output.log
