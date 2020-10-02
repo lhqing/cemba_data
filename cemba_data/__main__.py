@@ -292,7 +292,8 @@ def demultiplex_register_subparser(subparser):
         '-j',
         type=int,
         required=True,
-        help="Number of cores to use. Note that the demultiplex step will only use at most 16 cores."
+        help="Number of cores to use. Note that the demultiplex step will only use at most 32 cores, "
+             "the merge lane step will use the number of cores you provided."
     )
     return
 
