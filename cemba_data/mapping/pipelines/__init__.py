@@ -98,7 +98,7 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
         cmd = f'snakemake ' \
               f'-d $SCRATCH/{output_dir_name}/{snake_file.parent.name} ' \
               f'--snakefile $SCRATCH/{output_dir_name}/{snake_file.parent.name}/Snakefile ' \
-              f'-j {cores_per_job}' \
+              f'-j {cores_per_job} ' \
               f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={total_mem_mb} '
         cmds[uid] = cmd
