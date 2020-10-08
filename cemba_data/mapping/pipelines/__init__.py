@@ -256,6 +256,7 @@ def start_from_cell_fastq(output_dir, fastq_pattern, config_path):
     output_dir = pathlib.Path(output_dir).absolute()
     if output_dir.exists():
         raise FileExistsError(f'Output dir {output_dir} already exist, please delete it or use another path.')
+    output_dir.mkdir()
     subprocess.run(['cp', config_path, f'{output_dir}/mapping_config.ini'], check=True)
     stats_dir = output_dir / 'stats'
     stats_dir.mkdir(exist_ok=True)
