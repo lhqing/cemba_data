@@ -1,7 +1,8 @@
+import glob
 import os
 import pathlib
-import glob
 import subprocess
+
 import pandas as pd
 
 import cemba_data
@@ -270,11 +271,13 @@ def start_from_cell_fastq(output_dir, fastq_pattern, config_path):
         cell_id = '-'.join(cell_id)
         if suffix == 'R1.fq.gz':
             if cell_id in r1_records:
-                raise ValueError(f'Found duplicated cell ID: {cell_id}')
+                raise ValueError(f'Found duplicated cell ID: {cell_id}, '
+                                 f'File caused this error: {path}')
             r1_records[cell_id] = path
         elif suffix == 'R2.fq.gz':
             if cell_id in r2_records:
-                raise ValueError(f'Found duplicated cell ID: {cell_id}')
+                raise ValueError(f'Found duplicated cell ID: {cell_id}, '
+                                 f'File caused this error: {path}')
             r2_records[cell_id] = path
         else:
             raise ValueError(

@@ -397,7 +397,7 @@ def start_from_cell_fastq_register_subparser(subparser):
         "-fq",
         type=str,
         required=True,
-        help="FASTQ files with wildcard to match all bcl2fastq results, pattern with wildcard must be quoted."
+        help="Path pattern with wildcard to match all cell-level FASTQ files, pattern with wildcard must be quoted."
     )
     return
 
