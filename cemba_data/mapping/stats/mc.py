@@ -43,9 +43,10 @@ def mc_additional_cols(final_df):
     """Additional columns for mC mapping summary"""
     final_df = final_df.copy()
     final_df['CellInputReadPairs'] = final_df['R1InputReads'].astype(int)  # == final_df['R2InputReads']
-    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
-                                    for _, i in final_df.groupby('PCRIndex')])
-    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+    if 'PCRIndex' in final_df.columns:  # plate info might not exist if the cell name is abnormal
+        cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                        for _, i in final_df.groupby('PCRIndex')])
+        final_df['CellBarcodeRatio'] = cell_barcode_ratio
 
     final_df['FinalmCReads'] = final_df['R1FinalBismarkReads'] + final_df['R2FinalBismarkReads']
     return final_df

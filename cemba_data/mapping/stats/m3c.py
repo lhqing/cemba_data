@@ -69,9 +69,10 @@ def m3c_additional_cols(final_df):
     final_df['R1DuplicationRate'] = (1 - final_df['R1DeduppedReads'] / final_df['R1UniqueMappedReads']) * 100
     final_df['R2DuplicationRate'] = (1 - final_df['R2DeduppedReads'] / final_df['R2UniqueMappedReads']) * 100
 
-    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
-                                    for _, i in final_df.groupby('PCRIndex')])
-    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+    if 'PCRIndex' in final_df.columns:  # plate info might not exist if the cell name is abnormal
+        cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                        for _, i in final_df.groupby('PCRIndex')])
+        final_df['CellBarcodeRatio'] = cell_barcode_ratio
 
     final_df['TotalContacts'] = final_df[
         ['CisShortContact', 'CisLongContact', 'TransContact']].sum(axis=1)

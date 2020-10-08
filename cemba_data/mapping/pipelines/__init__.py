@@ -72,20 +72,25 @@ def write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_di
               f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={int(cores_per_job * memory_per_core)} '
         cmds[uid] = cmd
-    uid_order = pd.read_csv(
-        output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
-    ).sort_values(ascending=False)
     script_path = script_dir / 'snakemake_cmd.txt'
     with open(script_path, 'w') as f:
-        for uid in uid_order.index:
-            if uid in cmds:
-                f.write(cmds.pop(uid) + '\n')
         try:
-            assert len(cmds) == 0
-        except AssertionError as e:
-            print(cmds)
-            print(uid_order)
-            raise e
+            uid_order = pd.read_csv(
+                output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
+            ).sort_values(ascending=False)
+            for uid in uid_order.index:
+                if uid in cmds:
+                    f.write(cmds.pop(uid) + '\n')
+            try:
+                assert len(cmds) == 0
+            except AssertionError as e:
+                print(cmds)
+                print(uid_order)
+                raise e
+        except FileNotFoundError:
+            # uid_order file do not exist (when starting from cell FASTQs)
+            for cmd in cmds.values():
+                f.write(cmd + '\n')
     return script_path
 
 
@@ -102,20 +107,25 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
               f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={total_mem_mb} '
         cmds[uid] = cmd
-    uid_order = pd.read_csv(
-        output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
-    ).sort_values(ascending=False)
     script_path = script_dir / 'snakemake_cmd.txt'
     with open(script_path, 'w') as f:
-        for uid in uid_order.index:
-            if uid in cmds:
-                f.write(cmds.pop(uid) + '\n')
         try:
-            assert len(cmds) == 0
-        except AssertionError as e:
-            print(cmds)
-            print(uid_order)
-            raise e
+            uid_order = pd.read_csv(
+                output_dir / 'stats/UIDTotalCellInputReadPairs.csv', index_col=0, squeeze=True, header=None
+            ).sort_values(ascending=False)
+            for uid in uid_order.index:
+                if uid in cmds:
+                    f.write(cmds.pop(uid) + '\n')
+            try:
+                assert len(cmds) == 0
+            except AssertionError as e:
+                print(cmds)
+                print(uid_order)
+                raise e
+        except FileNotFoundError:
+            # uid_order file do not exist (when starting from cell FASTQs)
+            for cmd in cmds.values():
+                f.write(cmd + '\n')
     return f'$SCRATCH/{output_dir_name}/snakemake/sbatch/snakemake_cmd.txt'
 
 

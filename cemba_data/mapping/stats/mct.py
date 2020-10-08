@@ -114,9 +114,10 @@ def aggregate_feature_counts(output_dir):
 def mct_additional_cols(final_df, output_dir):
     final_df = final_df.copy()
     final_df['CellInputReadPairs'] = final_df['R1InputReads'].astype(int)  # == final_df['R2InputReads']
-    cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
-                                    for _, i in final_df.groupby('PCRIndex')])
-    final_df['CellBarcodeRatio'] = cell_barcode_ratio
+    if 'PCRIndex' in final_df.columns:  # plate info might not exist if the cell name is abnormal
+        cell_barcode_ratio = pd.concat([(i['CellInputReadPairs'] / i['CellInputReadPairs'].sum())
+                                        for _, i in final_df.groupby('PCRIndex')])
+        final_df['CellBarcodeRatio'] = cell_barcode_ratio
 
     stats = pd.read_hdf(output_dir / 'TotalRNAData.h5', key='stats')
     final_df['GenesDetected'] = stats['GenesDetected']

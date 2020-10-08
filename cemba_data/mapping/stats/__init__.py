@@ -92,29 +92,30 @@ def final_summary(output_dir, cleanup=True, notebook=None):
     allc_paths = pd.Series({path.name.split('.')[0]: str(path)
                             for path in output_dir.glob('*/allc/*tsv.gz')})
     allc_paths.to_csv(output_dir / 'stats/AllcPaths.tsv', sep='\t', header=False)
-
-    # run summary notebook
-    nb_path = output_dir / 'stats/MappingSummary.ipynb'
-    try:
-        mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
-        if notebook is None:
-            template_notebook = PACKAGE_DIR / f'files/mapping_summary_template/{mode}_template.ipynb'
-        else:
-            template_notebook = str(notebook)
-        print(f'Using notebook template from {template_notebook}')
-        print('Executing summary plotting notebook...')
-        execute_notebook(
-            input_path=str(template_notebook),
-            output_path=str(nb_path),
-            parameters=dict(output_dir=str(output_dir))
-        )
-        print('Summary notebook successfully executed. Exporting HTML...')
-        subprocess.run(['jupyter', 'nbconvert', '--to', 'html', str(nb_path)])
-        print(f'See the summary plots here: {str(nb_path)[:-5]}html')
-        print(f'Or customize the summary plots here: {nb_path}')
-    except PapermillExecutionError:
-        print(f'Ops, summary plotting notebook got some error, check the information in {nb_path}')
-        cleanup = False
+    
+    if 'Plate' in total_mapping_summary.columns:  # only run notebook when plate info exist
+        # run summary notebook
+        nb_path = output_dir / 'stats/MappingSummary.ipynb'
+        try:
+            mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
+            if notebook is None:
+                template_notebook = PACKAGE_DIR / f'files/mapping_summary_template/{mode}_template.ipynb'
+            else:
+                template_notebook = str(notebook)
+            print(f'Using notebook template from {template_notebook}')
+            print('Executing summary plotting notebook...')
+            execute_notebook(
+                input_path=str(template_notebook),
+                output_path=str(nb_path),
+                parameters=dict(output_dir=str(output_dir))
+            )
+            print('Summary notebook successfully executed. Exporting HTML...')
+            subprocess.run(['jupyter', 'nbconvert', '--to', 'html', str(nb_path)])
+            print(f'See the summary plots here: {str(nb_path)[:-5]}html')
+            print(f'Or customize the summary plots here: {nb_path}')
+        except PapermillExecutionError:
+            print(f'Ops, summary plotting notebook got some error, check the information in {nb_path}')
+            cleanup = False
 
     # delete
     if cleanup:
