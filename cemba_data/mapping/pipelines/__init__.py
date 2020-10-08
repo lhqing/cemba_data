@@ -1,6 +1,7 @@
 import os
 import pathlib
-
+import glob
+import subprocess
 import pandas as pd
 
 import cemba_data
@@ -248,4 +249,54 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=10, memory_gb_per_core=
               f"(e.g., use a job scheduler or run locally).")
 
     print(f"Once all commands are executed successfully, use 'yap summary' to generate final mapping summary.")
+    return
+
+
+def start_from_cell_fastq(output_dir, fastq_pattern, config_path):
+    output_dir = pathlib.Path(output_dir).absolute()
+    if output_dir.exists():
+        raise FileExistsError(f'Output dir {output_dir} already exist, please delete it or use another path.')
+    subprocess.run(['cp', config_path, f'{output_dir}/mapping_config.ini'], check=True)
+    stats_dir = output_dir / 'stats'
+    stats_dir.mkdir(exist_ok=True)
+
+    # parse fastq patterns
+    fastq_paths = [pathlib.Path(p).absolute() for p in glob.glob(fastq_pattern)]
+    r1_records = {}
+    r2_records = {}
+    for path in fastq_paths:
+        *cell_id, suffix = path.name.split('-')
+        cell_id = '-'.join(cell_id)
+        if suffix == 'R1.fq.gz':
+            if cell_id in r1_records:
+                raise ValueError(f'Found duplicated cell ID: {cell_id}')
+            r1_records[cell_id] = path
+        elif suffix == 'R2.fq.gz':
+            if cell_id in r2_records:
+                raise ValueError(f'Found duplicated cell ID: {cell_id}')
+            r2_records[cell_id] = path
+        else:
+            raise ValueError(
+                f'Unable to parse read type. Expect file name ends with "-R1.fq.gz" or "-R2.fq.gz", '
+                f'File caused this error: {path}'
+            )
+    fastq_df = pd.DataFrame({'R1Path': r1_records, 'R2Path': r2_records})
+
+    # make symlink of fastq files, using dir structure of demultiplex
+    # the cells are randomly grouped though, max group is 64
+    groups = min(64, fastq_df.shape[0])
+    for i, (cell_id, (r1_path, r2_path)) in enumerate(fastq_df.sample(fastq_df.shape[0]).iterrows()):
+        group_id = i % groups
+        fastq_dir = output_dir / f'Group{group_id}/fastq'
+        fastq_dir.mkdir(exist_ok=True, parents=True)
+
+        # make symlinks
+        new_r1_path = fastq_dir / r1_path.name
+        new_r1_path.symlink_to(r1_path)
+        new_r2_path = fastq_dir / r2_path.name
+        new_r2_path.symlink_to(r2_path)
+
+    # prepare scripts
+    make_snakefile(output_dir)
+    prepare_run(output_dir)
     return
