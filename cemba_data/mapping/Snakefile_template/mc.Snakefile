@@ -201,6 +201,7 @@ rule cgn_extraction:
         "allc/{cell_id}.allc.tsv.gz",
     output:
         "allc-CGN/{cell_id}.CGN-Merge.allc.tsv.gz",
+    params:
         prefix="allc-CGN/{cell_id}",
     threads:
         1
@@ -210,6 +211,6 @@ rule cgn_extraction:
         'allcools extract-allc '
         '--strandness merge '
         '--allc_path  {input} '
-        '--output_prefix {output.prefix} '
+        '--output_prefix {params.prefix} '
         '--mc_contexts CGN '
         '--chrom_size_path {genome_sizes} '
