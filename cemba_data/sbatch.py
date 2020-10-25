@@ -196,12 +196,12 @@ def sacct(jobs):
 
 
 def sbatch_submitter(project_name, command_file_path, working_dir, time_str, queue='skx-normal',
-                     email=None, email_type='fail', max_jobs=None):
+                     email=None, email_type='fail', max_jobs=None, dry_run=False):
     # read commands
     with open(command_file_path) as f:
         # I always assume the command is ordered with descending priority.
         # But sbatch will submit last job first (list.pop), so reverse the order here.
-        commands = [line.rstrip('\n') for line in f][::-1]
+        commands = [line.rstrip('\n') for line in f if not line.startswith('#')][::-1]
 
     # set name
     project_name = project_name.replace(' ', '_')
@@ -260,51 +260,52 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                               f'Make sure you do not have sbatch submitter running and (if so) delete that flag file.')
     with open(flag_path, 'w') as f:
         f.write('')
-    while (len(queue_job_path_list) != 0) or (len(running_job_id_set) != 0):
-        if not flag_path.exists():
-            # break if flag missing
-            break
+    if not dry_run:
+        while (len(queue_job_path_list) != 0) or (len(running_job_id_set) != 0):
+            if not flag_path.exists():
+                # break if flag missing
+                break
 
-        # squeue and update running job status
-        squeue_df = squeue()
-        remaining_slots = max_jobs - squeue_df.shape[0]
-        # TODO diff queue has diff limit, so here actually need to determine queue type
-        # the max_jobs is apply to user level, not to the current submitter level
-        if remaining_slots > 0:
-            # things are getting done, weak up
-            sleepy = 30
+            # squeue and update running job status
+            squeue_df = squeue()
+            remaining_slots = max_jobs - squeue_df.shape[0]
+            # TODO diff queue has diff limit, so here actually need to determine queue type
+            # the max_jobs is apply to user level, not to the current submitter level
+            if remaining_slots > 0:
+                # things are getting done, weak up
+                sleepy = 30
 
-            # check running jobs
-            new_running_job_id_set = set()
-            for job_id in running_job_id_set:
-                if job_id not in squeue_df.index:
-                    # running job finished
-                    finished_job_id_set.add(job_id)
-                    # status will be judged in the end
-                else:
-                    # still running
-                    new_running_job_id_set.add(job_id)
-                    pass
-            running_job_id_set = new_running_job_id_set
-            print(f'{len(running_job_id_set)} running job IDs: {", ".join(running_job_id_set)}')
+                # check running jobs
+                new_running_job_id_set = set()
+                for job_id in running_job_id_set:
+                    if job_id not in squeue_df.index:
+                        # running job finished
+                        finished_job_id_set.add(job_id)
+                        # status will be judged in the end
+                    else:
+                        # still running
+                        new_running_job_id_set.add(job_id)
+                        pass
+                running_job_id_set = new_running_job_id_set
+                print(f'{len(running_job_id_set)} running job IDs: {", ".join(running_job_id_set)}')
 
-            # submit new jobs
-            while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
-                print(f'Remaining slots: {remaining_slots}')
-                script_path = queue_job_path_list.pop()
-                # skip if job already submitted and are successful before
-                if script_path in successful_script_paths:
-                    print(f'Already successful in previous submission: {script_path}')
-                    continue
-                job_id = submit_sbatch(script_path)
-                running_job_id_set.add(job_id)
-                job_id_to_script_path[job_id] = script_path
-                remaining_slots -= 1
+                # submit new jobs
+                while (remaining_slots > 0) and (len(queue_job_path_list) > 0):
+                    print(f'Remaining slots: {remaining_slots}')
+                    script_path = queue_job_path_list.pop()
+                    # skip if job already submitted and are successful before
+                    if script_path in successful_script_paths:
+                        print(f'Already successful in previous submission: {script_path}')
+                        continue
+                    job_id = submit_sbatch(script_path)
+                    running_job_id_set.add(job_id)
+                    job_id_to_script_path[job_id] = script_path
+                    remaining_slots -= 1
 
-        # sleep
-        sleepy += 30
-        sleepy = min(300, sleepy)
-        time.sleep(sleepy)
+            # sleep
+            sleepy += 30
+            sleepy = min(300, sleepy)
+            time.sleep(sleepy)
 
     # only check status if something has finished
     if len(finished_job_id_set) > 0:

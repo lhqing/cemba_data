@@ -9,6 +9,7 @@
 # r2_adapter='AGATCGGAAGAGCGTCGTGTAGGGA'
 # bismark_reference = 'path_to_bismark_reference'
 # reference_fasta = 'path_to_genome_fasta'
+# genome_sizes = 'path_to_genome_sizes'
 # unmapped_param_str = ''  # will generate unmapped bam if --un
 # num_upstr_bases=0  # for NOMe, num_upstr_bases=1
 # num_downstr_bases=2
@@ -25,6 +26,7 @@
 rule summary:
     input:
         expand("allc/{cell_id}.allc.tsv.gz", cell_id=CELL_IDS),
+        expand("allc-CGN/{cell_id}.CGN-Merge.allc.tsv.gz", cell_id=CELL_IDS),
         # also add all the stats path here,
         # once summary is generated, snakemake will delete these stats
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
@@ -191,3 +193,24 @@ rule allc:
         '--num_downstr_bases {num_downstr_bases} '
         '--compress_level {compress_level} '
         '--save_count_df'
+
+
+# CGN extraction from ALLC
+rule cgn_extraction:
+    input:
+        "allc/{cell_id}.allc.tsv.gz",
+    output:
+        "allc-CGN/{cell_id}.CGN-Merge.allc.tsv.gz",
+    params:
+        prefix="allc-CGN/{cell_id}",
+    threads:
+        1
+    resources:
+        mem_mb=500
+    shell:
+        'allcools extract-allc '
+        '--strandness merge '
+        '--allc_path  {input} '
+        '--output_prefix {params.prefix} '
+        '--mc_contexts CGN '
+        '--chrom_size_path {genome_sizes} '

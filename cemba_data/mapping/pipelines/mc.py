@@ -25,6 +25,7 @@ def mc_config_str(config):
         'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
         'bismark_reference': 'required',
         'reference_fasta': 'required',
+        'genome_sizes': 'required',
         'mc_stat_feature': 'CHN CGN CCC',
         'mc_stat_alias': 'mCH mCG mCCC'
     }
