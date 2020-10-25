@@ -12,7 +12,7 @@ import pandas as pd
 
 import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
-from ..mapping.pipelines import make_snakefile, prepare_run
+from ..mapping.pipelines import make_snakefile, prepare_run, validate_mapping_config
 from ..utilities import snakemake, get_configuration
 
 # logger
@@ -381,6 +381,8 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     new_config_path = output_dir / 'mapping_config.ini'
     subprocess.run(f'cp {config_path} {new_config_path}', shell=True, check=True)
     barcode_version = config['barcode_version']
+    # validate config file first before demultiplex
+    validate_mapping_config(output_dir)
 
     _demultiplex(
         fastq_pattern=fastq_pattern,

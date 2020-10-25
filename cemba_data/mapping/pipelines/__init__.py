@@ -30,6 +30,27 @@ def prepare_uid_snakefile(uid_dir, config_str, snake_template):
     return
 
 
+def validate_mapping_config(output_dir):
+    output_dir = pathlib.Path(output_dir).absolute()
+    config = get_configuration(output_dir / 'mapping_config.ini')
+    try:
+        mode = config['mode']
+    except KeyError:
+        raise KeyError('mode not found in the config file.')
+
+    if mode == 'mc':
+        config_str = mc_config_str(config)
+    elif mode == 'mct':
+        config_str = mct_config_str(config)
+    elif mode == 'm3c':
+        config_str = m3c_config_str(config)
+    else:
+        raise ValueError(f'Unknown mode {mode}')
+
+    print(f'Mapping config file looks good. Here is what will be used in generating Snakefile:\n{config_str}')
+    return
+
+
 def make_snakefile(output_dir):
     output_dir = pathlib.Path(output_dir).absolute()
     config = get_configuration(output_dir / 'mapping_config.ini')

@@ -41,7 +41,8 @@ def m3c_config_str(config):
             if default != 'required':
                 typed_config[k] = default
             else:
-                raise ValueError(f'Required parameter {k} not found in config.')
+                raise ValueError(f'Required parameter {k} not found in config. '
+                                 f'You can print the newest mapping config template via "yap default-mapping-config".')
 
     for k, default in str_parameters.items():
         if k in config:
@@ -50,7 +51,8 @@ def m3c_config_str(config):
             if default != 'required':
                 typed_config[k] = f"'{default}'"
             else:
-                raise ValueError(f'Required parameter {k} not found in config.')
+                raise ValueError(f'Required parameter {k} not found in config. '
+                                 f'You can print the newest mapping config template via "yap default-mapping-config".')
 
     config_str = ""
     for k, v in typed_config.items():
