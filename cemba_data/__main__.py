@@ -204,6 +204,13 @@ def sbatch_register_subparser(subparser):
         help="Max number of jobs for the same user (not for the same sbatch command). "
              "If not provided, will determine automatically based on stampede2 limits."
     )
+
+    parser.add_argument(
+        "--dry_run",
+        required=False,
+        action='store_true',
+        help="Prepare scripts for sbatch manual submission or debug."
+    )
     return
 
 
