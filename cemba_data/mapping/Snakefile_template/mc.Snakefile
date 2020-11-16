@@ -29,7 +29,8 @@ mcg_context = 'CGN' if num_upstr_bases == 0 else 'HCGN'
 rule summary:
     input:
         expand("allc/{cell_id}.allc.tsv.gz", cell_id=CELL_IDS),
-        expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz", cell_id=CELL_IDS),
+        expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz", cell_id=CELL_IDS,
+               mcg_context=mcg_context),
         # also add all the stats path here,
         # once summary is generated, snakemake will delete these stats
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
