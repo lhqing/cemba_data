@@ -132,7 +132,15 @@ def _read_plate_info(plate_info_path):
     return critical_info, plate_info
 
 
-def _plate_384_random_index_8(plate_info, barcode_table):
+def reverse_comp(sequence):
+    rc_dict = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C',
+               'a': 't', 't': 'a', 'c': 'G', 'g': 'C',
+               'n': 'n', 'N': 'N'}
+    _seq = ''.join([rc_dict[s] for s in sequence[::-1]])
+    return _seq
+
+
+def _plate_384_random_index_8(plate_info, barcode_table, i5_reverse_comp=False):
     """UID pattern of V1 {sample_id_prefix}-{plate1}-{plate2}-{plate_pos}"""
     records = []
 
@@ -180,7 +188,8 @@ def _plate_384_random_index_8(plate_info, barcode_table):
                 # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
                 records.append({'Sample_ID': sample_id,
                                 'index': i7_barcode,  # the index must be i7
-                                'index2': i5_barcode,  # the index2 must be i5
+                                'index2': reverse_comp(i5_barcode) if i5_reverse_comp else i5_barcode,
+                                # the index2 must be i5
                                 'Sample_Project': plate_pair['tube_label'].iloc[0],
                                 'Description': plate_pair['email'].iloc[0]})
 
@@ -188,8 +197,12 @@ def _plate_384_random_index_8(plate_info, barcode_table):
     return miseq_sample_sheet, nova_sample_sheet
 
 
-def _plate_384_random_index_384(plate_info, barcode_table):
-    """UID pattern of V2 {sample_id_prefix}-{plate}-{multiplex_group}-{barcode_name}"""
+def _plate_384_random_index_384(plate_info, barcode_table, i5_reverse_comp=False):
+    """
+    UID pattern of V2 {sample_id_prefix}-{plate}-{multiplex_group}-{barcode_name}
+
+    If i5_reverse_comp, use the reverse complement i5 sequence, this is needed for NovaSeq v1.5 S4 kit.
+    """
     records = []
 
     # check plate_info primer compatibility
@@ -213,7 +226,7 @@ def _plate_384_random_index_384(plate_info, barcode_table):
         # THIS IS BASED ON FORMAT BCL2FASTQ NEEDS
         records.append({'Sample_ID': sample_id,
                         'index': i7_barcode,  # the index must be i7
-                        'index2': i5_barcode,  # the index2 must be i5
+                        'index2': reverse_comp(i5_barcode) if i5_reverse_comp else i5_barcode,  # the index2 must be i5
                         'Sample_Project': row['tube_label'],
                         'Description': row['email']})
 
@@ -274,53 +287,57 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
     n_random_index = critical_info['n_random_index']
     input_plate_size = critical_info['input_plate_size']
     barcode_table_path = BARCODE_TABLE[n_random_index, input_plate_size]
-    if (n_random_index, input_plate_size) == ('8', '384'):
-        barcode_table = pd.read_csv(barcode_table_path, sep='\t')
-        barcode_table['primer_quarter'] = barcode_table['Index_set'] + "_" + barcode_table['Index_quarter']
-        barcode_table.set_index(['primer_quarter', 'plate_pos'], inplace=True)
-        miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_8(plate_info, barcode_table)
-    elif (critical_info['n_random_index'], critical_info['input_plate_size']) == ('384', '384'):
-        barcode_table = pd.read_csv(barcode_table_path,
-                                    sep='\t', index_col='set_384_plate_pos')
-        miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_384(plate_info, barcode_table)
-    else:
-        raise NotImplementedError(f"Unknown combination of n_random_index {n_random_index} "
-                                  f"and input_plate_size {input_plate_size}")
+    for i5_reverse_comp in [True, False]:
+        if (n_random_index, input_plate_size) == ('8', '384'):
+            barcode_table = pd.read_csv(barcode_table_path, sep='\t')
+            barcode_table['primer_quarter'] = barcode_table['Index_set'] + "_" + barcode_table['Index_quarter']
+            barcode_table.set_index(['primer_quarter', 'plate_pos'], inplace=True)
+            miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_8(plate_info, barcode_table,
+                                                                              i5_reverse_comp=i5_reverse_comp)
+        elif (critical_info['n_random_index'], critical_info['input_plate_size']) == ('384', '384'):
+            barcode_table = pd.read_csv(barcode_table_path,
+                                        sep='\t', index_col='set_384_plate_pos')
+            miseq_sample_sheet, nova_sample_sheet = _plate_384_random_index_384(plate_info, barcode_table,
+                                                                                i5_reverse_comp=i5_reverse_comp)
+        else:
+            raise NotImplementedError(f"Unknown combination of n_random_index {n_random_index} "
+                                      f"and input_plate_size {input_plate_size}")
 
-    # before write out, check plate info compatibility:
-    # check plate_info primer compatibility
-    if int(n_random_index) == 8:
-        for primer_quarter, n_plate in plate_info['primer_quarter'].value_counts().iteritems():
-            if n_plate < 2:
-                print(f'{primer_quarter} only have 1 plate, please make sure this is right.')
-            elif n_plate == 2:
-                pass
+        # before write out, check plate info compatibility:
+        # check plate_info primer compatibility
+        if int(n_random_index) == 8:
+            for primer_quarter, n_plate in plate_info['primer_quarter'].value_counts().iteritems():
+                if n_plate < 2:
+                    print(f'{primer_quarter} only have 1 plate, please make sure this is right.')
+                elif n_plate == 2:
+                    pass
+                else:
+                    raise ValueError(f'{primer_quarter} have {n_plate} plates in the table, that is impossible.')
+        elif int(n_random_index) == 384:
+            for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
+                if n_primer > 1:
+                    raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, that is impossible.')
+        else:
+            raise ValueError(f'Unknown n_random_index {n_random_index}.')
+
+        # write miseq sample sheet
+        if not i5_reverse_comp:
+            with open(output_prefix + '.miseq.sample_sheet.csv', 'w') as output_f:
+                if header_path is None:
+                    output_f.write(SAMPLESHEET_DEFAULT_HEADER)
+                else:
+                    with open(header_path) as hf:
+                        output_f.write(hf.read())
+                output_f.write(miseq_sample_sheet.to_csv(index=None))
+
+        # write novaseq sample sheet
+        with open(output_prefix + f'.novaseq.{"V1.5" if i5_reverse_comp else "v1"}.sample_sheet.csv', 'w') as output_f:
+            if header_path is None:
+                output_f.write(SAMPLESHEET_DEFAULT_HEADER)
             else:
-                raise ValueError(f'{primer_quarter} have {n_plate} plates in the table, that is impossible.')
-    elif int(n_random_index) == 384:
-        for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
-            if n_primer > 1:
-                raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, that is impossible.')
-    else:
-        raise ValueError(f'Unknown n_random_index {n_random_index}.')
-
-    # write miseq sample sheet
-    with open(output_prefix + '.miseq.sample_sheet.csv', 'w') as output_f:
-        if header_path is None:
-            output_f.write(SAMPLESHEET_DEFAULT_HEADER)
-        else:
-            with open(header_path) as hf:
-                output_f.write(hf.read())
-        output_f.write(miseq_sample_sheet.to_csv(index=None))
-
-    # write novaseq sample sheet
-    with open(output_prefix + '.novaseq.sample_sheet.csv', 'w') as output_f:
-        if header_path is None:
-            output_f.write(SAMPLESHEET_DEFAULT_HEADER)
-        else:
-            with open(header_path) as hf:
-                output_f.write(hf.read())
-        output_f.write(nova_sample_sheet.to_csv(index=None))
+                with open(header_path) as hf:
+                    output_f.write(hf.read())
+            output_f.write(nova_sample_sheet.to_csv(index=None))
     return
 
 
