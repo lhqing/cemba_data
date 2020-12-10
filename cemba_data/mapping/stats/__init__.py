@@ -45,17 +45,24 @@ def final_summary(output_dir, cleanup=True, notebook=None):
     # first make sure all the UID dir having Snakefile also has mapping summary (means successful)
     snakefile_list = list(output_dir.glob('*/Snakefile'))
     summary_paths = []
+    missing_summary_dirs = []
     for path in snakefile_list:
         uid_dir = path.parent
         summary_path = uid_dir / 'MappingSummary.csv.gz'
         if summary_path.exists():
             summary_paths.append(summary_path)
         else:
-            raise FileNotFoundError(f'All sub dir should be successfully mapped before generating final summary. \n'
-                                    f'However, MappingSummary.csv.gz does not exist in sub dir {uid_dir}. \n'
-                                    f'This is the final target file of snakefile in {path}. \n'
-                                    f'Run the following command to see what is missing: \n'
-                                    f'snakemake -d {uid_dir} --snakefile {path} -np')
+            missing_summary_dirs.append(uid_dir)
+
+    if len(missing_summary) != 0:
+        print('These sub dir missing MappingSummary files:')
+        for p in missing_summary_dirs:
+            print(p)
+        raise FileNotFoundError(f'Note that all sub dir should be successfully mapped '
+                                f'before generating final summary. \n'
+                                f'The MappingSummary.csv.gz is the final target file of snakefile in {path}. \n'
+                                f'Run the corresponding snakemake command again to retry mapping.\n'
+                                f'The snakemake commands can be found in output_dir/snakemake/*/snakemake_cmd.txt')
 
     # aggregate mapping summaries
     total_mapping_summary = pd.concat([pd.read_csv(path, index_col=0)
@@ -92,7 +99,7 @@ def final_summary(output_dir, cleanup=True, notebook=None):
     allc_paths = pd.Series({path.name.split('.')[0]: str(path)
                             for path in output_dir.glob('*/allc/*tsv.gz')})
     allc_paths.to_csv(output_dir / 'stats/AllcPaths.tsv', sep='\t', header=False)
-    
+
     if 'Plate' in total_mapping_summary.columns:  # only run notebook when plate info exist
         # run summary notebook
         nb_path = output_dir / 'stats/MappingSummary.ipynb'
