@@ -30,6 +30,40 @@ status	in_reads	in_bp	too_short	too_long	too_many_n	out_reads	w/adapters	qualtri
     return data
 
 
+def parse_trim_fastq_stats_mct(stat_path):
+    *cell_id, read_type = pathlib.Path(stat_path).name.split('.')[0].split('-')
+    cell_id = '-'.join(cell_id)
+    with open(stat_path) as f:
+        lines = f.readlines()
+        adapter_str = ''.join(lines[:-2])
+        trim_lines = lines[-2:]
+
+    # adapter counts
+    total_dict = {}
+    for line in adapter_str.replace('===\n\n', '; ').replace('=== Adapter ', 'Adapter: ').split('\n'):
+        if line.startswith('=== Summary'):
+            total_dict[f'{read_type}InputReads'] = int(line.strip('\n').split(' ')[-1].replace(',', ''))
+        if line.startswith('Adapter: '):
+            line_list = line.split('; ')
+            line_dict = {}
+            for l in line_list:
+                k, v = l.split(': ')
+                line_dict[k] = v
+            name = line_dict.pop('Adapter').strip(' ')
+            total_dict[f'{read_type}With{name}'] = int(line_dict['Trimmed'][:-5])
+    data = pd.Series(total_dict, name=cell_id)
+
+    # add trimmed counts, the last two rows in tsv format, the same as normal mc
+    trim_data = pd.DataFrame([
+        line.strip('\n').split('\t') for line in trim_lines
+    ]).T.set_index(0)[1]
+    data[f'{read_type}QualTrimBP'] = int(trim_data['qualtrim_bp'])
+    data[f'{read_type}TrimmedReads'] = int(trim_data['out_reads'])
+    data[f'{read_type}TrimmedReadsBP'] = int(trim_data['out_bp'])
+    data[f'{read_type}TrimmedReadsRate'] = data[f'{read_type}TrimmedReads'] / data[f'{read_type}InputReads']
+    return data
+
+
 def parse_bismark_report(stat_path):
     """
     parse bismark output

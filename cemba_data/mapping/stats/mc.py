@@ -2,7 +2,9 @@ import pathlib
 
 import pandas as pd
 
-from .utilities import parse_trim_fastq_stats, parse_bismark_report, parse_deduplicate_stat, generate_allc_stats
+from .utilities import parse_trim_fastq_stats, parse_trim_fastq_stats_mct, \
+    parse_bismark_report, parse_deduplicate_stat, \
+    generate_allc_stats
 
 
 def mc_mapping_stats(output_dir, config):
@@ -19,9 +21,14 @@ def mc_mapping_stats(output_dir, config):
         print(f'Parsing stats of {cell_id}.')
         total_stats = []
         for read_type in ['R1', 'R2']:
-            total_stats.append(
-                parse_trim_fastq_stats(
-                    fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.tsv'))
+            if config['mode'] == 'mct':
+                total_stats.append(
+                    parse_trim_fastq_stats_mct(
+                        fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.txt'))
+            else:
+                total_stats.append(
+                    parse_trim_fastq_stats(
+                        fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.tsv'))
             total_stats.append(
                 parse_bismark_report(
                     bam_dir / f'{cell_id}-{read_type}.trimmed_bismark_bt2_SE_report.txt'))

@@ -54,7 +54,7 @@ def final_summary(output_dir, cleanup=True, notebook=None):
         else:
             missing_summary_dirs.append(uid_dir)
 
-    if len(missing_summary) != 0:
+    if len(missing_summary_dirs) != 0:
         print('These sub dir missing MappingSummary files:')
         for p in missing_summary_dirs:
             print(p)

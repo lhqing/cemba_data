@@ -11,8 +11,8 @@ rule summary:
         # also add all the stats path here,
         # once summary is generated, snakemake will delete these stats
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
-        expand("fastq/{cell_id}-R1.trimmed.stats.tsv", cell_id=CELL_IDS),
-        expand("fastq/{cell_id}-R2.trimmed.stats.tsv", cell_id=CELL_IDS),
+        expand("fastq/{cell_id}-R1.trimmed.stats.txt", cell_id=CELL_IDS),
+        expand("fastq/{cell_id}-R2.trimmed.stats.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R1.trimmed_bismark_bt2.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.trimmed_bismark_bt2.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R1.trimmed_bismark_bt2_SE_report.txt", cell_id=CELL_IDS),
@@ -37,11 +37,24 @@ rule trim_r1:
         "fastq/{cell_id}-R1.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
-        stats=temp("fastq/{cell_id}-R1.trimmed.stats.tsv")
+        stats=temp("fastq/{cell_id}-R1.trimmed.stats.txt")
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r1_adapter} {input} 2> {output.stats} | "
+        "cutadapt -a R1Adapter={r1_adapter} "
+        "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
+        "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
+        "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
+        "-a N6_rc=GTACTCTGCGTTGATACCACTGCTT "
+        "-a 3PpolyT=TTTTTTTTTTTTTTTX "
+        "-g 5PpolyT=XTTTTTTTTTTTTTTT "
+        "-a 3PpolyA=AAAAAAAAAAAAAAAX "
+        "-g 5PpolyA=XAAAAAAAAAAAAAAA "
+        "-a polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
+        "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
+        "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
+        "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
+        "{input} 2> {output.stats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r1_left_cut} -u -{r1_right_cut} -m 30 "
         "-o {output.fq} - >> {output.stats}"
 
@@ -50,11 +63,24 @@ rule trim_r2:
         "fastq/{cell_id}-R2.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
-        stats=temp("fastq/{cell_id}-R2.trimmed.stats.tsv")
+        stats=temp("fastq/{cell_id}-R2.trimmed.stats.txt")
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r2_adapter} {input} 2> {output.stats} | "
+        "cutadapt -a R2Adapter={r2_adapter} "
+        "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
+        "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
+        "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
+        "-a N6_rc=GTACTCTGCGTTGATACCACTGCTT "
+        "-a 3PpolyT=TTTTTTTTTTTTTTTX "
+        "-g 5PpolyT=XTTTTTTTTTTTTTTT "
+        "-a 3PpolyA=AAAAAAAAAAAAAAAX "
+        "-g 5PpolyA=XAAAAAAAAAAAAAAA "
+        "-a polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
+        "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
+        "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
+        "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
+        "{input} 2> {output.stats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r2_left_cut} -u -{r2_right_cut} -m 30 "
         "-o {output.fq} - >> {output.stats}"
 
