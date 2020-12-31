@@ -248,22 +248,22 @@ rule star:
     shell:
         'STAR --runThreadN {threads} '
         '--genomeDir {star_reference} '
-        '--alignEndsType EndToEnd '
+        '--alignEndsType Local '
         '--genomeLoad NoSharedMemory '
         '--outSAMstrandField intronMotif '
         '--outSAMtype BAM Unsorted '
         '--outSAMunmapped None '
         '--outSAMattributes NH HI AS NM MD '
         '--sjdbOverhang 100 '
-        '--outFilterType BySJout '
-        '--outFilterMultimapNmax 20 '
-        '--alignSJoverhangMin 8 '
-        '--alignSJDBoverhangMin 1 '
-        '--outFilterMismatchNmax 999 '
-        '--outFilterMismatchNoverLmax 0.04 '
-        '--alignIntronMin 20 '
-        '--alignIntronMax 1000000 '
-        '--alignMatesGapMax 1000000 '
+        '--outFilterType BySJout '  # ENCODE standard options
+        '--outFilterMultimapNmax 20 '  # ENCODE standard options
+        '--alignSJoverhangMin 8 '  # ENCODE standard options
+        '--alignSJDBoverhangMin 1 '  # ENCODE standard options
+        '--outFilterMismatchNmax 999 '  # ENCODE standard options
+        '--outFilterMismatchNoverLmax 0.04 '  # ENCODE standard options
+        '--alignIntronMin 20 '  # ENCODE standard options
+        '--alignIntronMax 1000000 '  # ENCODE standard options
+        '--alignMatesGapMax 1000000 '  # ENCODE standard options
         '--outFileNamePrefix rna_bam/TotalRNA '
         '--readFilesIn {star_input_str} '
         '--readFilesCommand gzip -cd '
