@@ -96,10 +96,19 @@ def squeue():
                                check=True,
                                encoding='utf8',
                                stdout=subprocess.PIPE).stdout.strip()
-    squeue_result = subprocess.run(['squeue', '-u', user_name],
-                                   check=True,
-                                   encoding='utf8',
-                                   stdout=subprocess.PIPE).stdout
+    for i in range(3):
+        try:
+            squeue_result = subprocess.run(['squeue', '-u', user_name],
+                                           check=True,
+                                           encoding='utf8',
+                                           stdout=subprocess.PIPE).stdout
+            break
+        except subprocess.CalledProcessError:
+            print(f'Squeue got an error, waiting 60s and trying again {i + 1}/3')
+            time.sleep(60)
+            continue
+    else:
+        raise SystemError('Squeue command failed')
     print('Current squeue output:')
     print(squeue_result, end='\n\n')
 
