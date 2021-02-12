@@ -29,6 +29,7 @@
 {email_type_str}
 
 # By default, send email when job fails
+module load python_cacher
 
 # Other commands must follow all #SBATCH directives...
 date
