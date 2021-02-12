@@ -210,7 +210,7 @@ def _plate_384_random_index_384(plate_info, barcode_table, i5_reverse_comp=False
     # for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
     #     if n_primer > 1:
     #         raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, that is impossible.')
-    
+
     for _, row in plate_info.iterrows():
         plate = row['plate_id']
         # remove all the '-' with '_' in plate names
@@ -315,9 +315,12 @@ def make_sample_sheet(plate_info_path: str, output_prefix: str, header_path=None
                 else:
                     raise ValueError(f'{primer_quarter} have {n_plate} plates in the table, that is impossible.')
         elif int(n_random_index) == 384:
-            for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
-                if n_primer > 1:
-                    raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, that is impossible.')
+            pass
+            # this is now possible, we use the same index for one plate
+            # for primer_name, n_primer in plate_info['primer_name'].value_counts().iteritems():
+            #     if n_primer > 1:
+            #         raise ValueError(f'{primer_name} have {n_primer} multiplex_group in the table, '
+            #                          f'that is impossible.')
         else:
             raise ValueError(f'Unknown n_random_index {n_random_index}.')
 
