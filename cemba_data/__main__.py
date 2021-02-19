@@ -435,6 +435,79 @@ def summary_register_subparser(subparser):
     return
 
 
+def mc_bulk_subparser(subparser):
+    parser = subparser.add_parser('mc-bulk',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Prepare the snakefile for merging single-cell ALLC files "
+                                       "into pseudo-bulk ALLC files and generate BigWig files.")
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--allc_table",
+        "-p",
+        type=str,
+        required=True,
+        help="Path of the allc table. The allc table is a two column tsv file. "
+             "The first columns is the absolute ALLC file paths; "
+             "the second column is the group name of each file."
+    )
+
+    parser_req.add_argument(
+        "--output_dir",
+        "-o",
+        type=str,
+        required=True,
+        help="Path of the output directory, will be created if not exist."
+    )
+
+    parser_req.add_argument(
+        "--bigwig_contexts",
+        type=str,
+        nargs='+',
+        required=True,
+        help="mC contexts for generating the bigwig tracks."
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="Path of the chromosome size file path."
+    )
+
+    parser_opt.add_argument(
+        "--extract_mcg",
+        dest='extract_mcg',
+        action='store_true',
+        help='Whether run the step to extract mCG sites from the merged ALLC. '
+             'If your input ALLC only contains mCG sites, this can be skipped. '
+             'Otherwise, this needs to be done before running the CG-DMR calling.'
+    )
+    parser.set_defaults(extract_mcg=False)
+
+    parser_opt.add_argument(
+        "--bigwig_bin_size",
+        type=int,
+        default=50,
+        help="Bin size used to generate bigwig."
+    )
+
+    parser_opt.add_argument(
+        "--merge_allc_cpu",
+        type=int,
+        default=8,
+        help="Number of CPU to use in individual merge-allc job."
+    )
+
+    parser_opt.add_argument(
+        "--mcg_context",
+        type=str,
+        default='CGN',
+        help="mC context for extract_mcg step, only relevant when extract_mcg=True."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -456,6 +529,7 @@ def main():
     demultiplex_register_subparser(subparsers)
     start_from_cell_fastq_register_subparser(subparsers)
     summary_register_subparser(subparsers)
+    mc_bulk_subparser(subparsers)
 
     # initiate
     args = None
@@ -496,6 +570,8 @@ def main():
         from .mapping import start_from_cell_fastq as func
     elif cur_command == 'summary':
         from cemba_data.mapping import final_summary as func
+    elif cur_command == 'mc-bulk':
+        from cemba_data.bulk import prepare_mc_bulk as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
