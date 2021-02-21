@@ -293,6 +293,14 @@ def generate_contacts_internal_subparser(subparser):
         help="Minimum gap distance to be considered as contact"
     )
 
+    parser.add_argument(
+        "--keep_split_table",
+        dest='keep_split_table',
+        action='store_true',
+        help='Keep the reads split table before contacts table?'
+    )
+    parser.set_defaults(keep_split_table=False)
+
 
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,

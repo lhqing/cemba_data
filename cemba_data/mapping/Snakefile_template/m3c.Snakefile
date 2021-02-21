@@ -286,7 +286,6 @@ rule generate_contact:
         "bam/{cell_id}.3C.sorted.bam"
     output:
         contact="hic/{cell_id}.3C.contact.tsv.gz",
-        split=temp("hic/{cell_id}.3C.contact.tsv.gz.split.tsv"),
         stats=temp("hic/{cell_id}.3C.contact.tsv.gz.counts.txt")
     resources:
         mem_mb=300
