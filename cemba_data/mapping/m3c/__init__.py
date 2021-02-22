@@ -1,6 +1,56 @@
 import pysam
 import subprocess
 import pandas as pd
+import dnaio
+
+
+def split_fastq_reads(fastq_path, output_path, trim_b=0, size_l=40, size_r=40, size_m=30):
+    """
+    Split reads in the fastq file into three parts for remapping.
+    Depending on the read length, reads may be
+    1) skipped,
+    2) split into left and right parts,
+    3) split into left, right and middle parts
+    left size size_l (name with -l suffix)
+    right size size_r (name with -r suffix)
+    middle size size_m (name with -m suffix)
+    Parameters
+    ----------
+    fastq_path
+    output_path
+    trim_b
+    size_l
+    size_r
+    size_m
+    Returns
+    -------
+    """
+    trim_b = int(trim_b)
+    size_max = max(size_l, size_r)
+    with dnaio.open(fastq_path) as f, \
+            dnaio.open(output_path, mode='w') as out_f:
+        for read in f:
+            if trim_b > 0:
+                read = read[trim_b:-trim_b]
+            read_length = len(read)
+            if read_length <= size_max:
+                continue
+            else:
+                # split reads to left and right part, they may have overlap
+                left_read = read[:size_l]
+                left_read.name += '-l'
+                out_f.write(left_read)
+
+                right_read = read[-size_r:]
+                right_read.name += '-r'
+                out_f.write(right_read)
+
+                # if the middle part is longer enough, we also use it
+                if read_length >= (size_l + size_r + size_m):
+                    middle_read = read[size_l:-size_r]
+                    middle_read.name += '-m'
+                    out_f.write(middle_read)
+    return
 
 
 def _output(rfh, tot1, tot2, pre_id, locs):
@@ -65,7 +115,7 @@ def _parse_bam(bam_path, output_path):
     return output_path
 
 
-def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=1000):
+def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=2500):
     dfh = open(input_path, 'r')
     rfh = open(output_path, 'w')
     chrom = pd.read_csv(chrom_size_path, sep='\t', header=None, index_col=0).index.tolist()
@@ -107,10 +157,13 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=1000):
               'CisLongContact': cis_long,
               'TransContact': trans}
     pd.Series(counts).to_csv(f'{output_path}.counts.txt', header=False)
+
+    # sort the contacts
+    subprocess.run(f'sort -k2,2 -k6,6 -k1,1n -k5,5n -k3,3n {output_path} -o {output_path}')
     return output_path
 
 
-def generate_contacts(bam_path, output_path, chrom_size_path, min_gap=1000, keep_split_table=False):
+def generate_contacts(bam_path, output_path, chrom_size_path, min_gap=2500, keep_split_table=False):
     split_table_path = f'{output_path}.split.tsv'
 
     # from bam to eight column split table

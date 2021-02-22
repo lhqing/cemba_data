@@ -289,7 +289,7 @@ def generate_contacts_internal_subparser(subparser):
     parser_req.add_argument(
         "--min_gap",
         type=int,
-        default=1000,
+        default=2500,
         help="Minimum gap distance to be considered as contact"
     )
 
