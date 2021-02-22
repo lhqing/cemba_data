@@ -159,7 +159,7 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=2500):
     pd.Series(counts).to_csv(f'{output_path}.counts.txt', header=False)
 
     # sort the contacts
-    subprocess.run(f'sort -k2,2 -k6,6 -k1,1n -k5,5n -k3,3n {output_path} -o {output_path}')
+    subprocess.run(f'sort -k2,2 -k6,6 -k1,1n -k5,5n -k3,3n {output_path} -o {output_path}', shell=True, check=True)
     return output_path
 
 
