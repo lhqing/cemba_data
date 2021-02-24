@@ -129,6 +129,9 @@ def _read_plate_info(plate_info_path):
             raise ValueError(f'Found duplicated key {k}')
         plate_info[k] = v
 
+    # deduplicate primer name
+    # because we start to use the same primer for different multiplex groups
+    plate_info = plate_info.loc[~plate_info['primer_name'].duplicated(), :].copy()
     return critical_info, plate_info
 
 
