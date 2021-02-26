@@ -47,7 +47,19 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
     # make fastq dataframe
     fastq_df = make_fastq_dataframe(fastq_pattern,
                                     barcode_version=barcode_version,
-                                    output_path=output_dir / 'stats' / 'fastq_dataframe.csv')
+                                    output_path=output_dir / 'stats' /
+                                                'fastq_dataframe.csv')
+
+    # judge the type of V2 barcoding
+    if fastq_df['multiplex_group'].unique(
+    ).size == 1 and barcode_version == 'V2':
+        # in this case, the six multiplex group is indexed by a single PCR index
+        print(
+            'Detect only single multiplex group in each plate, will use V2-single mode.'
+        )
+        barcode_version = 'V2-single'
+        # the resulting demultiplexed dir will have all the 384 cells.
+        # I added a patch in the end to split them into multiplex groups that each sub-dir only contain 64 cells.
 
     # prepare UID sub dir
     snakefile_list = []
@@ -63,6 +75,10 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
             random_index_fasta_path = str(
                 PACKAGE_DIR / 'files/random_index_v2/'
                               f'random_index_v2.multiplex_group_{multiplex_group}.fa')
+        elif barcode_version == 'V2-single':
+            random_index_fasta_path = str(PACKAGE_DIR /
+                                          'files/random_index_v2/'
+                                          f'random_index_v2.fa')
         else:
             raise ValueError(f'Got unknown barcode version {barcode_version}.')
 
@@ -132,7 +148,7 @@ rule final:
 
     print('Demultiplexing raw FASTQ')
     snakemake(workdir=output_dir, snakefile=final_snake_path, cores=cpu)
-    return
+    return barcode_version
 
 
 def _merge_lane(output_dir, cpu):
@@ -156,12 +172,14 @@ def _merge_lane(output_dir, cpu):
             cell_id = f'{uid}-{index_name}'
             records.append([cell_id, lane, read_type, str(path)])
         cell_fastq_df = pd.DataFrame(
-            records, columns=['cell_id', 'index_name', 'read_type', 'fastq_path'])
+            records,
+            columns=['cell_id', 'index_name', 'read_type', 'fastq_path'])
 
         # prepare snakefile for each cell_id * read_type
         rules = ''
         output_paths = []
-        for (cell_id, read_type), sub_df in cell_fastq_df.groupby(['cell_id', 'read_type']):
+        for (cell_id, read_type), sub_df in cell_fastq_df.groupby(
+                ['cell_id', 'read_type']):
             input_paths = list(sub_df['fastq_path'])
             output_path = fastq_dir / f'{cell_id}-{read_type}.fq.gz'
 
@@ -256,8 +274,7 @@ def _summarize_demultiplex(output_dir, barcode_version):
 
     # get index info
     if barcode_version == 'V1':
-        random_index_fasta_path = str(PACKAGE_DIR /
-                                      'files/random_index_v1.fa')
+        random_index_fasta_path = str(PACKAGE_DIR / 'files/random_index_v1.fa')
     elif barcode_version == 'V2':
         # here we don't need to worry about the multiplex_group issue,
         # because we just need a index_name to index_seq map
@@ -292,10 +309,14 @@ def _summarize_demultiplex(output_dir, barcode_version):
                                              'uid'] + '-' + total_demultiplex_stats['index_name']
 
     cell_table = total_demultiplex_stats.groupby('cell_id').agg({
-        'Trimmed': 'sum',
-        'TotalPair': 'sum',
-        'index_name': lambda i: i.unique()[0],
-        'uid': lambda i: i.unique()[0]
+        'Trimmed':
+            'sum',
+        'TotalPair':
+            'sum',
+        'index_name':
+            lambda i: i.unique()[0],
+        'uid':
+            lambda i: i.unique()[0]
     })
     cell_table.rename(columns={
         'Trimmed': 'CellInputReadPairs',
@@ -317,7 +338,10 @@ def _final_cleaning(output_dir):
     """
     output_dir = pathlib.Path(output_dir)
 
-    delete_patterns = [f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile', '*/fastq/*-unknown-R*.fq.gz', '.snakemake']
+    delete_patterns = [
+        f'Snakefile_*', '*/lanes', '*/raw', '*/Snakefile',
+        '*/fastq/*-unknown-R*.fq.gz', '.snakemake'
+    ]
 
     total_paths = []
     for pattern in delete_patterns:
@@ -328,7 +352,8 @@ def _final_cleaning(output_dir):
 
 
 def _skip_abnormal_fastq_pairs(output_dir):
-    demultiplex_df = pd.read_csv(output_dir / 'stats/demultiplex.stats.csv', index_col=0)
+    demultiplex_df = pd.read_csv(output_dir / 'stats/demultiplex.stats.csv',
+                                 index_col=0)
     config = get_configuration(output_dir / 'mapping_config.ini')
     total_read_pairs_min = int(config['total_read_pairs_min'])
     total_read_pairs_max = int(config['total_read_pairs_max'])
@@ -337,8 +362,12 @@ def _skip_abnormal_fastq_pairs(output_dir):
     too_small = demultiplex_df['CellInputReadPairs'] < total_read_pairs_min
     judge = too_small | too_large
     unmapped_cells = demultiplex_df[judge]
-    print(f'Skip {too_small.sum()} cells due to too less input read pairs (< {total_read_pairs_min})')
-    print(f'Skip {too_large.sum()} cells due to too large input read pairs (> {total_read_pairs_max})')
+    print(
+        f'Skip {too_small.sum()} cells due to too less input read pairs (< {total_read_pairs_min})'
+    )
+    print(
+        f'Skip {too_large.sum()} cells due to too large input read pairs (> {total_read_pairs_max})'
+    )
 
     for cell_id, row in unmapped_cells.iterrows():
         uid = row['UID']
@@ -351,13 +380,47 @@ def _skip_abnormal_fastq_pairs(output_dir):
             new_path = skipped_dir / f'{cell_id}-{read_type}.fq.gz'
             # if CellInputReadPairs = 0, the FASTQ file do not actually exist, but it does have a row in metadata.
             if fastq_path.exists():
-                subprocess.run(['mv', str(fastq_path), str(new_path)], check=True)
+                subprocess.run(['mv', str(fastq_path),
+                                str(new_path)],
+                               check=True)
 
     # save UID total input reads, for command order
     uid_order = demultiplex_df[~judge].groupby(
-        'UID')['CellInputReadPairs'].sum().sort_values(
-        ascending=False)
-    uid_order.to_csv(output_dir / 'stats/UIDTotalCellInputReadPairs.csv', header=False)
+        'UID')['CellInputReadPairs'].sum().sort_values(ascending=False)
+    uid_order.to_csv(output_dir / 'stats/UIDTotalCellInputReadPairs.csv',
+                     header=False)
+    return
+
+
+def _reformat_v2_single(output_dir):
+    # fix names and dir structure
+    output_dir = pathlib.Path(output_dir)
+    fastq_paths = list(output_dir.glob('*/fastq/*gz'))
+    for path in fastq_paths:
+        plate, cur_group, pcr_index, random_index, suffix = path.name.split(
+            '-')
+        col = int(random_index[1:])
+        real_group = ((col - 1) % 12) // 2 + 1
+        new_path = str(path).replace(f'{plate}-{cur_group}-{pcr_index}',
+                                     f'{plate}-{real_group}-{pcr_index}')
+        path = str(path)
+        if path == new_path:
+            continue
+        pathlib.Path(new_path).parent.mkdir(exist_ok=True, parents=True)
+        subprocess.run(['mv', path, new_path])
+
+    # fix names in the demultiplex stats
+    cell_stats = pd.read_csv(output_dir / 'stats/demultiplex.stats.csv',
+                             index_col=0)
+    new_stats = []
+    for cell_id, row in cell_stats.iterrows():
+        real_group = ((int(row['IndexName'][1:]) - 1) % 12) // 2 + 1
+        plate, _, pcr_index, random_index = cell_id.split('-')
+        row.name = f'{plate}-{real_group}-{pcr_index}-{random_index}'
+        row['UID'] = f'{plate}-{real_group}-{pcr_index}'
+        new_stats.append(row)
+    new_stats = pd.DataFrame(new_stats)
+    new_stats.to_csv(output_dir / 'stats/demultiplex.stats.csv')
     return
 
 
@@ -371,27 +434,33 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
 
     output_dir = pathlib.Path(output_dir).absolute()
     if output_dir.exists():
-        raise FileExistsError('output_dir already exists, to prevent conflicts, '
-                              'use another output_dir or delete the existing output_dir first.')
+        raise FileExistsError(
+            'output_dir already exists, to prevent conflicts, '
+            'use another output_dir or delete the existing output_dir first.')
     else:
         output_dir.mkdir(parents=True)
         (output_dir / 'stats').mkdir()
 
     config = get_configuration(config_path)
     new_config_path = output_dir / 'mapping_config.ini'
-    subprocess.run(f'cp {config_path} {new_config_path}', shell=True, check=True)
+    subprocess.run(f'cp {config_path} {new_config_path}',
+                   shell=True,
+                   check=True)
     barcode_version = config['barcode_version']
     # validate config file first before demultiplex
     validate_mapping_config(output_dir)
 
-    _demultiplex(
-        fastq_pattern=fastq_pattern,
-        output_dir=output_dir,
-        barcode_version=barcode_version,
-        cpu=demultiplex_cpu)
+    demultiplex_version = _demultiplex(fastq_pattern=fastq_pattern,
+                                       output_dir=output_dir,
+                                       barcode_version=barcode_version,
+                                       cpu=demultiplex_cpu)
     _merge_lane(output_dir=output_dir, cpu=merge_cpu)
-    _summarize_demultiplex(output_dir=output_dir, barcode_version=barcode_version)
+    _summarize_demultiplex(output_dir=output_dir,
+                           barcode_version=barcode_version)
     _final_cleaning(output_dir=output_dir)
+    if demultiplex_version == 'V2-single':
+        print('Reformat directories to separate multiplex groups')
+        _reformat_v2_single(output_dir=output_dir)
     _skip_abnormal_fastq_pairs(output_dir=output_dir)
     make_snakefile(output_dir=output_dir)
 
