@@ -51,8 +51,7 @@ def _demultiplex(fastq_pattern, output_dir, barcode_version, cpu):
                                                 'fastq_dataframe.csv')
 
     # judge the type of V2 barcoding
-    if fastq_df['multiplex_group'].unique(
-    ).size == 1 and barcode_version == 'V2':
+    if (barcode_version == 'V2') and (fastq_df['multiplex_group'].unique().size == 1):
         # in this case, the six multiplex group is indexed by a single PCR index
         print(
             'Detect only single multiplex group in each plate, will use V2-single mode.'
