@@ -51,26 +51,28 @@ rule trim_r1:
         "fastq/{cell_id}-R1.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
+        tmpstats=temp("fastq/{cell_id}-R1.trimmed.tmpstats.tsv"),
         stats=temp("fastq/{cell_id}-R1.trimmed.stats.tsv")
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r1_adapter} {input} 2> {output.stats} | "
+        "cutadapt --report=minimal -a {r1_adapter} {input} 2> {output.tmpstats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r1_left_cut} -u -{r1_right_cut} -m 30 "
-        "-o {output.fq} - >> {output.stats}"
+        "-o {output.fq} - >> {output.tmpstats} && cp {output.tmpstats} {output.stats}"
 
 rule trim_r2:
     input:
         "fastq/{cell_id}-R2.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
+        tmpstats=temp("fastq/{cell_id}-R2.trimmed.tmpstats.tsv"),
         stats=temp("fastq/{cell_id}-R2.trimmed.stats.tsv")
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r2_adapter} {input} 2> {output.stats} | "
+        "cutadapt --report=minimal -a {r2_adapter} {input} 2> {output.tmpstats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r2_left_cut} -u -{r2_right_cut} -m 30 "
-        "-o {output.fq} - >> {output.stats}"
+        "-o {output.fq} - >> {output.tmpstats} && cp {output.tmpstats} {output.stats}"
 
 # bismark mapping, R1 and R2 separately
 rule bismark_r1:
