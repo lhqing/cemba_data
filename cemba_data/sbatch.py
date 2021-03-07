@@ -34,7 +34,7 @@ def judge_job_success(job_id, retry=3):
     tried = 0
     for i in range(retry):
         try:
-            p = subprocess.run(['sacct', '-j', str(job_id), '--format=jobid;exitcode'],
+            p = subprocess.run(['sacct', '-j', str(job_id), '--format=jobid,exitcode'],
                                check=True, stdout=subprocess.PIPE, encoding='utf8')
             sacct_txt = p.stdout
             pt = re.compile(f'{job_id}\s+0:0')
