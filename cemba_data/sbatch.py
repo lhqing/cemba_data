@@ -261,7 +261,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
         print('Found previous submission records, successful jobs will not be submit again.')
         previous_sacct_df = pd.read_csv(sacct_path, index_col=0)
         previous_sacct_df_success = previous_sacct_df[previous_sacct_df['Success']]
-        successful_script_paths = set(previous_sacct_df_success['ScriptPath'].tolist())
+        successful_script_paths = set(previous_sacct_df_success['ScriptPath'].astype(str).tolist())
         print(f'Successful script paths: {", ".join(successful_script_paths)}')
 
     # create job script files
@@ -344,7 +344,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                     print(f'Remaining slots: {remaining_slots}')
                     script_path = queue_job_path_list.pop()
                     # skip if job already submitted and are successful before
-                    if script_path in successful_script_paths:
+                    if str(script_path) in successful_script_paths:
                         print(f'Already successful in previous submission: {script_path}')
                         continue
                     job_id = submit_sbatch(script_path)
