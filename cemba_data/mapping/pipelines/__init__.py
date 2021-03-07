@@ -128,7 +128,8 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
               f'--snakefile $SCRATCH/{output_dir_name}/{snake_file.parent.name}/Snakefile ' \
               f'-j {cores_per_job} ' \
               f'--default-resources mem_mb=100 ' \
-              f'--resources mem_mb={total_mem_mb} '
+              f'--resources mem_mb={total_mem_mb} ' \
+              f'&& test -f "$SCRATCH/{output_dir_name}/{snake_file.parent.name}/MappingSummary.csv.gz"'
         cmds[uid] = cmd
     script_path = script_dir / 'snakemake_cmd.txt'
     with open(script_path, 'w') as f:
@@ -194,17 +195,24 @@ yap qsub \
     return
 
 
-def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=96, total_mem_mb=192000):
+def prepare_sbatch(name, snakemake_dir):
+    sbatch_cores_per_job = 96
+
     output_dir = snakemake_dir.parent
     output_dir_name = output_dir.name
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
-    time_str = "8:00:00"
+
     if mode == 'm3c':
-        time_str = "10:00:00"
+        time_str = "6:00:00"
+        total_mem_mb = 160000
     elif mode == 'mc':
-        time_str = "7:00:00"
+        time_str = "4:00:00"
+        total_mem_mb = 192000
     elif mode == 'mct':
-        time_str = "8:00:00"
+        time_str = "6:00:00"
+        total_mem_mb = 192000
+    else:
+        raise KeyError(f'Unknown mode {mode}')
     sbatch_dir = snakemake_dir / 'sbatch'
     sbatch_dir.mkdir(exist_ok=True)
 
@@ -221,7 +229,8 @@ def prepare_sbatch(name, snakemake_dir, sbatch_cores_per_job=96, total_mem_mb=19
     sbatch_total_path = sbatch_dir / 'sbatch.sh'
     with open(sbatch_total_path, 'w') as f:
         f.write(sbatch_cmd)
-    print('#' * 60)
+
+    print('#' * 40)
     print(f"IF YOU USE SBATCH ON STAMPEDE2:")
     print(f"All snakemake commands need to be executed "
           f"were included in {sbatch_total_path}")

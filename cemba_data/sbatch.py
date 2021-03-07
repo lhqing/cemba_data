@@ -9,7 +9,7 @@ import re
 import shlex
 import subprocess
 import time
-
+from collections import defaultdict
 import pandas as pd
 
 import cemba_data
@@ -28,6 +28,25 @@ STAMPEDE2_QUEUES = {
     'skx-normal': 25,
     'skx-large': 3
 }
+
+
+def judge_job_success(job_id, retry=3):
+    tried = 0
+    for i in range(retry):
+        try:
+            p = subprocess.run(['sacct', '-j', str(job_id), '--format=jobid;exitcode'],
+                               check=True, stdout=subprocess.PIPE, encoding='utf8')
+            sacct_txt = p.stdout
+            pt = re.compile(f'{job_id}\s+0:0')
+            if pt.search(sacct_txt):
+                return True
+            else:
+                return False
+        except subprocess.CalledProcessError:
+            tried += 1
+            print(f'sacct error, try again {tried}/{retry}')
+            time.sleep(10)
+    return False
 
 
 def get_job_id(sbatch_result):
@@ -110,7 +129,7 @@ def squeue():
     else:
         raise SystemError('Squeue command failed')
     print('Current squeue output:')
-    print(squeue_result, end='\n\n')
+    print(squeue_result, end='\n')
 
     records = []
     col_names = []
@@ -149,7 +168,7 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
         email_str = ''
         email_type_str = ''
 
-    script_path_to_command = {}
+    queue_job_path_list = []
     for i, command in enumerate(commands):
         job_name = f'{name_prefix}_{i}'
         sbatch_script = sbatch_template.format(
@@ -164,8 +183,8 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
         job_script_path = sbatch_dir / f'{job_name}.sh'
         with open(job_script_path, 'w') as f:
             f.write(sbatch_script)
-        script_path_to_command[str(job_script_path)] = command
-    return script_path_to_command
+        queue_job_path_list.append(job_script_path)
+    return queue_job_path_list
 
 
 def sacct(jobs):
@@ -205,7 +224,7 @@ def sacct(jobs):
 
 
 def sbatch_submitter(project_name, command_file_path, working_dir, time_str, queue='skx-normal',
-                     email=None, email_type='fail', max_jobs=None, dry_run=False):
+                     email=None, email_type='fail', max_jobs=None, dry_run=False, retry=2):
     # read commands
     with open(command_file_path) as f:
         # I always assume the command is ordered with descending priority.
@@ -246,7 +265,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
         print(f'Successful script paths: {", ".join(successful_script_paths)}')
 
     # create job script files
-    script_path_to_command = make_sbatch_script_files(
+    queue_job_path_list = make_sbatch_script_files(
         commands=commands,
         sbatch_dir=sbatch_dir,
         name_prefix=project_name,
@@ -258,7 +277,6 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
     # prepare submission
     running_job_id_set = set()  # sbatch_id
     finished_job_id_set = set()  # job_id
-    queue_job_path_list = list(script_path_to_command.keys()).copy()
     job_id_to_script_path = {}
 
     # start submission
@@ -269,16 +287,25 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                               f'Make sure you do not have sbatch submitter running and (if so) delete that flag file.')
     with open(flag_path, 'w') as f:
         f.write('')
+    script_path_to_tried_times = defaultdict(int)
     if not dry_run:
+        squeue_fail = 0
         while (len(queue_job_path_list) != 0) or (len(running_job_id_set) != 0):
             if not flag_path.exists():
                 # break if flag missing
                 break
-
             # squeue and update running job status
-            squeue_df = squeue()
+            try:
+                squeue_df = squeue()
+                squeue_fail = 0
+            except Exception as e:
+                print('Squeue parser raised an error, will retry after 150s.')
+                squeue_fail += 1
+                if squeue_fail > 10:
+                    raise e
+                time.sleep(150)
+                continue
             remaining_slots = max_jobs - squeue_df.shape[0]
-            # TODO diff queue has diff limit, so here actually need to determine queue type
             # the max_jobs is apply to user level, not to the current submitter level
             if remaining_slots > 0:
                 # things are getting done, weak up
@@ -289,7 +316,21 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                 for job_id in running_job_id_set:
                     if job_id not in squeue_df.index:
                         # running job finished
-                        finished_job_id_set.add(job_id)
+                        if judge_job_success(job_id):
+                            # job succeed
+                            finished_job_id_set.add(job_id)
+                        else:
+                            # job failed
+                            script_path = job_id_to_script_path[job_id]
+                            script_path_to_tried_times[script_path] += 1
+                            if script_path_to_tried_times[script_path] <= retry:
+                                print(f'Job {job_id} failed, retry {script_path} '
+                                      f'{script_path_to_tried_times[script_path]}/{retry}.')
+                                queue_job_path_list.append(script_path)
+                            else:
+                                # add the last job_id into finished
+                                finished_job_id_set.add(job_id)
+                                print(f'{script_path} failed after {retry + 1} attempts.')
                         # status will be judged in the end
                     else:
                         # still running
