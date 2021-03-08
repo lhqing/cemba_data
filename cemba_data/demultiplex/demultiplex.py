@@ -468,3 +468,12 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
     # or generate by themselves if they want different setting.
     prepare_run(output_dir)
     return
+
+
+def update_snakemake(output_dir):
+    """When mapping_config.ini is updated, or the output_dir path changed,
+    use this function to update snakefile and snakemake commands."""
+    output_dir = pathlib.Path(output_dir).absolute()
+    make_snakefile(output_dir=output_dir)
+    prepare_run(output_dir)
+    return

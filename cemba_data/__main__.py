@@ -305,6 +305,24 @@ def demultiplex_register_subparser(subparser):
     return
 
 
+def update_snakemake_register_subparser(subparser):
+    parser = subparser.add_parser('update-snakemake',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Update Snakemake related files when mapping_config.ini "
+                                       "OR file directory changed.")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--output_dir",
+        "-o",
+        type=str,
+        required=True,
+        help="Pipeline output directory."
+    )
+    return
+
+
 def print_default_config_register_subparser(subparser):
     parser = subparser.add_parser('default-mapping-config',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -527,6 +545,7 @@ def main():
     print_plate_info_register_subparser(subparsers)
     make_sample_sheet_register_subparser(subparsers)
     demultiplex_register_subparser(subparsers)
+    update_snakemake_register_subparser(subparsers)
     start_from_cell_fastq_register_subparser(subparsers)
     summary_register_subparser(subparsers)
     mc_bulk_subparser(subparsers)
@@ -562,6 +581,8 @@ def main():
         from .demultiplex import print_plate_info as func
     elif cur_command == 'make-sample-sheet':
         from .demultiplex import make_sample_sheet as func
+    elif cur_command == 'update-snakemake':
+        from .demultiplex import update_snakemake as func
     elif cur_command == 'demultiplex':
         from .demultiplex import demultiplex_pipeline as func
     elif cur_command == 'default-mapping-config':
