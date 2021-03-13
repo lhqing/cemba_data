@@ -28,15 +28,34 @@
 {email_str}
 {email_type_str}
 
-# By default, send email when job fails
-module load python_cacher
 
-# Other commands must follow all #SBATCH directives...
+#----------------------------------------------------
+# Clone the whole conda environment into /tmp so the snakemake command do not access $WORK
+# This requires pre-install the env named mapping
+conda create -p /tmp/mapping --clone mapping
+# conda init do not work in shell script, this worked as an replacement
+source $(dirname $(which conda))/../etc/profile.d/conda.sh
+conda activate /tmp/mapping
+
+# Check the path
+which python
+which snakemake
+which yap
+which allcools
+which bismark
+
+# Installation finished
+#----------------------------------------------------
+
+
+# ---------------------------------------------------
+# actual command
+
+# print some info
 date
 hostname
-module list
-which python
 pwd
+# module load remora
 
 # Set thread count (default value is 1)...
 export OMP_NUM_THREADS=48
