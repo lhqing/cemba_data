@@ -116,6 +116,11 @@ def _parse_bam(bam_path, output_path):
 
 
 def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=2500):
+    output_path = str(output_path)
+    if output_path.endswith('.gz'):
+        # remove gz first
+        output_path = output_path[:-3]
+
     dfh = open(input_path, 'r')
     rfh = open(output_path, 'w')
     chrom = pd.read_csv(chrom_size_path, sep='\t', header=None, index_col=0).index.tolist()
@@ -160,6 +165,9 @@ def _parse_split_table(input_path, output_path, chrom_size_path, min_gap=2500):
 
     # sort the contacts
     subprocess.run(f'sort -k2,2 -k6,6 -k1,1n -k5,5n -k3,3n {output_path} -o {output_path}', shell=True, check=True)
+
+    # compress the contacts, .gz will be added
+    subprocess.run(f'gzip {output_path}', shell=True, check=True)
     return output_path
 
 
