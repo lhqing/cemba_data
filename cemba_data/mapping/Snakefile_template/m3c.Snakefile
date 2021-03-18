@@ -19,7 +19,7 @@ rule summary:
         expand("bam/{cell_id}-R1.two_mapping.deduped.bam", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.two_mapping.deduped.bam", cell_id=CELL_IDS),
         expand("hic/{cell_id}.3C.contact.tsv.gz", cell_id=CELL_IDS),
-        expand("hic/{cell_id}.3C.contact.tsv.gz.counts.txt", cell_id=CELL_IDS)
+        expand("hic/{cell_id}.3C.contact.tsv.counts.txt", cell_id=CELL_IDS)
     output:
         "MappingSummary.csv.gz"
     shell:
@@ -286,7 +286,7 @@ rule generate_contact:
         "bam/{cell_id}.3C.sorted.bam"
     output:
         contact="hic/{cell_id}.3C.contact.tsv.gz",
-        stats=temp("hic/{cell_id}.3C.contact.tsv.gz.counts.txt")
+        stats=temp("hic/{cell_id}.3C.contact.tsv.counts.txt")
     resources:
         mem_mb=300
     shell:
