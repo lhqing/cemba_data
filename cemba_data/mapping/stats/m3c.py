@@ -46,7 +46,7 @@ def m3c_mapping_stats(output_dir, config):
                 _m3c_count_bams(bam_dir, cell_id, read_type)
             )
         # contacts
-        contact_counts = pd.read_csv(hic_dir / f'{cell_id}.3C.contact.tsv.gz.counts.txt',
+        contact_counts = pd.read_csv(hic_dir / f'{cell_id}.3C.contact.tsv.counts.txt',
                                      header=None, index_col=0, squeeze=True)
         contact_counts.name = cell_id
         total_stats.append(contact_counts)
