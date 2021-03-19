@@ -203,10 +203,10 @@ def prepare_sbatch(name, snakemake_dir):
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
 
     if mode == 'm3c':
-        time_str = "6:00:00"
+        time_str = "7:00:00"
         total_mem_mb = 160000
     elif mode == 'mc':
-        time_str = "4:00:00"
+        time_str = "6:00:00"
         total_mem_mb = 192000
     elif mode == 'mct':
         time_str = "6:00:00"
