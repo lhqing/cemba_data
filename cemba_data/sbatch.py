@@ -11,6 +11,8 @@ import subprocess
 import time
 from collections import defaultdict
 import pandas as pd
+import random
+import string
 
 import cemba_data
 
@@ -168,6 +170,8 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
         email_str = ''
         email_type_str = ''
 
+    env_dir_random = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
     queue_job_path_list = []
     for i, command in enumerate(commands):
         job_name = f'{name_prefix}_{i}'
@@ -178,7 +182,8 @@ def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str,
             email_str=email_str,
             email_type_str=email_type_str,
             command=command,
-            log_dir=sbatch_dir
+            log_dir=sbatch_dir,
+            env_dir_random=env_dir_random
         )
         job_script_path = sbatch_dir / f'{job_name}.sh'
         with open(job_script_path, 'w') as f:

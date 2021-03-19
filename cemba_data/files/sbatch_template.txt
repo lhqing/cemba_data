@@ -32,10 +32,10 @@
 #----------------------------------------------------
 # Clone the whole conda environment into /tmp so the snakemake command do not access $WORK
 # This requires pre-install the env named mapping
-conda create -p /tmp/mapping --clone mapping
+conda create -p /tmp/mapping_{env_dir_random} --clone mapping
 # conda init do not work in shell script, this worked as an replacement
 source $(dirname $(which conda))/../etc/profile.d/conda.sh
-conda activate /tmp/mapping
+conda activate /tmp/mapping_{env_dir_random}
 
 # Check the path
 which python
@@ -55,6 +55,8 @@ which bismark
 date
 hostname
 pwd
+# If you want to profile the job (CPU, MEM usage, etc.)
+# load remora and add "remora snakemake..."
 # module load remora
 
 # Set thread count (default value is 1)...
