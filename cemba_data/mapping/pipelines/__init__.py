@@ -129,6 +129,7 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
               f'-j {cores_per_job} ' \
               f'--default-resources mem_mb=100 ' \
               f'--resources mem_mb={total_mem_mb} ' \
+              f'--rerun-incomplete ' \
               f'&& test -f "$SCRATCH/{output_dir_name}/{snake_file.parent.name}/MappingSummary.csv.gz"'
         cmds[uid] = cmd
     script_path = script_dir / 'snakemake_cmd.txt'
