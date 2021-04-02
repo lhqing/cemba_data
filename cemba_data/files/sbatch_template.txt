@@ -30,12 +30,12 @@
 
 
 #----------------------------------------------------
-# Clone the whole conda environment into /tmp so the snakemake command do not access $WORK
-# This requires pre-install the env named mapping
-conda create -p /tmp/mapping_{env_dir_random} --clone mapping
-# conda init do not work in shell script, this worked as an replacement
-source $(dirname $(which conda))/../etc/profile.d/conda.sh
-conda activate /tmp/mapping_{env_dir_random}
+# Clone the whole miniconda into /tmp so the snakemake command do not access $WORK
+tar -xf /work2/05622/lhq/test_conda.tar -C /tmp
+export CONDA_PREFIX=/tmp/test/miniconda3
+export CONDA_PYTHON_EXE=/tmp/test/miniconda3/bin/python
+export CONDA_EXE=/tmp/test/miniconda3/bin/conda
+export PATH=/dev/shm/bin:/tmp/test/miniconda3/envs/mapping/bin:/tmp/test/miniconda3/bin:/opt/apps/cmake/3.16.1/bin:/opt/apps/intel18/python2/2.7.15/bin:/opt/apps/autotools/1.1/bin:/opt/apps/git/2.24.1/bin:/opt/apps/libfabric/1.7.0/bin:/opt/apps/intel18/impi/18.0.2/bin:/opt/intel/compilers_and_libraries_2018.2.199/linux/mpi/intel64/bin:/opt/intel/compilers_and_libraries_2018.2.199/linux/bin/intel64:/opt/apps/gcc/6.3.0/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/opt/dell/srvadmin/bin:.
 
 # Check the path
 which python
