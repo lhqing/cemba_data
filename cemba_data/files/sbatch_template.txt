@@ -63,4 +63,8 @@ pwd
 export OMP_NUM_THREADS=48
 
 {command}
+
+# delete everything in /tmp
+
+rm -rf /tmp/test*
 # ---------------------------------------------------
