@@ -96,7 +96,7 @@ def submit_sbatch(job_script_path):
     -------
 
     """
-    p = subprocess.run(['sbatch', job_script_path],
+    p = subprocess.run(['sbatch', str(job_script_path)],
                        check=True,
                        encoding='utf8',
                        stdout=subprocess.PIPE)
