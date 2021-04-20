@@ -1,8 +1,7 @@
 import glob
-import os
 import pathlib
 import subprocess
-
+import os
 import pandas as pd
 
 import cemba_data
@@ -266,7 +265,12 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=10, memory_gb_per_core=
 
     # this is only some automatic code for ecker lab...
     # so conditioned by the host name
-    host_name = os.environ['HOSTNAME']
+    try:
+        host_name = os.environ['HOSTNAME']
+    except KeyError:
+        host_name = subprocess.run('hostname', stdout=subprocess.PIPE, encoding='utf8').stdout
+        if not isinstance(host_name, str):
+            host_name = 'unknown'
     if any([host_name.startswith(s) for s in INHOUSE_SERVERS]):
         prepare_qsub(name=name,
                      snakemake_dir=snakemake_dir,
