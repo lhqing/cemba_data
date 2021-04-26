@@ -275,7 +275,7 @@ rule filter_bam:
     output:
         temp('rna_bam/TotalRNAAligned.filtered.bam')
     threads:
-        workflow.cores * 0.8
+        min(workflow.cores * 0.8, 10)
     shell:
         "samtools sort -@ {threads} -m 2G {input} | samtools view -bh -q 10 -o {output} -"
 
@@ -299,7 +299,7 @@ rule feature_count:
         count='rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv',
         stats=temp('rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary')
     threads:
-        workflow.cores * 0.8
+        min(workflow.cores * 0.8, 10)
     resources:
         mem_mb=1000
     shell:
