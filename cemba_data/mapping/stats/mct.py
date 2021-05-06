@@ -83,15 +83,6 @@ def mct_mapping_stats(output_dir, config):
     select_dna_stats_df = summarize_select_dna_reads(output_dir, config)
     rna_stats_df = summary_rna_mapping(output_dir)
     final_df = pd.concat([mc_stats_df, select_dna_stats_df, rna_stats_df], axis=1)
-
-    # calculate some mCT specific ratios
-    final_df['DNAReadsYield'] = final_df['FinalDNAReads'] / (
-            final_df['CellInputReadPairs'] * 2)
-    final_df['RNAReadsYield'] = final_df['FinalRNAReads'] / final_df[
-        'CellInputReadPairs']
-    final_df['RNA/(DNA+RNA)'] = final_df['FinalRNAReads'].fillna(0) / (
-            final_df['R1FinalBismarkReads'].fillna(0) + 1)
-
     return final_df
 
 
@@ -130,4 +121,12 @@ def mct_additional_cols(final_df, output_dir):
 
     stats = pd.read_hdf(output_dir / 'TotalRNAData.h5', key='stats')
     final_df['GenesDetected'] = stats['GenesDetected']
+
+    # calculate some mCT specific ratios
+    final_df['DNAReadsYield'] = final_df['FinalDNAReads'] / (
+            final_df['CellInputReadPairs'] * 2)
+    final_df['RNAReadsYield'] = final_df['FinalRNAReads'] / final_df[
+        'CellInputReadPairs']
+    final_df['RNA/(DNA+RNA)'] = final_df['FinalRNAReads'].fillna(0) / (
+            final_df['R1FinalBismarkReads'].fillna(0) + 1)
     return final_df
