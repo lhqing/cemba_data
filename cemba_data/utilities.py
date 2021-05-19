@@ -173,7 +173,7 @@ IUPAC_TABLE = {
     'D': 'AGT',
     'H': 'ATC',
     'V': 'ACG',
-    'N': 'ATCG'
+    'N': 'ATCGN'
 }
 
 

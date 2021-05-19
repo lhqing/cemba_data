@@ -371,7 +371,7 @@ def _skip_abnormal_fastq_pairs(output_dir):
     for cell_id, row in unmapped_cells.iterrows():
         uid = row['UID']
         skipped_dir = output_dir / uid / 'fastq/skipped/'
-        skipped_dir.mkdir(exist_ok=True)
+        skipped_dir.mkdir(exist_ok=True, parents=True)
 
         # move both R1 R2 to skipped files, it will not be included in Snakefile
         for read_type in ['R1', 'R2']:
