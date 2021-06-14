@@ -27,7 +27,7 @@ STAMPEDE2_QUEUES = {
     'long': 2,
     'flat-quadrant': 5,
     'skx-dev': 1,
-    'skx-normal': 25,
+    'skx-normal': 20,
     'skx-large': 3
 }
 
@@ -96,12 +96,21 @@ def submit_sbatch(job_script_path):
     -------
 
     """
-    p = subprocess.run(['sbatch', str(job_script_path)],
-                       check=True,
-                       encoding='utf8',
-                       stdout=subprocess.PIPE)
-    job_id = get_job_id(p.stdout)
-    print(f'Submit job script: {job_script_path}. Job ID is {job_id}.')
+    try:
+        p = subprocess.run(['sbatch', str(job_script_path)],
+                           check=True,
+                           encoding='utf8',
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
+        job_id = get_job_id(p.stdout)
+        print(f'Submit job script: {job_script_path}. Job ID is {job_id}.')
+    except subprocess.CalledProcessError as e:
+        print('sbatch STDOUT')
+        print(e.stdout)
+        print('sbatch STDERR')
+        print(e.stderr)
+        print('sbatch submission failed, see information above.')
+        raise e
     return job_id
 
 

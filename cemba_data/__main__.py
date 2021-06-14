@@ -177,9 +177,8 @@ def sbatch_register_subparser(subparser):
         "--queue",
         type=str,
         default='skx-normal',
-        choices=['skx-normal'],
-        help="Queue partition of stampede2. Right now only support skx-normal, "
-             "which is large memory nodes suitable for mapping jobs. "
+        help="Queue partition of stampede2. "
+             "See https://portal.tacc.utexas.edu/user-guides/stampede2#running-queues for more information."
     )
 
     parser_req.add_argument(

@@ -12,7 +12,13 @@ from ...utilities import get_configuration
 
 # Load defaults
 PACKAGE_DIR = pathlib.Path(cemba_data.__path__[0])
-INHOUSE_SERVERS = ['bpho', 'gale', 'cemba', 'oberon']
+INHOUSE_SERVERS = ['bpho', 'gale', 'cemba', 'oberon',
+                   'login1.stampede2.tacc.utexas.edu',
+                   'login2.stampede2.tacc.utexas.edu',
+                   'login3.stampede2.tacc.utexas.edu',
+                   'login4.stampede2.tacc.utexas.edu',
+                   'login5.stampede2.tacc.utexas.edu',
+                   'login6.stampede2.tacc.utexas.edu']
 
 
 def prepare_uid_snakefile(uid_dir, config_str, snake_template):
@@ -195,24 +201,39 @@ yap qsub \
     return
 
 
-def prepare_sbatch(name, snakemake_dir):
+def prepare_sbatch(name, snakemake_dir, queue):
     sbatch_cores_per_job = 96
 
     output_dir = snakemake_dir.parent
     output_dir_name = output_dir.name
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
 
-    if mode == 'm3c':
-        time_str = "7:00:00"
-        total_mem_mb = 160000
-    elif mode == 'mc':
-        time_str = "6:00:00"
-        total_mem_mb = 192000
-    elif mode == 'mct':
-        time_str = "6:00:00"
-        total_mem_mb = 192000
+    if queue == 'skx-normal':
+        if mode == 'm3c':
+            time_str = "7:00:00"
+            total_mem_mb = 160000
+        elif mode == 'mc':
+            time_str = "6:00:00"
+            total_mem_mb = 192000
+        elif mode == 'mct':
+            time_str = "6:00:00"
+            total_mem_mb = 192000
+        else:
+            raise KeyError(f'Unknown mode {mode}')
+    elif queue == 'normal':
+        if mode == 'm3c':
+            time_str = "13:00:00"
+            total_mem_mb = 90000
+        elif mode == 'mc':
+            time_str = "11:00:00"
+            total_mem_mb = 112000
+        elif mode == 'mct':
+            time_str = "11:00:00"
+            total_mem_mb = 112000
+        else:
+            raise KeyError(f'Unknown mode {mode}')
     else:
-        raise KeyError(f'Unknown mode {mode}')
+        raise ValueError(f'Unknown queue {queue}')
     sbatch_dir = snakemake_dir / 'sbatch'
     sbatch_dir.mkdir(exist_ok=True)
 
@@ -225,13 +246,14 @@ def prepare_sbatch(name, snakemake_dir):
                  f'--project_name {name} ' \
                  f'--command_file_path {script_path} ' \
                  f'--working_dir $SCRATCH/{output_dir_name}/snakemake/sbatch ' \
-                 f'--time_str {time_str}'
-    sbatch_total_path = sbatch_dir / 'sbatch.sh'
+                 f'--time_str {time_str} ' \
+                 f'--queue {queue}'
+    sbatch_total_path = sbatch_dir / f'sbatch-{queue}-queue.sh'
     with open(sbatch_total_path, 'w') as f:
         f.write(sbatch_cmd)
 
     print('#' * 40)
-    print(f"IF YOU USE SBATCH ON STAMPEDE2:")
+    print(f'For running jobs on the STAMPEDE2 {queue} queue:')
     print(f"All snakemake commands need to be executed "
           f"were included in {sbatch_total_path}")
     print(f"You just need to run this script to "
@@ -245,7 +267,7 @@ def prepare_sbatch(name, snakemake_dir):
           f"Alternatively, you can sbatch the commands in "
           f"$SCRATCH/{output_dir_name}/snakemake/sbatch/sbatch.sh by yourself, "
           f"as long as they all get successfully executed.")
-    print('#' * 60 + '\n')
+    print('#' * 40 + '\n')
     return
 
 
@@ -277,7 +299,8 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=10, memory_gb_per_core=
                      total_jobs=total_jobs,
                      cores_per_job=cores_per_job,
                      memory_gb_per_core=memory_gb_per_core)
-        prepare_sbatch(name=name, snakemake_dir=snakemake_dir)
+        prepare_sbatch(name=name, snakemake_dir=snakemake_dir, queue='normal')
+        prepare_sbatch(name=name, snakemake_dir=snakemake_dir, queue='skx-normal')
     else:
         script_path = write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_dir=snakemake_dir)
         print(f"All snakemake commands need to be executed were summarized in {script_path}")
