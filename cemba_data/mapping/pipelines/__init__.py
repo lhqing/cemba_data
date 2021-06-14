@@ -122,7 +122,7 @@ def write_qsub_commands(output_dir, cores_per_job, memory_gb_per_core, script_di
     return script_path
 
 
-def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
+def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb, queue):
     output_dir_name = output_dir.name
     cmds = {}
     snake_files = list(output_dir.glob('*/Snakefile'))
@@ -137,7 +137,7 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
               f'--rerun-incomplete ' \
               f'&& test -f "$SCRATCH/{output_dir_name}/{snake_file.parent.name}/MappingSummary.csv.gz"'
         cmds[uid] = cmd
-    script_path = script_dir / 'snakemake_cmd.txt'
+    script_path = script_dir / f'snakemake_{queue}_cmd.txt'
     with open(script_path, 'w') as f:
         try:
             uid_order = pd.read_csv(
@@ -156,7 +156,7 @@ def write_sbatch_commands(output_dir, cores_per_job, script_dir, total_mem_mb):
             # uid_order file do not exist (when starting from cell FASTQs)
             for cmd in cmds.values():
                 f.write(cmd + '\n')
-    return f'$SCRATCH/{output_dir_name}/snakemake/sbatch/snakemake_cmd.txt'
+    return f'$SCRATCH/{output_dir_name}/snakemake/sbatch/snakemake_{queue}_cmd.txt'
 
 
 def prepare_qsub(name, snakemake_dir, total_jobs, cores_per_job, memory_gb_per_core):
@@ -202,13 +202,12 @@ yap qsub \
 
 
 def prepare_sbatch(name, snakemake_dir, queue):
-    sbatch_cores_per_job = 96
-
     output_dir = snakemake_dir.parent
     output_dir_name = output_dir.name
     mode = get_configuration(output_dir / 'mapping_config.ini')['mode']
 
     if queue == 'skx-normal':
+        sbatch_cores_per_job = 96
         if mode == 'm3c':
             time_str = "7:00:00"
             total_mem_mb = 160000
@@ -221,6 +220,7 @@ def prepare_sbatch(name, snakemake_dir, queue):
         else:
             raise KeyError(f'Unknown mode {mode}')
     elif queue == 'normal':
+        sbatch_cores_per_job = 64
         if mode == 'm3c':
             time_str = "13:00:00"
             total_mem_mb = 90000
@@ -240,7 +240,8 @@ def prepare_sbatch(name, snakemake_dir, queue):
     script_path = write_sbatch_commands(output_dir,
                                         cores_per_job=sbatch_cores_per_job,
                                         script_dir=sbatch_dir,
-                                        total_mem_mb=total_mem_mb)
+                                        total_mem_mb=total_mem_mb,
+                                        queue=queue)
     # the path here is using stampede path
     sbatch_cmd = f'yap sbatch ' \
                  f'--project_name {name} ' \
