@@ -222,13 +222,13 @@ def prepare_sbatch(name, snakemake_dir, queue):
     elif queue == 'normal':
         sbatch_cores_per_job = 64
         if mode == 'm3c':
-            time_str = "13:00:00"
+            time_str = "48:00:00"
             total_mem_mb = 90000
         elif mode == 'mc':
-            time_str = "11:00:00"
+            time_str = "48:00:00"
             total_mem_mb = 112000
         elif mode == 'mct':
-            time_str = "11:00:00"
+            time_str = "48:00:00"
             total_mem_mb = 112000
         else:
             raise KeyError(f'Unknown mode {mode}')
@@ -244,7 +244,7 @@ def prepare_sbatch(name, snakemake_dir, queue):
                                         queue=queue)
     # the path here is using stampede path
     sbatch_cmd = f'yap sbatch ' \
-                 f'--project_name {name} ' \
+                 f'--project_name {name}_{queue} ' \
                  f'--command_file_path {script_path} ' \
                  f'--working_dir $SCRATCH/{output_dir_name}/snakemake/sbatch ' \
                  f'--time_str {time_str} ' \
