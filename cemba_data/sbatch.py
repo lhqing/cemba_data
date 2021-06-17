@@ -324,7 +324,8 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                     raise e
                 time.sleep(150)
                 continue
-            remaining_slots = max_jobs - squeue_df.shape[0]
+            # queue limit and total job limit both apply
+            remaining_slots = min((max_jobs - squeue_df.shape[0], max_jobs - 50))
             # the max_jobs is apply to user level, not to the current submitter level
             if remaining_slots > 0:
                 # things are getting done, weak up
