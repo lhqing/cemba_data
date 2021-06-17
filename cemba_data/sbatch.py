@@ -163,12 +163,13 @@ def squeue(partition):
         records.append(record)
     squeue_df = pd.DataFrame(records[1:],
                              columns=records[0]).set_index('JOBID')
+    total_job = squeue_df.shape[0]
     try:
         squeue_df = squeue_df[squeue_df['PARTITION'].str.lower() == partition.lower()].copy()
-        return squeue_df
+        return squeue_df, total_job
     except KeyError:
         print(squeue_df)
-        return squeue_df
+        return squeue_df, total_job
 
 
 def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str, email, email_type):
@@ -315,7 +316,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                 break
             # squeue and update running job status
             try:
-                squeue_df = squeue(partition=queue)
+                squeue_df, total_job = squeue(partition=queue)
                 squeue_fail = 0
             except Exception as e:
                 print('Squeue parser raised an error, will retry after 150s.')
@@ -325,7 +326,7 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                 time.sleep(150)
                 continue
             # queue limit and total job limit both apply
-            remaining_slots = min((max_jobs - squeue_df.shape[0], max_jobs - 50))
+            remaining_slots = min((max_jobs - squeue_df.shape[0], total_job - 50))
             # the max_jobs is apply to user level, not to the current submitter level
             if remaining_slots > 0:
                 # things are getting done, weak up
