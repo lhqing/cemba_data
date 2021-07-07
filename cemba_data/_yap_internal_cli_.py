@@ -302,6 +302,243 @@ def generate_contacts_internal_subparser(subparser):
     parser.set_defaults(keep_split_table=False)
 
 
+def dss_two_internal_subparser(subparser):
+    parser = subparser.add_parser('dss-two',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Run DSS two-group DMR")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--allc_table_path",
+        type=str,
+        required=True,
+        help="Three columns separated by tab: 1) allc path; 2) sample id 3) group id"
+    )
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Output directory"
+    )
+
+    parser_req.add_argument(
+        "--study_name",
+        type=str,
+        required=True,
+        help="Name of the study"
+    )
+
+    parser_req.add_argument(
+        "--chrom_sizes_path",
+        type=str,
+        required=True,
+        help="Path to genome chrom size file"
+    )
+
+    parser.add_argument(
+        "--chroms",
+        type=str,
+        nargs='+',
+        default=None,
+        help="Chromosomes to consider."
+    )
+
+    parser.add_argument("--p_threshold", type=float, default=0.001,
+                        help="FDR threshold to select sig DML")
+    parser.add_argument("--min_cg", type=int, required=True, default=1,
+                        help="Minimum CpGs for a DMR")
+    parser.add_argument("--min_len", type=int, required=True, default=1,
+                        help="Minimum length for a DMR")
+    parser.add_argument("--sig_ratio", type=float, required=True, default=0.5,
+                        help="Minimum ratio of CpGs that are significant in a DMR.")
+    parser.add_argument("--delta", type=float, required=True, default=0.1,
+                        help="Methylation delta that considered to be informative.")
+    parser.add_argument("--cpu", type=int, required=True, default=10,
+                        help="Number of CPUs to use")
+    parser.add_argument("--chunk_size", type=int, required=False, default=50000000,
+                        help="chunk size to parallel jobs")
+    parser.add_argument(
+        "--not_smoothing",
+        dest='smoothing',
+        action='store_false',
+        help='Do not preform smoothing (will perform smoothing by default).'
+    )
+    parser.set_defaults(smoothing=True)
+    parser.add_argument(
+        "--save_dml",
+        dest='save_dml',
+        action='store_true',
+        help='Save all the DML files (will delete DML table by default).'
+    )
+    parser.set_defaults(save_dml=False)
+    return
+
+def dss_multi_internal_subparser(subparser):
+    parser = subparser.add_parser('dss-multi',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Run DSS two-group DMR")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--allc_table_path",
+        type=str,
+        required=True,
+        help="Three columns separated by tab: 1) allc path; 2) sample id 3) group id"
+    )
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Output directory"
+    )
+
+    parser_req.add_argument(
+        "--study_name",
+        type=str,
+        required=True,
+        help="Name of the study"
+    )
+
+    parser_req.add_argument(
+        "--chrom_sizes_path",
+        type=str,
+        required=True,
+        help="Path to genome chrom size file"
+    )
+
+    parser.add_argument(
+        "--chroms",
+        type=str,
+        nargs='+',
+        default=None,
+        help="Chromosomes to consider."
+    )
+
+    parser.add_argument("--p_threshold", type=float, default=0.001,
+                        help="FDR threshold to select sig DML")
+    parser.add_argument("--min_cg", type=int, required=True, default=1,
+                        help="Minimum CpGs for a DMR")
+    parser.add_argument("--min_len", type=int, required=True, default=1,
+                        help="Minimum length for a DMR")
+    parser.add_argument("--sig_ratio", type=float, required=True, default=0.5,
+                        help="Minimum ratio of CpGs that are significant in a DMR.")
+    parser.add_argument("--cpu", type=int, required=True, default=10,
+                        help="Number of CPUs to use")
+    parser.add_argument("--chunk_size", type=int, required=False, default=50000000,
+                        help="chunk size to parallel jobs")
+    parser.add_argument(
+        "--no_smooth",
+        dest='smoothing',
+        action='store_false',
+        help='Do not preform smoothing (will perform smoothing by default).'
+    )
+    parser.set_defaults(smoothing=True)
+    parser.add_argument(
+        "--save_dml",
+        dest='save_dml',
+        action='store_true',
+        help='Save all the DML files (will delete DML table by default).'
+    )
+    parser.set_defaults(save_dml=False)
+    return
+
+
+def dmrseq_internal_subparser(subparser):
+    parser = subparser.add_parser('dmrseq',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Run DMRseq")
+
+    parser_req = parser.add_argument_group("Required inputs")
+
+    parser_req.add_argument(
+        "--allc_table_path",
+        type=str,
+        required=True,
+        help="Three columns separated by tab: 1) allc path; 2) sample id 3) group id"
+    )
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Output directory"
+    )
+
+    parser_req.add_argument(
+        "--study_name",
+        type=str,
+        required=True,
+        help="Name of the study"
+    )
+
+    parser_req.add_argument(
+        "--chrom_sizes_path",
+        type=str,
+        required=True,
+        help="Path to genome chrom size file"
+    )
+
+    parser.add_argument(
+        "--chroms",
+        type=str,
+        nargs='+',
+        default=None,
+        help="Chromosomes to consider."
+    )
+
+    parser.add_argument("--test_covariate", type=str, default='group',
+                        help="Test covariate name in the allc path table")
+    parser.add_argument("--match_covariate", type=str, required=False, default=None, nargs='+',
+                        help="Matched covariate name in the allc path table (will be adjusted during permutation.")
+    parser.add_argument("--adjust_covariate", type=str, required=False, default=None, nargs='+',
+                        help="adjust covariate name in the allc path table (will be adjusted in the model.")
+    parser.add_argument("--cutoff", type=float, required=False, default=0.1,
+                        help="Methylation delta that considered to be informative.")
+    parser.add_argument("--min_num_region", type=int, required=False, default=3,
+                        help="Minimum number of CpGs that are significant in a DMR, min is 3.")
+    parser.add_argument("--bp_span", type=int, required=False, default=1000,
+                        help="")
+    parser.add_argument("--min_in_span", type=int, required=False, default=30,
+                        help="")
+    parser.add_argument("--max_gap_smooth", type=int, required=False, default=2500,
+                        help="")
+    parser.add_argument("--max_gap", type=int, required=False, default=1000,
+                        help="")
+    parser.add_argument("--max_perms", type=int, required=False, default=10,
+                        help="")
+    parser.add_argument("--stat", type=str, required=False, default='stat',
+                        help="")
+    parser.add_argument("--chrs_per_chunk", type=int, required=False, default=1,
+                        help="")
+    parser.add_argument("--block_size", type=int, required=False, default=5000,
+                        help="")
+    parser.add_argument("--cpu", type=int, required=False, default=4,
+                        help="")
+    parser.add_argument("--template_path", type=str, required=False, default='default',
+                        help="")
+    parser.add_argument("--chunk_size", type=int, required=False, default=50000000,
+                        help="chunk size to parallel jobs")
+    parser.add_argument(
+        "--no_smooth",
+        dest='smooth',
+        action='store_false',
+        help='Do not preform smoothing (will perform smoothing by default).'
+    )
+    parser.set_defaults(smooth=True)
+    parser.add_argument(
+        "--block",
+        dest='block',
+        action='store_true',
+        help='Save all the DML files (will delete DML table by default).'
+    )
+    parser.set_defaults(block=False)
+    return
+
+
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -352,6 +589,12 @@ def internal_main():
         from .mapping.m3c import split_fastq_reads as func
     elif cur_command == 'generate-contacts':
         from .mapping.m3c import generate_contacts as func
+    elif cur_command == 'dss-two':
+        from .dmr.dss import run_dss_two_group as func
+    elif cur_command == 'dss-multi':
+        from .dmr.dss import run_dss_multi_group as func
+    elif cur_command == 'dmrseq':
+        from .dmr.dmrseq import run_dmrseq as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
