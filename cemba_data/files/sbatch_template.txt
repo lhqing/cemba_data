@@ -58,8 +58,11 @@ date
 hostname
 pwd
 # If you want to profile the job (CPU, MEM usage, etc.)
-# load remora and add "remora snakemake..."
-# module load remora
+# load remora with
+# "module load remora"
+# and change the command to
+# "remora {command}"
+
 
 # Set thread count (default value is 1)...
 export OMP_NUM_THREADS=48

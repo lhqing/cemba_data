@@ -525,6 +525,125 @@ def mc_bulk_subparser(subparser):
     )
 
 
+def snm3c_imputation_subparser(subparser):
+    parser = subparser.add_parser('m3c-impute',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Prepare the snakefile for snm3C-seq contact matrices imputation.")
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Path of the output directory after mapping is finished."
+    )
+
+    parser_req.add_argument(
+        "--chrom_size_path",
+        type=str,
+        required=True,
+        help="Path of the chromosome sizes file."
+    )
+
+    parser_opt.add_argument(
+        "--scheduler",
+        type=str,
+        default='sbatch',
+        choices=['sbatch', 'qsub'],
+        help="Which scheduler to use, if using sbatch, remember to provide remote chrom_size_path."
+    )
+
+    parser_opt.add_argument(
+        "--scool_cpu",
+        type=int,
+        default=5,
+        help="Number of CPU to use in generating scool files."
+    )
+
+    parser_opt.add_argument(
+        "--cpu_per_job",
+        type=int,
+        default=10,
+        help="Number of CPU for each imputation job."
+    )
+
+    parser_opt.add_argument(
+        "--batch_size",
+        type=int,
+        default=100,
+        help="Number of cells to process in each imputation job."
+    )
+
+    parser_opt.add_argument(
+        "--total_cpu",
+        type=int,
+        default=100,
+        help="Number of total CPUs to use in qsub."
+    )
+
+    parser_opt.add_argument(
+        "--min_contacts_per_cell",
+        type=int,
+        default=50000,
+        help="Minimum contacts for a cell to be included in the contacts analysis."
+    )
+
+    parser_opt.add_argument(
+        "--sbatch_time_str",
+        type=str,
+        default='2:00:00',
+        help="Time estimation for sbatch jobs."
+    )
+
+    parser_opt.add_argument(
+        "--min_cutoff",
+        type=str,
+        default='1e-5',
+        help="Minimum value cutoff of the imputation matrix. "
+             "Values smaller than the cutoff will be set to 0 to reduce file size."
+    )
+
+    parser_opt.add_argument(
+        "--skip_scool_prep",
+        dest='skip_scool_prep',
+        action='store_true',
+        help='Skip scool preparation step if you already have them prepared in the same location '
+             'and just want to use this command to change settings and update snakefiles.'
+    )
+    parser.set_defaults(skip_scool_prep=False)
+    return
+
+
+def snm3c_dataset_subparser(subparser):
+    parser = subparser.add_parser('m3c-impute',
+                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                  help="Prepare the snakefile for snm3C-seq contact matrices imputation.")
+    parser_req = parser.add_argument_group("Required inputs")
+    parser_opt = parser.add_argument_group("Optional inputs")
+
+    parser_req.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Path of the output directory after mapping is finished."
+    )
+
+    parser_req.add_argument(
+        "--fasta_path",
+        type=str,
+        required=True,
+        help="Path of the chromosome fasta file."
+    )
+
+    parser_opt.add_argument(
+        "--cpu",
+        type=int,
+        default=10,
+        help="Number of CPU for each job."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -548,6 +667,8 @@ def main():
     start_from_cell_fastq_register_subparser(subparsers)
     summary_register_subparser(subparsers)
     mc_bulk_subparser(subparsers)
+    snm3c_imputation_subparser(subparsers)
+    snm3c_dataset_subparser(subparsers)
 
     # initiate
     args = None
@@ -592,6 +713,8 @@ def main():
         from cemba_data.mapping import final_summary as func
     elif cur_command == 'mc-bulk':
         from cemba_data.bulk import prepare_mc_bulk as func
+    elif cur_command == 'm3c-impute':
+        from cemba_data.snm3C import prepare_impute_dir as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
