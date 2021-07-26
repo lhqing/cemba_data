@@ -616,7 +616,7 @@ def snm3c_imputation_subparser(subparser):
 
 
 def snm3c_dataset_subparser(subparser):
-    parser = subparser.add_parser('m3c-impute',
+    parser = subparser.add_parser('m3c-dataset',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                   help="Prepare the snakefile for snm3C-seq contact matrices imputation.")
     parser_req = parser.add_argument_group("Required inputs")
