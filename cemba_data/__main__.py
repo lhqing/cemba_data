@@ -715,6 +715,8 @@ def main():
         from cemba_data.bulk import prepare_mc_bulk as func
     elif cur_command == 'm3c-impute':
         from cemba_data.snm3C import prepare_impute_dir as func
+    elif cur_command == 'm3c-dataset':
+        from cemba_data.snm3C import prepare_dataset_commands as func
     else:
         log.debug(f'{cur_command} not Known, check the main function if else part')
         parser.parse_args(["-h"])
