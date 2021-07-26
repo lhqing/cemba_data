@@ -69,21 +69,21 @@ def prepare_dataset_commands(output_dir, fasta_path, cpu=10):
     with open(qsub_dir / 'dataset_cmd.txt', 'w') as f:
         f.write('\n'.join([compartment_cmd, domain_cmd, embedding_cmd]))
     qsub_str = f"""
-    #!/bin/bash
-    #$ -N y{project_name}
-    #$ -V
-    #$ -l h_rt=999:99:99
-    #$ -l s_rt=999:99:99
-    #$ -wd {qsub_dir}
-    #$ -e {qsub_dir}/qsub_dataset.error.log
-    #$ -o {qsub_dir}/qsub_dataset.output.log
-    #$ -pe smp 1
-    #$ -l h_vmem=3G
-    
-    yap qsub --command_file_path {qsub_dir}/dataset_cmd.txt \
-    --working_dir {qsub_dir} --project_name y{project_name}_dataset \
-    --total_cpu {int(cpu*3)} --qsub_global_parms "-pe smp={cpu};-l h_vmem=5G"
-    """
+#!/bin/bash
+#$ -N y{project_name}
+#$ -V
+#$ -l h_rt=999:99:99
+#$ -l s_rt=999:99:99
+#$ -wd {qsub_dir}
+#$ -e {qsub_dir}/qsub_dataset.error.log
+#$ -o {qsub_dir}/qsub_dataset.output.log
+#$ -pe smp 1
+#$ -l h_vmem=3G
+
+yap qsub --command_file_path {qsub_dir}/dataset_cmd.txt \
+--working_dir {qsub_dir} --project_name y{project_name}_dataset \
+--total_cpu {int(cpu*3)} --qsub_global_parms "-pe smp={cpu};-l h_vmem=5G"
+"""
     with open(qsub_dir / 'qsub_dataset.sh', 'w') as f:
         f.write(qsub_str)
     return
