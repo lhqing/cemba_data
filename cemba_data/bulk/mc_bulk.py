@@ -75,7 +75,7 @@ merge_allc_cpu = {merge_allc_cpu}
 mch_context = '{mch_context}'
 mcg_context = '{mcg_context}'
 bigwig_mch_bin_size = {bigwig_mch_bin_size}
-bigwig_mch_bin_size = {bigwig_mcg_bin_size}
+bigwig_mcg_bin_size = {bigwig_mcg_bin_size}
 chrom_size_path = '{chrom_size_path}'
 group = '{group}'
 
