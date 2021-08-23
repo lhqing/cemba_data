@@ -479,14 +479,6 @@ def mc_bulk_subparser(subparser):
     )
 
     parser_req.add_argument(
-        "--bigwig_contexts",
-        type=str,
-        nargs='+',
-        required=True,
-        help="mC contexts for generating the bigwig tracks."
-    )
-
-    parser_req.add_argument(
         "--chrom_size_path",
         type=str,
         required=True,
@@ -494,34 +486,45 @@ def mc_bulk_subparser(subparser):
     )
 
     parser_opt.add_argument(
-        "--extract_mcg",
-        dest='extract_mcg',
-        action='store_true',
-        help='Whether run the step to extract mCG sites from the merged ALLC. '
-             'If your input ALLC only contains mCG sites, this can be skipped. '
-             'Otherwise, this needs to be done before running the CG-DMR calling.'
-    )
-    parser.set_defaults(extract_mcg=False)
-
-    parser_opt.add_argument(
-        "--bigwig_bin_size",
-        type=int,
-        default=50,
-        help="Bin size used to generate bigwig."
-    )
-
-    parser_opt.add_argument(
-        "--merge_allc_cpu",
-        type=int,
-        default=8,
-        help="Number of CPU to use in individual merge-allc job."
+        "--mch_context",
+        type=str,
+        default='CHN',
+        help="mCH contexts for generating the bigwig tracks."
     )
 
     parser_opt.add_argument(
         "--mcg_context",
         type=str,
         default='CGN',
-        help="mC context for extract_mcg step, only relevant when extract_mcg=True."
+        help="mCG contexts for generating the bigwig tracks and merge strand."
+    )
+
+    parser_opt.add_argument(
+        "--bigwig_mch_bin_size",
+        type=int,
+        default=50,
+        help="Bin size used to generate mCH bigwig."
+    )
+
+    parser_opt.add_argument(
+        "--bigwig_mcg_bin_size",
+        type=int,
+        default=1,
+        help="Bin size used to generate mCG bigwig."
+    )
+
+    parser_opt.add_argument(
+        "--cpu_per_job",
+        type=int,
+        default=12,
+        help="Number of CPUs to use in individual merge-allc job."
+    )
+
+    parser_opt.add_argument(
+        "--total_cpu",
+        type=int,
+        default=12,
+        help="Number of CPUs to use in total."
     )
 
 
