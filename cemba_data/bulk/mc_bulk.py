@@ -65,7 +65,7 @@ def prepare_mc_bulk(allc_table,
     snakemake_cmds = []
     for group, paths in allc_dict.items():
         # each group has a separate snakemake file
-        group_dir = output_dir / 'group'
+        group_dir = output_dir / group
         group_dir.mkdir(exist_ok=True)
         allc_list_path = group_dir / f'{group}.allc_paths.txt'
         with open(allc_list_path, 'w') as f:
