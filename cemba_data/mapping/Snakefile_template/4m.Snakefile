@@ -18,13 +18,13 @@ rule summary:
         expand("bam/{cell_id}.mC.bam", cell_id=CELL_IDS),
         expand("bam/{cell_id}.3C.bam", cell_id=CELL_IDS),
         expand("hic/{cell_id}.3C.contact.tsv.gz", cell_id=CELL_IDS),
-        expand("hic/{cell_id}.3C.contact.tsv.counts.txt", cell_id=CELL_IDS),
+        expand("hic/{cell_id}.3C.contact.tsv.gz.counts.txt", cell_id=CELL_IDS),
         'rna_bam/TotalRNAAligned.out.bam',
         'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
-    #output:
-    #    "MappingSummary.csv.gz"
-    #shell:
-    #    "yap-internal summary --output_dir ./"
+    output:
+        "MappingSummary.csv.gz"
+    shell:
+        "yap-internal summary --output_dir ./"
 
 
 # Trim reads
@@ -33,7 +33,7 @@ rule trim_r1:
         "fastq/{cell_id}-R1.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
-        stats=temp("fastq/{cell_id}-R1.trimmed.stats.tsv")
+        stats=temp("fastq/{cell_id}-R1.trimmed.stats.txt")
     threads:
         2
     shell:
@@ -59,7 +59,7 @@ rule trim_r2:
         "fastq/{cell_id}-R2.fq.gz"
     output:
         fq=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
-        stats=temp("fastq/{cell_id}-R2.trimmed.stats.tsv")
+        stats=temp("fastq/{cell_id}-R2.trimmed.stats.txt")
     threads:
         2
     shell:

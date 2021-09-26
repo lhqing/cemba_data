@@ -60,6 +60,9 @@ def summarize_select_dna_reads(output_dir,
             continue
 
         cell_id = path.name.split('.')[0]
+        if cell_id.endswith('-R1') or cell_id.endswith('-R2'):
+            # select DNA preformed in R1 R2 separately:
+            cell_id = cell_id[:-3]
         _df['cell_id'] = cell_id
         _df['mc_rate_max_threshold'] = mc_rate_max_threshold
         _df['cov_min_threshold'] = cov_min_threshold

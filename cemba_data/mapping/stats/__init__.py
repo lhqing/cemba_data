@@ -7,6 +7,7 @@ from papermill import execute_notebook, PapermillExecutionError
 from .m3c import m3c_mapping_stats, m3c_additional_cols
 from .mc import mc_mapping_stats, mc_additional_cols
 from .mct import mct_mapping_stats, mct_additional_cols
+from ._4m import _4m_mapping_stats, _4m_additional_cols
 from .plate_info import get_plate_info
 from ..pipelines import PACKAGE_DIR
 from ...utilities import get_configuration
@@ -24,6 +25,8 @@ def mapping_stats(output_dir):
         final_df = mct_mapping_stats(output_dir, config)
     elif mode == 'm3c':
         final_df = m3c_mapping_stats(output_dir, config)
+    elif mode == '4m':
+        final_df = _4m_mapping_stats(output_dir, config)
     else:
         raise ValueError
 
@@ -70,7 +73,7 @@ def final_summary(output_dir, cleanup=True, notebook=None):
     total_mapping_summary_path = output_dir / 'stats/MappingSummary.csv.gz'
 
     # if this is mct, aggregate all the gene counts
-    if mode == 'mct':
+    if mode in ['mct', '4m']:
         from ..stats.mct import aggregate_feature_counts
         aggregate_feature_counts(output_dir)
 
@@ -81,6 +84,8 @@ def final_summary(output_dir, cleanup=True, notebook=None):
         total_mapping_summary = mct_additional_cols(total_mapping_summary, output_dir=output_dir)
     elif mode == 'm3c':
         total_mapping_summary = m3c_additional_cols(total_mapping_summary)
+    elif mode == '4m':
+        total_mapping_summary = _4m_additional_cols(total_mapping_summary, output_dir=output_dir)
     else:
         raise
 

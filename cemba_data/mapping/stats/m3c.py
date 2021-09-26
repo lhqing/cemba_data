@@ -3,10 +3,10 @@ import pathlib
 import pandas as pd
 from pysam import AlignmentFile
 
-from .utilities import parse_trim_fastq_stats, generate_allc_stats
+from .utilities import parse_trim_fastq_stats, parse_trim_fastq_stats_mct, generate_allc_stats
 
 
-def _m3c_bam_unique_read_counts(bam_path, read_type_int):
+def m3c_bam_unique_read_counts(bam_path, read_type_int):
     unique_reads = set()
     with AlignmentFile(bam_path) as bam:
         for read in bam:
@@ -14,12 +14,12 @@ def _m3c_bam_unique_read_counts(bam_path, read_type_int):
     return len(unique_reads)
 
 
-def _m3c_count_bams(bam_dir, cell_id, read_type):
+def m3c_count_bams(bam_dir, cell_id, read_type):
     bam_path_dict = {
         f'{read_type}UniqueMappedReads': bam_dir / f'{cell_id}-{read_type}.two_mapping.filter.bam',
         f'{read_type}DeduppedReads': bam_dir / f'{cell_id}-{read_type}.two_mapping.deduped.bam',
     }
-    read_counts = {name: _m3c_bam_unique_read_counts(path, 1 if read_type == 'R1' else 2)
+    read_counts = {name: m3c_bam_unique_read_counts(path, 1 if read_type == 'R1' else 2)
                    for name, path in bam_path_dict.items()}
     return pd.Series(read_counts, name=cell_id)
 
@@ -38,12 +38,17 @@ def m3c_mapping_stats(output_dir, config):
         total_stats = []  # list of series
         for read_type in ['R1', 'R2']:
             # fastq reads
-            total_stats.append(
-                parse_trim_fastq_stats(
-                    fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.tsv'))
+            if config['mode'] in ['4m', 'mct']:
+                total_stats.append(
+                    parse_trim_fastq_stats_mct(
+                        fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.txt'))
+            else:
+                total_stats.append(
+                    parse_trim_fastq_stats(
+                        fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.tsv'))
             # bam reads
             total_stats.append(
-                _m3c_count_bams(bam_dir, cell_id, read_type)
+                m3c_count_bams(bam_dir, cell_id, read_type)
             )
         # contacts
         contact_counts = pd.read_csv(hic_dir / f'{cell_id}.3C.contact.tsv.counts.txt',

@@ -1,6 +1,7 @@
 from collections import defaultdict
 import re
 import pysam
+import pandas as pd
 
 
 def read_mc_level(read, frac=True, nome=False):
@@ -15,12 +16,16 @@ def read_mc_level(read, frac=True, nome=False):
                 # skip unrelated base (.), CpG (Zz), CpUnknown (Uu)
                 continue
             # Skip GpC
-            if read.is_reverse:
-                if (pos == read_length) or (read.seq[pos + 1] == 'C'):
-                    continue
-            else:
-                if (pos == 0) or (read.seq[pos - 1] == 'G'):
-                    continue
+            try:
+                if read.is_reverse:
+                    if (pos == read_length) or (read.seq[pos + 1] == 'C'):
+                        continue
+                else:
+                    if (pos == 0) or (read.seq[pos - 1] == 'G'):
+                        continue
+            except IndexError:
+                # start or end of the read
+                continue
             if xm_base in 'xh':
                 normal_c += 1
             elif xm_base in 'XH':
@@ -54,18 +59,18 @@ def select_dna_reads_normal(input_bam,
         with pysam.AlignmentFile(output_bam, header=f.header,
                                  mode='wb') as out_f:
             for read in f:
-                mc_rate, cov = read_mc_level(read, nome=nome)
-                read_profile_dict[(int(100 * mc_rate), cov)] += 1
+                mc_frac, cov = read_mc_level(read, nome=nome)
+                read_profile_dict[(int(100 * mc_frac), cov)] += 1
 
                 # split reads
-                if (mc_rate > mc_rate_max_threshold) or (cov <
+                if (mc_frac > mc_rate_max_threshold) or (cov <
                                                          cov_min_threshold):
                     continue
                 out_f.write(read)
     with open(str(output_bam) + '.reads_profile.csv', 'w') as stat_f:
-        stat_f.write('mc_rate,cov,count\n')
-        for (mc_rate, cov), count in read_profile_dict.items():
-            stat_f.write(f'{mc_rate},{cov},{count}\n')
+        stat_f.write('mc_frac,cov,count\n')
+        for (mc_frac, cov), count in read_profile_dict.items():
+            stat_f.write(f'{mc_frac},{cov},{count}\n')
     return
 
 
@@ -93,17 +98,17 @@ def select_dna_reads_split_reads(input_bam,
         'mc': read_level_mcs,
         'cov': read_level_covs
     })
-    read_level_data['frac'] = read_level_data['mc'] / (read_level_data['cov'] +
+    read_level_data['mc_frac'] = read_level_data['mc'] / (read_level_data['cov'] +
                                                        0.001)
-    read_level_data['frac'] = (read_level_data['frac'] * 100).astype(int)
-    profile = read_level_data.groupby('frac')['cov'].value_counts()
+    read_level_data['mc_frac'] = (read_level_data['mc_frac'] * 100).astype(int)
+    profile = read_level_data.groupby('mc_frac')['cov'].value_counts()
     profile.name = 'count'
     profile = profile.reset_index()
-    profile.to_csv(f'{output_bam}.reads_profile.csv')
+    profile.to_csv(f'{output_bam}.reads_profile.csv', index=None)
 
     # filter reads
     use_reads = read_level_data[
-        (read_level_data['frac'] < mc_rate_max_threshold)
+        (read_level_data['mc_frac'] < mc_rate_max_threshold)
         & (read_level_data['cov'] >= cov_min_threshold)].index.tolist()
     use_reads = set(use_reads)
     del read_level_data

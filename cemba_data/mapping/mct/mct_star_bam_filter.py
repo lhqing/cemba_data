@@ -72,8 +72,8 @@ def single_read_mch_level(read, nome=False, frac=False):
     if frac:
         return mch, cov, other_snp
     else:
-        read_mch_rate = (mch / cov) if cov > 0 else 0
-        return read_mch_rate, cov, other_snp
+        read_mch_frac = (mch / cov) if cov > 0 else 0
+        return read_mch_frac, cov, other_snp
 
 
 def select_rna_reads_normal(input_bam,
@@ -126,17 +126,17 @@ def select_rna_reads_split_reads(input_bam,
         'mc': read_level_mcs,
         'cov': read_level_covs
     })
-    read_level_data['frac'] = read_level_data['mc'] / (read_level_data['cov'] +
+    read_level_data['mc_frac'] = read_level_data['mc'] / (read_level_data['cov'] +
                                                        0.001)
-    read_level_data['frac'] = (read_level_data['frac'] * 100).astype(int)
-    profile = read_level_data.groupby('frac')['cov'].value_counts()
+    read_level_data['mc_frac'] = (read_level_data['mc_frac'] * 100).astype(int)
+    profile = read_level_data.groupby('mc_frac')['cov'].value_counts()
     profile.name = 'count'
     profile = profile.reset_index()
-    profile.to_csv(f'{output_bam}.reads_profile.csv')
+    profile.to_csv(f'{output_bam}.reads_profile.csv', index=None)
 
     # filter reads
     use_reads = read_level_data[
-        (read_level_data['frac'] > mc_rate_min_threshold)
+        (read_level_data['mc_frac'] > mc_rate_min_threshold)
         & (read_level_data['cov'] >= cov_min_threshold)].index.tolist()
     use_reads = set(use_reads)
     del read_level_data

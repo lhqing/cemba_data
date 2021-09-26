@@ -21,7 +21,7 @@ def mc_mapping_stats(output_dir, config):
         print(f'Parsing stats of {cell_id}.')
         total_stats = []
         for read_type in ['R1', 'R2']:
-            if config['mode'] == 'mct':
+            if config['mode'] in ['4m', 'mct']:
                 total_stats.append(
                     parse_trim_fastq_stats_mct(
                         fastq_dir / f'{cell_id}-{read_type}.trimmed.stats.txt'))

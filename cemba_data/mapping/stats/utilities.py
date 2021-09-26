@@ -173,6 +173,7 @@ def get_allc_lambda_frac(allc_list, num_upstr_bases):
         mc_counts = defaultdict(int)
         cov_counts = defaultdict(int)
         with TabixFile(str(path)) as allc:
+            cell = pathlib.Path(path).name.split('.')[0]
             try:
                 for line in allc.fetch('chrL'):
                     chrom, pos, strand, context, mc, cov, _ = line.split('\t')
@@ -187,7 +188,6 @@ def get_allc_lambda_frac(allc_list, num_upstr_bases):
                     cy_frac = (df.loc['CT', 'mc'] + df.loc['CC', 'mc']) / cy_cov
                 else:
                     cy_frac = 0
-                cell = pathlib.Path(path).name.split('.')[0]
                 records[cell] = {'LambdaCYFrac': cy_frac, 'LambdaCYCov': cy_cov}
             except ValueError:
                 # no chrL lines
