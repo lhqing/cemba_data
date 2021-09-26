@@ -1,5 +1,6 @@
 from collections import defaultdict
-
+import re
+import pandas as pd
 import pysam
 
 REVERSE_READ_MCH_CONTEXT = {'CA', 'CC', 'CT'}
@@ -152,22 +153,22 @@ def select_rna_reads_split_reads(input_bam,
     return
 
 
-def select_dna_reads(input_bam,
+def select_rna_reads(input_bam,
                      output_bam,
-                     mc_rate_max_threshold=0.5,
+                     mc_rate_min_threshold=0.5,
                      cov_min_threshold=3,
                      nome=False,
                      assay_type='mc'):
     if assay_type == 'mc':
         select_rna_reads_normal(input_bam,
                                 output_bam,
-                                mc_rate_min_threshold=mc_rate_max_threshold,
+                                mc_rate_min_threshold=mc_rate_min_threshold,
                                 cov_min_threshold=cov_min_threshold,
                                 nome=nome)
     elif assay_type == 'm3c':
         select_rna_reads_split_reads(input_bam,
                                      output_bam,
-                                     mc_rate_min_threshold=mc_rate_max_threshold,
+                                     mc_rate_min_threshold=mc_rate_min_threshold,
                                      cov_min_threshold=cov_min_threshold,
                                      nome=nome)
     else:

@@ -8,6 +8,7 @@ import cemba_data
 from .m3c import m3c_config_str
 from .mc import mc_config_str
 from .mct import mct_config_str
+from ._4m import _4m_config_str
 from ...utilities import get_configuration
 
 # Load defaults
@@ -49,6 +50,8 @@ def validate_mapping_config(output_dir):
         config_str = mct_config_str(config)
     elif mode == 'm3c':
         config_str = m3c_config_str(config)
+    elif mode == '4m':
+        config_str = _4m_config_str(config)
     else:
         raise ValueError(f'Unknown mode {mode}')
 
@@ -70,6 +73,8 @@ def make_snakefile(output_dir):
         config_str = mct_config_str(config)
     elif mode == 'm3c':
         config_str = m3c_config_str(config)
+    elif mode == '4m':
+        config_str = _4m_config_str(config)
     else:
         raise ValueError(f'Unknown mode {mode}')
     print('Making Snakefile based on mapping config INI file. The parameters are:')
@@ -211,6 +216,9 @@ def prepare_sbatch(name, snakemake_dir, queue):
         if mode == 'm3c':
             time_str = "7:00:00"
             total_mem_mb = 160000
+        elif mode == '4m':
+            time_str = "7:00:00"
+            total_mem_mb = 160000
         elif mode == 'mc':
             time_str = "6:00:00"
             total_mem_mb = 192000
@@ -222,6 +230,9 @@ def prepare_sbatch(name, snakemake_dir, queue):
     elif queue == 'normal':
         sbatch_cores_per_job = 64
         if mode == 'm3c':
+            time_str = "48:00:00"
+            total_mem_mb = 90000
+        elif mode == '4m':
             time_str = "48:00:00"
             total_mem_mb = 90000
         elif mode == 'mc':
@@ -277,7 +288,7 @@ def prepare_run(output_dir, total_jobs=12, cores_per_job=10, memory_gb_per_core=
     mode = config['mode']
     if mode in ['mc', 'm3c'] and cores_per_job < 4:
         raise ValueError(f'cores must >= 4 to run this pipeline.')
-    elif mode == 'mct' and cores_per_job < 10:
+    elif mode in ['mct', '4m'] and cores_per_job < 10:
         raise ValueError(f'cores must >= 10 to run this pipeline.')
 
     output_dir = pathlib.Path(output_dir).absolute()

@@ -27,6 +27,15 @@ def print_default_mapping_config(mode, barcode_version, bismark_ref, genome_fast
     if mode == 'm3c':
         if chrom_size_path is None:
             raise ValueError('chrom_size_path must be provided when mode is m3c.')
+        chrom_size_path = pathlib.Path(chrom_size_path).absolute()
+    if mode == '4m':
+        if (star_ref is None) or (gtf is None):
+            raise ValueError('star_ref and gtf must be provided when mode is mct.')
+        star_ref = pathlib.Path(star_ref).absolute()
+        gtf = pathlib.Path(gtf).absolute()
+        if chrom_size_path is None:
+            raise ValueError('chrom_size_path must be provided when mode is m3c.')
+        chrom_size_path = pathlib.Path(chrom_size_path).absolute()
 
     genome_fasta = pathlib.Path(genome_fasta).absolute()
 
@@ -50,6 +59,13 @@ def print_default_mapping_config(mode, barcode_version, bismark_ref, genome_fast
         config_path = PACKAGE_DIR / 'files/default_config/mapping_config_m3c.ini'
         with open(config_path) as f:
             config_content = f.read()
+        config_content = config_content.replace('CHANGE_THIS_TO_YOUR_CHROM_SIZE_PATH', str(chrom_size_path))
+    elif mode == '4m':
+        config_path = PACKAGE_DIR / 'files/default_config/mapping_config_4m.ini'
+        with open(config_path) as f:
+            config_content = f.read()
+        config_content = config_content.replace('CHANGE_THIS_TO_YOUR_STAR_REFERENCE_DIR', str(star_ref))
+        config_content = config_content.replace('CHANGE_THIS_TO_YOUR_GENE_ANNOTATION_GTF', str(gtf))
         config_content = config_content.replace('CHANGE_THIS_TO_YOUR_CHROM_SIZE_PATH', str(chrom_size_path))
     else:
         raise

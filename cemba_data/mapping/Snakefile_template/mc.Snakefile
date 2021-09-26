@@ -1,26 +1,6 @@
 
-
-# Example (required) parameters
-# r1_left_cut = 10
-# r1_right_cut = 10
-# r1_adapter='AGATCGGAAGAGCACACGTCTGAAC'
-# r2_left_cut = 10
-# r2_right_cut = 10
-# r2_adapter='AGATCGGAAGAGCGTCGTGTAGGGA'
-# bismark_reference = 'path_to_bismark_reference'
-# reference_fasta = 'path_to_genome_fasta'
-# chrom_sizes_file = 'path_to_chrom_sizes_file'
-# unmapped_param_str = ''  # will generate unmapped bam if --un
-# num_upstr_bases=0  # for NOMe, num_upstr_bases=1
-# num_downstr_bases=2
-# compress_level=5
-# CELL_IDS = ['Cell1', 'Cell2', 'Cell3', 'Cell4', 'Cell5'...]
-#
-#
 # Snakemake rules below
 # suitable for snmC-seq2, snmC-seq3, NOMe-seq
-# From: demultiplexed R1 and R2 fastq file for each cell
-# To: merged final bam file and allc files for each cell
 
 # use diff mcg_context for normal mC or NOMe
 mcg_context = 'CGN' if num_upstr_bases == 0 else 'HCGN'

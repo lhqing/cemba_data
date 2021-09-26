@@ -1,8 +1,6 @@
 
 # Snakemake rules below
 # suitable for snmCT-seq, snmC2T-seq (with NOMe treatment)
-# From: demultiplexed R1 and R2 fastq file for each cell
-# To: merged final mc bam file; allc file; RNA bam (per UID) and count table (per UID)
 
 # the summary rule is the final target
 rule summary:
@@ -198,7 +196,9 @@ rule select_dna:
     shell:
         'yap-internal select-dna-reads --input_bam {input} '
         '--output_bam {output.bam} --mc_rate_max_threshold {mc_rate_max_threshold} '
-        '--cov_min_threshold {dna_cov_min_threshold}'
+        '--cov_min_threshold {dna_cov_min_threshold} '
+        '{nome_flag_str} '
+        '--assay_type mc'
 
 # generate ALLC using dna_reads.bam
 rule allc:
@@ -291,6 +291,8 @@ rule select_rna:
         '--output_bam {output.bam} ' \
         '--mc_rate_min_threshold {mc_rate_min_threshold} ' \
         '--cov_min_threshold {rna_cov_min_threshold} '
+        '{nome_flag_str} '
+        '--assay_type mc'
 
 rule feature_count:
     input:

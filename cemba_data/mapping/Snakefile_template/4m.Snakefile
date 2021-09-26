@@ -1,6 +1,9 @@
 
 # Snakemake rules below
-# suitable for snm3C-seq
+# suitable for sn4m-seq
+
+# use diff mcg_context for normal mC or NOMe
+mcg_context = 'CGN' if num_upstr_bases == 0 else 'HCGN'
 
 # the summary rule is the final target
 rule summary:
@@ -12,16 +15,17 @@ rule summary:
         expand("fastq/{cell_id}-R2.trimmed.stats.tsv", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R1.two_mapping.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.two_mapping.deduped.matrix.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}-R1.two_mapping.filter.bam", cell_id=CELL_IDS),
-        expand("bam/{cell_id}-R2.two_mapping.filter.bam", cell_id=CELL_IDS),
-        expand("bam/{cell_id}-R1.two_mapping.deduped.bam", cell_id=CELL_IDS),
-        expand("bam/{cell_id}-R2.two_mapping.deduped.bam", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.mC.bam", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.3C.bam", cell_id=CELL_IDS),
         expand("hic/{cell_id}.3C.contact.tsv.gz", cell_id=CELL_IDS),
-        expand("hic/{cell_id}.3C.contact.tsv.counts.txt", cell_id=CELL_IDS)
-    output:
-        "MappingSummary.csv.gz"
-    shell:
-        "yap-internal summary --output_dir ./"
+        expand("hic/{cell_id}.3C.contact.tsv.counts.txt", cell_id=CELL_IDS),
+        'rna_bam/TotalRNAAligned.out.bam',
+        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
+    #output:
+    #    "MappingSummary.csv.gz"
+    #shell:
+    #    "yap-internal summary --output_dir ./"
+
 
 # Trim reads
 rule trim_r1:
@@ -33,7 +37,20 @@ rule trim_r1:
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r1_adapter} {input} 2> {output.stats} | "
+        "cutadapt -a R1Adapter={r1_adapter} "
+        "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
+        "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
+        "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
+        "-a N6_rc=GTACTCTGCGTTGATACCACTGCTT "
+        "-a 3PpolyT=TTTTTTTTTTTTTTTX "
+        "-g 5PpolyT=XTTTTTTTTTTTTTTT "
+        "-a 3PpolyA=AAAAAAAAAAAAAAAX "
+        "-g 5PpolyA=XAAAAAAAAAAAAAAA "
+        "-a polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
+        "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
+        "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
+        "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
+        "{input} 2> {output.stats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r1_left_cut} -u -{r1_right_cut} -m 30 "
         "-o {output.fq} - >> {output.stats}"
 
@@ -46,11 +63,26 @@ rule trim_r2:
     threads:
         2
     shell:
-        "cutadapt --report=minimal -a {r2_adapter} {input} 2> {output.stats} | "
+        "cutadapt -a R2Adapter={r2_adapter} "
+        "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
+        "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
+        "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
+        "-a N6_rc=GTACTCTGCGTTGATACCACTGCTT "
+        "-a 3PpolyT=TTTTTTTTTTTTTTTX "
+        "-g 5PpolyT=XTTTTTTTTTTTTTTT "
+        "-a 3PpolyA=AAAAAAAAAAAAAAAX "
+        "-g 5PpolyA=XAAAAAAAAAAAAAAA "
+        "-a polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
+        "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
+        "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
+        "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
+        "{input} 2> {output.stats} | "
         "cutadapt --report=minimal -O 6 -q 20 -u {r2_left_cut} -u -{r2_right_cut} -m 30 "
         "-o {output.fq} - >> {output.stats}"
 
-# bismark mapping, R1 and R2 separately
+
+# bismark mapping first pass, R1 and R2 separately
+# save unmapped reads
 rule bismark_r1:
     input:
         "fastq/{cell_id}-R1.trimmed.fq.gz"
@@ -140,6 +172,7 @@ rule bismark_split_r2:
         "bismark {bismark_reference} --bowtie1 {input} "
         "-o bam/ --temp_dir bam/"
 
+
 # merge two bam files
 rule merge_r1_raw_bam:
     input:
@@ -198,10 +231,39 @@ rule sort_r2_bam:
     shell:
         "samtools sort -o {output} {input}"
 
+
+# select DNA reads from bismark mapped bam
+rule select_r1_dna:
+    input:
+        "bam/{cell_id}-R1.two_mapping.sorted.bam"
+    output:
+        bam="bam/{cell_id}-R1.two_mapping.dna_reads.bam",
+        stats='bam/{cell_id}-R1.two_mapping.dna_reads.bam.reads_profile.csv'
+    shell:
+        'yap-internal select-dna-reads --input_bam {input} '
+        '--output_bam {output.bam} --mc_rate_max_threshold {mc_rate_max_threshold} '
+        '--cov_min_threshold {dna_cov_min_threshold} '
+        '{nome_flag_str} '
+        '--assay_type m3c'
+
+rule select_r2_dna:
+    input:
+        "bam/{cell_id}-R2.two_mapping.sorted.bam"
+    output:
+        bam="bam/{cell_id}-R2.two_mapping.dna_reads.bam",
+        stats='bam/{cell_id}-R2.two_mapping.dna_reads.bam.reads_profile.csv'
+    shell:
+        'yap-internal select-dna-reads --input_bam {input} '
+        '--output_bam {output.bam} --mc_rate_max_threshold {mc_rate_max_threshold} '
+        '--cov_min_threshold {dna_cov_min_threshold} '
+        '{nome_flag_str} '
+        '--assay_type m3c'
+
+
 # remove PCR duplicates
 rule dedup_r1_bam:
     input:
-        "bam/{cell_id}-R1.two_mapping.sorted.bam"
+        "bam/{cell_id}-R1.two_mapping.dna_reads.bam"
     output:
         bam=temp("bam/{cell_id}-R1.two_mapping.deduped.bam"),
         stats=temp("bam/{cell_id}-R1.two_mapping.deduped.matrix.txt")
@@ -213,7 +275,7 @@ rule dedup_r1_bam:
 
 rule dedup_r2_bam:
     input:
-        "bam/{cell_id}-R2.two_mapping.sorted.bam"
+        "bam/{cell_id}-R2.two_mapping.dna_reads.bam"
     output:
         bam=temp("bam/{cell_id}-R2.two_mapping.deduped.bam"),
         stats=temp("bam/{cell_id}-R2.two_mapping.deduped.matrix.txt")
@@ -262,8 +324,8 @@ rule allc:
 # contact dedup happen within generate contact
 rule merge_3c_bam_for_contact:
     input:
-        "bam/{cell_id}-R1.two_mapping.sorted.bam",
-        "bam/{cell_id}-R2.two_mapping.sorted.bam"
+        "bam/{cell_id}-R1.two_mapping.dna_reads.bam",
+        "bam/{cell_id}-R2.two_mapping.dna_reads.bam"
     output:
         temp("bam/{cell_id}.3C.bam")
     shell:
@@ -290,3 +352,100 @@ rule generate_contact:
     shell:
         "yap-internal generate-contacts --bam_path {input} --output_path {output.contact} "
         "--chrom_size_path {chrom_size_path} --min_gap {min_gap}"
+
+
+# RNA mapping, also start from trimmed fastq
+cell_ids_str = ' , ID:'.join(CELL_IDS)
+# star separate multiple input by ,
+star_input_str = ','.join([f"fastq/{cell_id}-R1.trimmed.fq.gz" for cell_id in CELL_IDS])
+
+rule star:
+    input:
+        # here we only use R1 SE for RNA,
+        # R2 SE or R1R2 PE is worse than R1 actually, due to R2's low quality
+        # And we map all cells together, so the genome is only load once
+        # each cell will have a different @RG tag
+        expand("fastq/{cell_id}-R1.trimmed.fq.gz", cell_id = CELL_IDS)
+    output:
+        'rna_bam/TotalRNAAligned.out.bam',
+        temp('rna_bam/TotalRNALog.final.out'),
+        temp('rna_bam/TotalRNALog.out'),
+        temp('rna_bam/TotalRNALog.progress.out'),
+        temp('rna_bam/TotalRNASJ.out.tab')
+    threads:
+        workflow.cores * 0.8  # workflow.cores is user provided cores for snakemake
+    resources:
+        mem_mb=48000
+    shell:
+        'STAR --runThreadN {threads} '
+        '--genomeDir {star_reference} '
+        '--alignEndsType Local '
+        '--genomeLoad NoSharedMemory '
+        '--outSAMstrandField intronMotif '
+        '--outSAMtype BAM Unsorted '
+        '--outSAMunmapped None '
+        '--outSAMattributes NH HI AS NM MD '
+        '--sjdbOverhang 100 '
+        '--outFilterType BySJout '  # ENCODE standard options
+        '--outFilterMultimapNmax 20 '  # ENCODE standard options
+        '--alignSJoverhangMin 8 '  # ENCODE standard options
+        '--alignSJDBoverhangMin 1 '  # ENCODE standard options
+        '--outFilterMismatchNmax 999 '  # ENCODE standard options
+        '--outFilterMismatchNoverLmax 0.04 '  # ENCODE standard options
+        '--alignIntronMin 20 '  # ENCODE standard options
+        '--alignIntronMax 1000000 '  # ENCODE standard options
+        '--alignMatesGapMax 1000000 '  # ENCODE standard options
+        '--outFileNamePrefix rna_bam/TotalRNA '
+        '--readFilesIn {star_input_str} '
+        '--readFilesCommand gzip -cd '
+        '--outSAMattrRGline ID:{cell_ids_str}'
+
+rule filter_bam:
+    input:
+        'rna_bam/TotalRNAAligned.out.bam'
+    output:
+        temp('rna_bam/TotalRNAAligned.filtered.bam')
+    threads:
+        min(workflow.cores * 0.8, 10)
+    shell:
+        "samtools sort -@ {threads} -m 2G {input} | samtools view -bh -q 10 -o {output} -"
+
+rule index_filtered_bam:
+    input:
+        'rna_bam/TotalRNAAligned.filtered.bam'
+    output:
+        temp('rna_bam/TotalRNAAligned.filtered.bam.bai')
+    threads:
+        1
+    shell:
+        "samtools index {input}"
+
+rule select_rna:
+    input:
+        bam='rna_bam/TotalRNAAligned.filtered.bam',
+        bai='rna_bam/TotalRNAAligned.filtered.bam.bai'
+    output:
+        bam='rna_bam/TotalRNAAligned.rna_reads.bam',
+        stats=temp('rna_bam/TotalRNAAligned.rna_reads.bam.reads_profile.csv')
+    shell:
+        'yap-internal select-rna-reads ' \
+        '--input_bam {input.bam} ' \
+        '--output_bam {output.bam} ' \
+        '--mc_rate_min_threshold {mc_rate_min_threshold} ' \
+        '--cov_min_threshold {rna_cov_min_threshold} ' \
+        '--nome ' \
+        '--assay_type m3c'
+
+rule feature_count:
+    input:
+        'rna_bam/TotalRNAAligned.rna_reads.bam'
+    output:
+        count='rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv',
+        stats=temp('rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary')
+    threads:
+        min(workflow.cores * 0.8, 10)
+    resources:
+        mem_mb=1000
+    shell:
+        'featureCounts -t {feature_type} -g {id_type} ' \
+        '-a {gtf_path} -o {output.count} --byReadGroup -T {threads} {input}'
