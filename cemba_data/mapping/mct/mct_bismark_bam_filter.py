@@ -125,19 +125,19 @@ def select_dna_reads(input_bam,
                      mc_rate_max_threshold=0.5,
                      cov_min_threshold=3,
                      nome=False,
-                     read_type='mc'):
-    if read_type == 'mc':
+                     assay_type='mc'):
+    if assay_type == 'mc':
         select_dna_reads_normal(input_bam,
                                 output_bam,
                                 mc_rate_max_threshold=mc_rate_max_threshold,
                                 cov_min_threshold=cov_min_threshold,
                                 nome=nome)
-    elif read_type == 'm3c':
+    elif assay_type == 'm3c':
         select_dna_reads_split_reads(input_bam,
                                      output_bam,
                                      mc_rate_max_threshold=mc_rate_max_threshold,
                                      cov_min_threshold=cov_min_threshold,
                                      nome=nome)
     else:
-        raise ValueError(f'Unknown read_type {read_type}.')
+        raise ValueError(f'Unknown assay_type {assay_type}.')
     return

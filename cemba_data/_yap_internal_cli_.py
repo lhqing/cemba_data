@@ -53,7 +53,7 @@ def select_dna_reads_internal_subparser(subparser):
     )
 
     parser.add_argument(
-        "--read_type",
+        "--assay_type",
         type=str,
         default='mc',
         choices=['mc', 'm3c']
@@ -97,6 +97,13 @@ def select_rna_reads_internal_subparser(subparser):
         "--cov_min_threshold",
         type=int,
         default=5
+    )
+
+    parser.add_argument(
+        "--assay_type",
+        type=str,
+        default='mc',
+        choices=['mc', 'm3c']
     )
 
     parser.add_argument(
