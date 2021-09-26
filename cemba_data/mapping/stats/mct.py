@@ -68,7 +68,7 @@ def summarize_select_dna_reads(output_dir,
 
     selected_reads = total_stats_df[
         (total_stats_df['cov'] >= cov_min_threshold)
-        & (total_stats_df['mc_rate'] < mc_rate_max_threshold)]
+        & (total_stats_df['mc_frac'] < mc_rate_max_threshold)]
 
     selected_reads = selected_reads.groupby('cell_id')['count'].sum()
     selected_ratio = selected_reads / total_stats_df.groupby('cell_id')['count'].sum()

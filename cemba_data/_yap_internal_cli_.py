@@ -51,6 +51,21 @@ def select_dna_reads_internal_subparser(subparser):
         type=int,
         default=5
     )
+
+    parser.add_argument(
+        "--read_type",
+        type=str,
+        default='mc',
+        choices=['mc', 'm3c']
+    )
+
+    parser.add_argument(
+        "--nome",
+        dest='nome',
+        action='store_true',
+        help='Is nome treated?'
+    )
+    parser.set_defaults(nome=False)
     return
 
 
@@ -83,6 +98,14 @@ def select_rna_reads_internal_subparser(subparser):
         type=int,
         default=5
     )
+
+    parser.add_argument(
+        "--nome",
+        dest='nome',
+        action='store_true',
+        help='Is nome treated?'
+    )
+    parser.set_defaults(nome=False)
     return
 
 
@@ -374,6 +397,7 @@ def dss_two_internal_subparser(subparser):
     )
     parser.set_defaults(save_dml=False)
     return
+
 
 def dss_multi_internal_subparser(subparser):
     parser = subparser.add_parser('dss-multi',

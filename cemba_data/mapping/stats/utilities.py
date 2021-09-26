@@ -1,5 +1,6 @@
 import pathlib
-
+from collections import defaultdict
+from pysam import TabixFile
 import pandas as pd
 
 from ...utilities import parse_mc_pattern
@@ -124,6 +125,7 @@ def parse_deduplicate_stat(stat_path):
 
 def generate_allc_stats(output_dir, config):
     output_dir = pathlib.Path(output_dir).absolute()
+    allc_list = list(output_dir.glob('allc/*tsv.gz'))
     allc_stats_dict = {p.name.split('.')[0]: p for p in output_dir.glob('allc/*count.csv')}
 
     patterns = config['mc_stat_feature'].split(' ')
@@ -155,5 +157,40 @@ def generate_allc_stats(output_dir, config):
         cell_records.append(cell_level_data)
     final_df = pd.concat(cell_records, axis=1, sort=True).reindex(allc_stats_dict.keys())
     final_df['GenomeCov'] = cell_genome_cov
+
+    # add lambda DNA mCY fraction and coverage
+    lambda_frac = get_allc_lambda_frac(allc_list, config['num_upstr_bases'])
+    for col, data in lambda_frac.items():
+        final_df[col] = data
+
     final_df.index.name = 'cell_id'
     return final_df
+
+
+def get_allc_lambda_frac(allc_list, num_upstr_bases):
+    records = {}
+    for path in allc_list:
+        mc_counts = defaultdict(int)
+        cov_counts = defaultdict(int)
+        with TabixFile(str(path)) as allc:
+            try:
+                for line in allc.fetch('chrL'):
+                    chrom, pos, strand, context, mc, cov, _ = line.split('\t')
+                    # this will lead to only four contexts: CA, CC, CT, CG
+                    context = context[num_upstr_bases:num_upstr_bases + 2]
+                    mc_counts[context] += int(mc)
+                    cov_counts[context] += int(cov)
+                df = pd.DataFrame({'mc': pd.Series(mc_counts), 'cov': pd.Series(cov_counts)})
+                df = df.reindex(['CG', 'CC', 'CT', 'CA']).fillna(0)  # reindex to make all four context exist
+                cy_cov = df.loc['CT', 'cov'] + df.loc['CC', 'cov']
+                if cy_cov > 0:
+                    cy_frac = (df.loc['CT', 'mc'] + df.loc['CC', 'mc']) / cy_cov
+                else:
+                    cy_frac = 0
+                cell = pathlib.Path(path).name.split('.')[0]
+                records[cell] = {'LambdaCYFrac': cy_frac, 'LambdaCYCov': cy_cov}
+            except ValueError:
+                # no chrL lines
+                records[cell] = {'LambdaCYFrac': 0, 'LambdaCYCov': 0}
+    records = pd.DataFrame(records).T
+    return records
