@@ -168,6 +168,7 @@ def generate_allc_stats(output_dir, config):
 
 
 def get_allc_lambda_frac(allc_list, num_upstr_bases):
+    num_upstr_bases = int(num_upstr_bases)
     records = {}
     for path in allc_list:
         mc_counts = defaultdict(int)
