@@ -101,10 +101,16 @@ def select_dna_reads_split_reads(input_bam,
     read_level_data['mc_frac'] = read_level_data['mc'] / (read_level_data['cov'] +
                                                        0.001)
     read_level_data['mc_frac'] = (read_level_data['mc_frac'] * 100).astype(int)
-    profile = read_level_data.groupby('mc_frac')['cov'].value_counts()
-    profile.name = 'count'
-    profile = profile.reset_index()
-    profile.to_csv(f'{output_bam}.reads_profile.csv', index=None)
+    if read_level_data.shape[0] == 0:
+        # in case there is no read at all:
+        with open(f'{output_bam}.reads_profile.csv', 'w') as f:
+            f.write('mc_frac,cov,count\n')
+            f.write('0,1,0\n')
+    else:
+        profile = read_level_data.groupby('mc_frac')['cov'].value_counts()
+        profile.name = 'count'
+        profile = profile.reset_index()
+        profile.to_csv(f'{output_bam}.reads_profile.csv', index=None)
 
     # filter reads
     use_reads = read_level_data[

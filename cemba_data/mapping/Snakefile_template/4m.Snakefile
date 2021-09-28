@@ -11,16 +11,22 @@ rule summary:
         expand("allc/{cell_id}.allc.tsv.gz", cell_id=CELL_IDS),
         # also add all the stats path here, so they won't be deleted until summary is generated
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
-        expand("fastq/{cell_id}-R1.trimmed.stats.tsv", cell_id=CELL_IDS),
-        expand("fastq/{cell_id}-R2.trimmed.stats.tsv", cell_id=CELL_IDS),
+        expand("fastq/{cell_id}-R1.trimmed.stats.txt", cell_id=CELL_IDS),
+        expand("fastq/{cell_id}-R2.trimmed.stats.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}-R1.two_mapping.deduped.bam", cell_id=CELL_IDS),
+        expand("bam/{cell_id}-R2.two_mapping.deduped.bam", cell_id=CELL_IDS),
+        expand("bam/{cell_id}-R1.two_mapping.filter.bam", cell_id=CELL_IDS),
+        expand("bam/{cell_id}-R2.two_mapping.filter.bam", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R1.two_mapping.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}-R2.two_mapping.deduped.matrix.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.mC.bam", cell_id=CELL_IDS),
         expand("bam/{cell_id}.3C.bam", cell_id=CELL_IDS),
         expand("hic/{cell_id}.3C.contact.tsv.gz", cell_id=CELL_IDS),
-        expand("hic/{cell_id}.3C.contact.tsv.gz.counts.txt", cell_id=CELL_IDS),
+        expand("hic/{cell_id}.3C.contact.tsv.counts.txt", cell_id=CELL_IDS),
         'rna_bam/TotalRNAAligned.out.bam',
-        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv'
+        'rna_bam/TotalRNAAligned.filtered.bam',
+        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv',
+        'rna_bam/TotalRNAAligned.rna_reads.feature_count.tsv.summary'
     output:
         "MappingSummary.csv.gz"
     shell:
