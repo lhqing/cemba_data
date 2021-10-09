@@ -76,8 +76,7 @@ rule bigwig_ch:
         "--output_prefix {group} "
         "--bin_size {bigwig_mch_bin_size} "
         "--mc_contexts {mch_context} "
-        "--chrom_size_path {chrom_size_path} "
-        "--strandness both"
+        "--chrom_size_path {chrom_size_path}"
 
 
 # Generate mCG BigWig files
@@ -97,5 +96,4 @@ rule bigwig_cg:
         "--output_prefix {group} "
         "--bin_size {bigwig_mcg_bin_size} "
         "--mc_contexts {mcg_context} "
-        "--chrom_size_path {chrom_size_path} "
-        "--strandness both"
+        "--chrom_size_path {chrom_size_path}"
