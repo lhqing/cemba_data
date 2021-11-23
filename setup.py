@@ -23,7 +23,7 @@ setup(
     },
     install_requires=['pandas>=1.0',
                       'numpy',
-                      'seaborn==0.10',
+                      'seaborn',
                       'matplotlib',
                       'papermill',
                       'dnaio',
