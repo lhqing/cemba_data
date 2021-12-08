@@ -549,6 +549,14 @@ def snm3c_imputation_subparser(subparser):
         help="Path of the chromosome sizes file."
     )
 
+    parser_req.add_argument(
+        "--contact_table",
+        type=str,
+        required=False,
+        default=None,
+        help="Path to the cell contact table, if not provided, will generate automatically."
+    )
+
     parser_opt.add_argument(
         "--scheduler",
         type=str,

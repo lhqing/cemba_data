@@ -47,6 +47,7 @@ input_scool = {new_path}
 
 def prepare_impute_dir(output_dir,
                        chrom_size_path,
+                       contact_table=None,
                        scheduler='sbatch',
                        scool_cpu=5,
                        cpu_per_job=10,
@@ -70,18 +71,20 @@ def prepare_impute_dir(output_dir,
     dataset_dir.mkdir(exist_ok=True)
 
     # make contacts
-    contact_paths = pd.Series({path.name.split('.')[0]: str(path)
-                               for path in output_dir.glob('*/hic/*contact.tsv.gz')})
-
-    # filter by minimum contacts cutoff
-    cell_meta = pd.read_csv(f'{output_dir}/stats/MappingSummary.csv.gz', index_col=0)
-    use_cells = cell_meta[cell_meta['CisLongContact'] > min_contacts_per_cell].index
-    print(f'{cell_meta.shape[0]} cells in total, '
-          f'{use_cells.size} cells having contacts > {min_contacts_per_cell} cutoff.')
-    contact_paths = contact_paths.loc[use_cells].copy()
-
     contact_table_path = scool_dir / 'contacts_table.tsv'
-    contact_paths.to_csv(contact_table_path, sep='\t', header=None)
+    if contact_table is None:
+        contact_paths = pd.Series({path.name.split('.')[0]: str(path)
+                                   for path in output_dir.glob('*/hic/*contact.tsv.gz')})
+
+        # filter by minimum contacts cutoff
+        cell_meta = pd.read_csv(f'{output_dir}/stats/MappingSummary.csv.gz', index_col=0)
+        use_cells = cell_meta[cell_meta['CisLongContact'] > min_contacts_per_cell].index
+        print(f'{cell_meta.shape[0]} cells in total, '
+              f'{use_cells.size} cells having contacts > {min_contacts_per_cell} cutoff.')
+        contact_paths = contact_paths.loc[use_cells].copy()
+        contact_paths.to_csv(contact_table_path, sep='\t', header=None)
+    else:
+        subprocess.run(f'cp -f {contact_table} {contact_table_path}', shell=True, check=True)
 
     # target scool file paths
     scool_path_10k = raw_dir / f'{project_name}.10K.scool'
@@ -98,10 +101,10 @@ def prepare_impute_dir(output_dir,
             raise FileNotFoundError(f'skip_scool_prep is True, but {scool_path_100k} not found.')
     else:
         scool_cmd = f'hicluster generate-scool --contacts_table {contact_table_path} ' \
-                f'--output_prefix {raw_dir / project_name} ' \
-                f'--chrom_size_path {chrom_size_path} ' \
-                f'--resolutions 10000 25000 100000 ' \
-                f'--min_pos_dist 2500 --cpu {scool_cpu}'
+                    f'--output_prefix {raw_dir / project_name} ' \
+                    f'--chrom_size_path {chrom_size_path} ' \
+                    f'--resolutions 10000 25000 100000 ' \
+                    f'--min_pos_dist 2500 --cpu {scool_cpu}'
         print('Generating raw scool files for 10Kb, 25Kb and 100Kb resolutions.')
         execute_command(scool_cmd)
 
