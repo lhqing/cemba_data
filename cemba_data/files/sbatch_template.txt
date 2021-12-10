@@ -40,6 +40,7 @@ export PATH=/dev/shm/bin:/tmp/test_{env_dir_random}/test/miniconda3/envs/mapping
 find /tmp/test_{env_dir_random}/test/miniconda3/ -type f -print0 | sed 's/ /\\ /g; s/(/\\(/g; s/)/\\)/g' | xargs -0 -P 30 -I % sh -c '/bin/sed -i "s/\/tmp\/test\/miniconda3\/envs\/mapping\/bin\/python/\/tmp\/test_{env_dir_random}\/test\/miniconda3\/envs\/mapping\/bin\/python/" %'
 
 pip install cemba_data --upgrade
+pip install schicluster --upgrade
 
 # Check the path
 which python

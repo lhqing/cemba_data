@@ -54,6 +54,10 @@ def prepare_impute_dir(output_dir,
                        batch_size=100,
                        total_cpu=100,
                        min_contacts_per_cell=50000,
+                       blacklist_1d_path=None,
+                       blacklist_2d_path=None,
+                       blacklist_resolution=10000,
+                       remove_duplicates=True,
                        sbatch_time_str='2:00:00',
                        min_cutoff='1e-5',
                        skip_scool_prep=False):
@@ -100,11 +104,25 @@ def prepare_impute_dir(output_dir,
         if not scool_path_100k.exists():
             raise FileNotFoundError(f'skip_scool_prep is True, but {scool_path_100k} not found.')
     else:
+        if blacklist_1d_path is not None:
+            blacklist_1d_path_str = f'--blacklist_1d_path {blacklist_1d_path} '
+        else:
+            blacklist_1d_path_str = f' '
+        if blacklist_2d_path is not None:
+            blacklist_2d_path_str = f'--blacklist_2d_path {blacklist_2d_path} '
+        else:
+            blacklist_2d_path_str = f' '
+        if remove_duplicates:
+            remove_duplicates_str = f' '
+        else:
+            remove_duplicates_str = f'--not_remove_duplicates '
         scool_cmd = f'hicluster generate-scool --contacts_table {contact_table_path} ' \
                     f'--output_prefix {raw_dir / project_name} ' \
                     f'--chrom_size_path {chrom_size_path} ' \
                     f'--resolutions 10000 25000 100000 ' \
-                    f'--min_pos_dist 2500 --cpu {scool_cpu}'
+                    f'--min_pos_dist 2500 --cpu {scool_cpu} ' \
+                    f'--blacklist_resolution {blacklist_resolution} ' \
+                    f'{blacklist_1d_path_str}{blacklist_2d_path_str}{remove_duplicates_str}'
         print('Generating raw scool files for 10Kb, 25Kb and 100Kb resolutions.')
         execute_command(scool_cmd)
 
