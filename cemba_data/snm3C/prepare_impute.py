@@ -40,6 +40,10 @@ scratch_path = subprocess.run('echo $SCRATCH',
 input_scool = {new_path}
 '''
                 f.write(new_line)
+            elif line.startswith('chrom_size_path'):
+                new_path = f"f'{{scratch_path}}/{project_name}/scool/raw/chrom_sizes.txt'"
+                new_line = f'chrom_size_path = {new_path}\n'
+                f.write(new_line)
             else:
                 f.write(line)
     return
@@ -69,26 +73,12 @@ def prepare_impute_dir(output_dir,
     snakemake_dir.mkdir(exist_ok=True, parents=True)
     raw_dir = scool_dir / 'raw'
     raw_dir.mkdir(exist_ok=True)
+    subprocess.run(f'cp {chrom_size_path} {raw_dir}/chrom_sizes.txt', shell=True)
+    chrom_size_path = f'{raw_dir}/chrom_sizes.txt'
     impute_dir = scool_dir / 'impute'
     impute_dir.mkdir(exist_ok=True)
     dataset_dir = scool_dir / 'dataset'
     dataset_dir.mkdir(exist_ok=True)
-
-    # make contacts
-    contact_table_path = scool_dir / 'contacts_table.tsv'
-    if contact_table is None:
-        contact_paths = pd.Series({path.name.split('.')[0]: str(path)
-                                   for path in output_dir.glob('*/hic/*contact.tsv.gz')})
-
-        # filter by minimum contacts cutoff
-        cell_meta = pd.read_csv(f'{output_dir}/stats/MappingSummary.csv.gz', index_col=0)
-        use_cells = cell_meta[cell_meta['CisLongContact'] > min_contacts_per_cell].index
-        print(f'{cell_meta.shape[0]} cells in total, '
-              f'{use_cells.size} cells having contacts > {min_contacts_per_cell} cutoff.')
-        contact_paths = contact_paths.loc[use_cells].copy()
-        contact_paths.to_csv(contact_table_path, sep='\t', header=None)
-    else:
-        subprocess.run(f'cp -f {contact_table} {contact_table_path}', shell=True, check=True)
 
     # target scool file paths
     scool_path_10k = raw_dir / f'{project_name}.10K.scool'
@@ -104,6 +94,22 @@ def prepare_impute_dir(output_dir,
         if not scool_path_100k.exists():
             raise FileNotFoundError(f'skip_scool_prep is True, but {scool_path_100k} not found.')
     else:
+        # make contacts
+        contact_table_path = scool_dir / 'contacts_table.tsv'
+        if contact_table is None:
+            contact_paths = pd.Series({path.name.split('.')[0]: str(path)
+                                       for path in output_dir.glob('*/hic/*contact.tsv.gz')})
+
+            # filter by minimum contacts cutoff
+            cell_meta = pd.read_csv(f'{output_dir}/stats/MappingSummary.csv.gz', index_col=0)
+            use_cells = cell_meta[cell_meta['CisLongContact'] > min_contacts_per_cell].index
+            print(f'{cell_meta.shape[0]} cells in total, '
+                  f'{use_cells.size} cells having contacts > {min_contacts_per_cell} cutoff.')
+            contact_paths = contact_paths.loc[use_cells].copy()
+            contact_paths.to_csv(contact_table_path, sep='\t', header=None)
+        else:
+            subprocess.run(f'cp -f {contact_table} {contact_table_path}', shell=True, check=True)
+
         if blacklist_1d_path is not None:
             blacklist_1d_path_str = f'--blacklist_1d_path {blacklist_1d_path} '
         else:
@@ -133,7 +139,7 @@ def prepare_impute_dir(output_dir,
     impute_10k_cmd = f'hicluster imputation ' \
                      f'--input_scool {scool_path_10k} ' \
                      f'--output_dir {this_out_dir} ' \
-                     f'--chrom_size_path {chrom_size_path} ' \
+                     f'--chrom_size_path "{chrom_size_path}" ' \
                      f'--output_dist 5050000 ' \
                      f'--window_size 30000000 ' \
                      f'--step_size 10000000 ' \
@@ -151,7 +157,7 @@ def prepare_impute_dir(output_dir,
     impute_25k_cmd = f'hicluster imputation ' \
                      f'--input_scool {scool_path_25k} ' \
                      f'--output_dir {this_out_dir} ' \
-                     f'--chrom_size_path {chrom_size_path} ' \
+                     f'--chrom_size_path "{chrom_size_path}" ' \
                      f'--output_dist 10050000 ' \
                      f'--window_size 500000000 ' \
                      f'--step_size 500000000 ' \
@@ -169,7 +175,7 @@ def prepare_impute_dir(output_dir,
     impute_100k_cmd = f'hicluster imputation ' \
                       f'--input_scool {scool_path_100k} ' \
                       f'--output_dir {this_out_dir} ' \
-                      f'--chrom_size_path {chrom_size_path} ' \
+                      f'--chrom_size_path "{chrom_size_path}" ' \
                       f'--output_dist 500000000 ' \
                       f'--window_size 500000000 ' \
                       f'--step_size 500000000 ' \
