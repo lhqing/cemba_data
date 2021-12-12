@@ -201,8 +201,7 @@ def prepare_impute_dir(output_dir,
     elif scheduler == 'sbatch':
         # an important notice
         print(f'\n\n\nYou used sbatch as scheduler, remember to '
-              f'1) provide the remote path of chrom_size_path; '
-              f'2) transfer the {project_name}/scool directory to $SCRATCH/{project_name}/scool. '
+              f'transfer the {project_name}/scool directory to $SCRATCH/{project_name}/scool. '
               f'Otherwise the snakemake will raise error.')
 
         # prepare sbatch
@@ -221,7 +220,8 @@ def prepare_impute_dir(output_dir,
                         out_f.write(line)
         sbatch_str = f'yap sbatch --project_name {project_name} ' \
                      f'--command_file_path {remote_sbatch_dir}/snakemake_cmd.txt ' \
-                     f'--working_dir {remote_sbatch_dir} --time_str {sbatch_time_str}'
+                     f'--working_dir {remote_sbatch_dir} --time_str {sbatch_time_str} ' \
+                     f'--template schicluster'
         with open(local_sbatch_dir / 'sbatch.sh', 'w') as f:
             f.write(sbatch_str)
 

@@ -195,6 +195,14 @@ def sbatch_register_subparser(subparser):
         help="Type of status you want to get notice, default is fail, means only get notice when job failed."
     )
 
+    parser_req.add_argument(
+        "--template",
+        type=str,
+        choices=['yap', 'schicluster'],
+        default='yap',
+        help="Type of sbatch template to use."
+    )
+
     parser.add_argument(
         "--max_jobs",
         type=int,

@@ -172,10 +172,16 @@ def squeue(partition):
         return squeue_df, total_job
 
 
-def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str, email, email_type):
+def make_sbatch_script_files(commands, sbatch_dir, name_prefix, queue, time_str, email, email_type, template='yap'):
     """See stampede2 doc: https://portal.tacc.utexas.edu/user-guides/stampede2#running-sbatch"""
-    with open(PACKAGE_DIR / 'files/sbatch_template.txt') as f:
-        sbatch_template = f.read()
+    if template == 'yap':
+        with open(PACKAGE_DIR / 'files/sbatch_template_yap.txt') as f:
+            sbatch_template = f.read()
+    elif template == 'schicluster':
+        with open(PACKAGE_DIR / 'files/sbatch_template_schicluster.txt') as f:
+            sbatch_template = f.read()
+    else:
+        raise ValueError('Only support ["yap", "schicluster"] template')
     sbatch_dir = pathlib.Path(sbatch_dir)
 
     if email is not None:
@@ -244,7 +250,8 @@ def sacct(jobs):
 
 
 def sbatch_submitter(project_name, command_file_path, working_dir, time_str, queue='skx-normal',
-                     email=None, email_type='fail', max_jobs=None, dry_run=False, retry=2):
+                     email=None, email_type='fail', max_jobs=None, dry_run=False, retry=2,
+                     template='yap'):
     # read commands
     with open(command_file_path) as f:
         # I always assume the command is ordered with descending priority.
@@ -292,7 +299,9 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
         queue=queue,
         time_str=time_str,
         email=email,
-        email_type=email_type)
+        email_type=email_type,
+        template=template
+    )
 
     # prepare submission
     running_job_id_set = set()  # sbatch_id
