@@ -28,23 +28,20 @@
 {email_str}
 {email_type_str}
 
-
 #----------------------------------------------------
 # Clone the whole miniconda into /tmp so the snakemake command do not access $WORK
 mkdir /tmp/test_{env_dir_random}
 
 # use micromamba
-alias micromamba=/work/05622/lhq/stampede2/bin/micromamba
-
-# setup micromamba
-export MAMBA_ROOT_PREFIX=/tmp/test_{env_dir_random}
-eval "$( shell hook -s posix)"
+export PATH=/work/05622/lhq/stampede2/bin:$PATH
+micromamba shell init -s bash -p /tmp/test_{env_dir_random}
+source ~/.bashrc
 
 # activate base environment
 micromamba activate
 
 # create schicluster environment
-micromamba create -n schicluster python=3.8 numpy scipy scikit-learn h5py \
+micromamba create -y -n schicluster python=3.8 numpy scipy scikit-learn h5py \
 joblib cooler pandas statsmodels rpy2 anndata xarray snakemake pybedtools
 micromamba activate schicluster
 
@@ -53,7 +50,7 @@ export PYTHONPATH=/tmp/test_{env_dir_random}/envs/schicluster/lib/python3.8/site
 
 # install schicluster
 pip install schicluster
-which schicluster
+which hicluster
 
 # Installation finished
 #----------------------------------------------------
