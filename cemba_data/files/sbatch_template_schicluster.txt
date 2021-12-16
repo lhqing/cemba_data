@@ -42,7 +42,7 @@ micromamba activate
 
 # create schicluster environment
 micromamba create -y -n schicluster python=3.8 numpy scipy scikit-learn h5py \
-joblib cooler pandas statsmodels rpy2 anndata xarray snakemake pybedtools
+joblib cooler pandas statsmodels rpy2 anndata xarray snakemake pybedtools htslib=1.9
 micromamba activate schicluster
 
 # export correct PYTHONPATH
@@ -73,7 +73,12 @@ pwd
 # Set thread count (default value is 1)...
 export OMP_NUM_THREADS=48
 
-{command}
+for i in `seq 1 10`
+do
+    {command} --batch summary=${i}/10
+done
+
+# {command}
 
 # delete everything in /tmp
 
