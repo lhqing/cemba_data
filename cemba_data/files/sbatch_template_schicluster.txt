@@ -73,9 +73,9 @@ pwd
 # Set thread count (default value is 1)...
 export OMP_NUM_THREADS=48
 
-for i in `seq 1 10`
+for i in `seq 1 5`
 do
-    {command} --batch summary=${i}/10
+    {command} --batch summary=${i}/5
 done
 
 # {command}
