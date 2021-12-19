@@ -8,13 +8,24 @@ FORWARD_READ_MCH_CONTEXT = {'AG', 'TG', 'GG'}
 
 
 def single_read_mch_level(read, nome=False, frac=False):
+    """
+
+    Parameters
+    ----------
+    read
+    nome
+        If True, skip all the GpC context as it is subject to methylation
+    frac
+
+    Returns
+    -------
+
+    """
     # ref seq is parsed based on read seq and MD tag, and do not depend on reverse or not
     ref_seq = read.get_reference_sequence().upper()
+    ref_pos = read.get_reference_positions()
     # use dict instead of string is because ref_seq could contain blocks when skip happen
-    ref_seq_dict = {
-        pos: base
-        for pos, base in zip(read.get_reference_positions(), ref_seq)
-    }
+    ref_seq_dict = {pos: base for pos, base in zip(ref_pos, ref_seq)}
     read_seq = read.seq.upper()
 
     # only count mCH
