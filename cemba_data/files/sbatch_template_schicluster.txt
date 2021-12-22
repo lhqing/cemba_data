@@ -75,7 +75,7 @@ export OMP_NUM_THREADS=48
 
 for i in `seq 1 5`
 do
-    {command} --batch summary=${i}/5
+    {command} --batch summary=${{i}}/5
 done
 
 # {command}
