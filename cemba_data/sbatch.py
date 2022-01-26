@@ -114,6 +114,18 @@ def submit_sbatch(job_script_path):
     return job_id
 
 
+def squeue_text():
+    user_name = subprocess.run(['whoami'],
+                               check=True,
+                               encoding='utf8',
+                               stdout=subprocess.PIPE).stdout.strip()
+    squeue_result = subprocess.run(['squeue', '-u', user_name],
+                                   check=True,
+                                   encoding='utf8',
+                                   stdout=subprocess.PIPE).stdout
+    return squeue_result
+
+
 def squeue(partition):
     """
     check current running job
@@ -122,16 +134,9 @@ def squeue(partition):
     -------
     squeue results in a pd.DataFrame
     """
-    user_name = subprocess.run(['whoami'],
-                               check=True,
-                               encoding='utf8',
-                               stdout=subprocess.PIPE).stdout.strip()
     for i in range(3):
         try:
-            squeue_result = subprocess.run(['squeue', '-u', user_name],
-                                           check=True,
-                                           encoding='utf8',
-                                           stdout=subprocess.PIPE).stdout
+            squeue_result = squeue_text()
             break
         except subprocess.CalledProcessError:
             print(f'Squeue got an error, waiting 60s and trying again {i + 1}/3')
@@ -328,7 +333,11 @@ def sbatch_submitter(project_name, command_file_path, working_dir, time_str, que
                 squeue_df, total_job = squeue(partition=queue)
                 squeue_fail = 0
             except Exception as e:
-                print('Squeue parser raised an error, will retry after 150s.')
+                error_path = sbatch_dir / 'squeue_text.txt'
+                print(f'Squeue parser raised an error, will retry after 150s. '
+                      f'The content causing error is wrote to {error_path}')
+                with open(error_path, 'w') as f:
+                    f.write(squeue_text())
                 squeue_fail += 1
                 if squeue_fail > 10:
                     raise e
