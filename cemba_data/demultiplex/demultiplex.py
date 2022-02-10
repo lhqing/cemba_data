@@ -2,7 +2,6 @@
 Demultiplex pipeline
 """
 
-import locale
 import logging
 import pathlib
 import re
@@ -246,9 +245,8 @@ def _read_cutadapt_result(stat_path):
         total_pairs = -1
         for line in f:
             if line.startswith('Total read pairs processed'):
-                # some weird transform of cutadapt outputs...
-                locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-                total_pairs = locale.atoi(line.split(' ')[-1])
+                total_pairs = line.split(' ')[-1]
+                total_pairs = int(''.join(re.compile(r'\d').findall(total_pairs)))
 
             m = p.search(line)
             if m is not None:
