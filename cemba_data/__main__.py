@@ -6,10 +6,13 @@ When adding new function:
 
 import argparse
 import logging
+import os
 import sys
 
 import cemba_data
 from cemba_data import __version__
+
+os.environ["NUMEXPR_MAX_THREADS"] = "8"
 
 log = logging.getLogger()
 
