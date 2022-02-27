@@ -107,7 +107,12 @@ def fragments_to_bigwig(output_prefix, cluster, chrom_size_path, bw_bin_size=10,
     return
 
 
-def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, cpu=1):
+def prepare_atac_bulk(cluster_table,
+                      snap_table,
+                      output_prefix,
+                      chrom_size_path,
+                      bw_bin_size=10,
+                      cpu=1):
     """
     Merge snATAC single cell fragments stored in SNAP files into pseudo bulk and generate bigwig.
 
@@ -124,6 +129,8 @@ def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, 
         2) path to SNAP file
     output_prefix
         overall output prefix
+    chrom_size_path
+        path to chrom sizes file
     bw_bin_size
         bigwig bin size
     cpu
@@ -168,6 +175,7 @@ def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, 
             f = exe.submit(fragments_to_bigwig,
                            output_prefix,
                            cluster,
+                           chrom_size_path=chrom_size_path,
                            bw_bin_size=bw_bin_size,
                            scale=million_reads_scaler[cluster])
             futures[f] = cluster
