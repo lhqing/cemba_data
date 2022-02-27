@@ -137,11 +137,8 @@ def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, 
                                 names=['sample', 'barcode', 'cluster'])
     snap_table = pd.read_csv(snap_table, index_col=0, header=None, squeeze=True)
 
-    sample_clusters = {s: c.set_index('barcode')['cluster'].to_dict()
+    sample_clusters = {s: c.set_index('barcode')['cluster']
                        for s, c in cluster_table.groupby('sample')}
-    for s in sample_clusters.keys():
-        c = sample_clusters[s]
-        c.index = c.index.str.split('-').str[1]
 
     # dump fragments
     with ProcessPoolExecutor(cpu) as exe:
