@@ -107,7 +107,7 @@ def fragments_to_bigwig(output_prefix, cluster, chrom_size_path, bw_bin_size=10,
     return
 
 
-def atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, cpu=1):
+def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, cpu=1):
     """
     Merge snATAC single cell fragments stored in SNAP files into pseudo bulk and generate bigwig.
 
