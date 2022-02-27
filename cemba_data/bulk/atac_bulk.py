@@ -108,6 +108,31 @@ def fragments_to_bigwig(output_prefix, cluster, chrom_size_path, bw_bin_size=10,
 
 
 def atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, cpu=1):
+    """
+    Merge snATAC single cell fragments stored in SNAP files into pseudo bulk and generate bigwig.
+
+    Parameters
+    ----------
+    cluster_table
+        Three-column CSV,
+        1) sample id (SNAP sample, not cell)
+        2) cell barcode within a sample
+        3) cluster label
+    snap_table
+        Two-column CSV,
+        1) sample id, matching cluster table col 1;
+        2) path to SNAP file
+    output_prefix
+        overall output prefix
+    bw_bin_size
+        bigwig bin size
+    cpu
+        parallel CPU
+
+    Returns
+    -------
+
+    """
     cluster_table = pd.read_csv(cluster_table, index_col=None, header=None,
                                 names=['sample', 'barcode', 'cluster'])
     snap_table = pd.read_csv(snap_table, index_col=0, header=None, squeeze=True)
