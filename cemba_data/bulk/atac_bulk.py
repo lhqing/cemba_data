@@ -169,7 +169,7 @@ def prepare_atac_bulk(cluster_table, snap_table, output_prefix, bw_bin_size=10, 
                            output_prefix,
                            cluster,
                            bw_bin_size=bw_bin_size,
-                           scale=million_reads_scaler['ASC'])
+                           scale=million_reads_scaler[cluster])
             futures[f] = cluster
 
         for f in as_completed(futures):
