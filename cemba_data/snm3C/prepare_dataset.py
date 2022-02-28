@@ -66,6 +66,7 @@ def prepare_dataset_commands(output_dir, fasta_path, cpu=10):
 
     # prepare qsub
     qsub_dir = snakemake_dir / 'qsub'
+    qsub_dir.mkdir(exist_ok=True)
     with open(qsub_dir / 'dataset_cmd.txt', 'w') as f:
         f.write('\n'.join([compartment_cmd, domain_cmd, embedding_cmd]))
     qsub_str = f"""
