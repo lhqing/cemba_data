@@ -53,7 +53,10 @@ def prepare_mc_bulk(allc_table,
 
     # prepare ALLC path dict
     # allc_path to group
-    allc_path = pd.read_csv(allc_table, sep='\t', index_col=0, header=None, squeeze=True)
+    if str(allc_table).endswith('csv'):
+        allc_path = pd.read_csv(allc_table, index_col=0, header=None, squeeze=True)
+    else:
+        allc_path = pd.read_csv(allc_table, sep='\t', index_col=0, header=None, squeeze=True)
     file_not_exist = allc_path[allc_path.index.map(lambda i: not pathlib.Path(i).exists())]
     if file_not_exist.size != 0:
         path_str = "\n".join(file_not_exist.index.tolist())

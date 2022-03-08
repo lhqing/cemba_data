@@ -19,7 +19,7 @@ REQUIRED_KEYS = ['pe smp', 'l h_vmem']
 
 
 def _default_command_dict(name, error_path, output_path, working_dir,
-                          h_rt='99:99:99', s_rt='99:99:99'):
+                          h_rt='999:99:99', s_rt='999:99:99'):
     """Default qsub command dict"""
     command_dict = {'command': None,
                     'N': name,
