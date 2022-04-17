@@ -28,6 +28,8 @@ def prepare_uid_snakefile(uid_dir, config_str, snake_template):
 
     # no file in this UID, do not make snakefile
     if len(cell_ids) == 0:
+        print(f'There is no cell_id parsed from FASTQ files, '
+              f'check the {uid_dir}, make sure things are intact.')
         return
 
     total_snakefile = config_str + cell_id_str + snake_template
