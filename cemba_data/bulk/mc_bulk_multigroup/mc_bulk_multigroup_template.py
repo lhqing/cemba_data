@@ -12,17 +12,17 @@ rule main:
     input:
         expand("{sample}.allc.tsv.gz", sample=sample_prefixes),
         expand("{sample}.allc.tsv.gz.tbi", sample=sample_prefixes),
-    output:
-        f"{group}.finished"
-    shell:
-        "date > {output}"
+#    output:
+#        f"{group}.finished"
+#    shell:
+#        "date > {output}"
         
 
 
 # Merge ALLC
 rule merge_allc:
     input:
-        expand("{sample}.pathlist", sample=merge_sample_prefixes),
+        "{sample}.pathlist",
     output:
         allc="{sample}.allc.tsv.gz",
         tbi="{sample}.allc.tsv.gz.tbi"
@@ -30,23 +30,16 @@ rule merge_allc:
         max(1, min(int(1.1 * merge_allc_cpu), int(workflow.cores / 1.1)))
     resources:
         mem_mb=merge_allc_cpu * 5000
-    shell:
-        "allcools merge-allc "
-        "--allc_paths {input} "
-        "--output_path {output.allc} "
-        "--chrom_size_path {chrom_size_path} "
-        "--cpu {threads}"
-
-# Copy ALLC
-rule copy_allc:
-    input:
-        expand("{sample}.pathlist", sample=copy_sample_prefixes),
-    output:
-        allc="{sample}.allc.tsv.gz",
-        tbi="{sample}.allc.tsv.gz.tbi"
-    shell:
-        "cp $(cat {input}) {output.allc} ;"
-        "cp $(cat {input}).tbi {output.allc} ;"
+    run:
+        if wildcards.sample in merge_sample_prefixes:
+            shell("allcools merge-allc "
+                  "--allc_paths {input} "
+                  "--output_path {output.allc} "
+                  "--chrom_size_path {chrom_size_path} "
+                  "--cpu {threads}")
+        else:
+            shell("cp $(cat {input}) {output.allc} ;"
+                  "cp $(cat {input}).tbi {output.allc} ;")
 
 '''
 
@@ -65,17 +58,16 @@ rule main:
     input:
         expand("{sample}.{mcg_context}-Merge.allc.tsv.gz", sample=sample_prefixes),
         expand("{sample}.{mcg_context}-Merge.allc.tsv.gz.tbi", sample=sample_prefixes),
-    output:
-        f"{group}.finished"
-    shell:
-        "date > {output}"
+#    output:
+#        f"{group}.finished"
+#    shell:
+#        "date > {output}"
         
-
 
 # Merge ALLC
 rule merge_allc:
     input:
-        expand("{sample}.pathlist", sample=merge_sample_prefixes),
+        "{sample}.pathlist",
     output:
         allc="{sample}.allc.tsv.gz",
         tbi="{sample}.allc.tsv.gz.tbi"
@@ -83,23 +75,16 @@ rule merge_allc:
         max(1, min(int(1.1 * merge_allc_cpu), int(workflow.cores / 1.1)))
     resources:
         mem_mb=merge_allc_cpu * 5000
-    shell:
-        "allcools merge-allc "
-        "--allc_paths {input} "
-        "--output_path {output.allc} "
-        "--chrom_size_path {chrom_size_path} "
-        "--cpu {threads}"
-
-# Copy ALLC
-rule copy_allc:
-    input:
-        expand("{sample}.pathlist", sample=copy_sample_prefixes),
-    output:
-        allc="{sample}.allc.tsv.gz",
-        tbi="{sample}.allc.tsv.gz.tbi"
-    shell:
-        "cp $(cat {input}) {output.allc} ;"
-        "cp $(cat {input}).tbi {output.allc} ;"
+    run:
+        if wildcards.sample in merge_sample_prefixes:
+            shell("allcools merge-allc "
+                  "--allc_paths {input} "
+                  "--output_path {output.allc} "
+                  "--chrom_size_path {chrom_size_path} "
+                  "--cpu {threads}")
+        else:
+            shell("cp $(cat {input}) {output.allc} ;"
+                  "cp $(cat {input}).tbi {output.allc} ;")
 
 # Extract mCG ALLC for DMR calling
 rule extract_allc_mcg:
