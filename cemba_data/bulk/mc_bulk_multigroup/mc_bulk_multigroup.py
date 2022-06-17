@@ -33,7 +33,7 @@ def merge_bulk_multigroup(group_path, output_path, chrom_size_path,
 
     df = df[df.columns[1:]].drop_duplicates()
 
-    df['_path'] = output_path+'/'+df['_elem']+'.allc.tsv.gz'
+    df['_path'] = output_path+'/_elem/'+df['_elem']+'.allc.tsv.gz'
 
     cate_grp_df = []
     for cate in sample_cates:
@@ -88,7 +88,7 @@ group = "{snk_id}"
     cate_snk_ids = prepare_snakefiles(cate_grp_df, output_path, 'cate',cate_snakegroup_num, template=MERGE_EXTRACT_TEMPLATE)
 
     def prepare_commands(snake_ids):
-        cmds = [f'snakemake  -d {outdir.resolve()} --snakefile {outdir.resolve()}/snakefiles/{x}.snakefile '
+        cmds = [f'snakemake  -d {outdir.resolve()} --snakefile {outdir.resolve()}/snakefiles/{snkid}.snakefile '
                 f'-j {n_cpu} --default-resources mem_mb=100 --resources mem_mb=1000 --rerun-incomplete' \
                 for snkid in snake_ids]
         return cmds
