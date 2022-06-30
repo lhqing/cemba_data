@@ -1,19 +1,33 @@
+"""
+Each cell_parser function takes a path from single cell and return a series named by cell_id
+
+"""
+
+
 import pathlib
 
+import numpy as np
 import pandas as pd
 
+from .stats_col_names import COL_NAMES
 
-def parse_hisat_report(stat_path):
+
+def cell_parser_hisat_summary(stat_path):
     """
-    parse hisat3n output
+    parse hisat3n summary file
     """
-    *cell_id, read_type = pathlib.Path(stat_path).name.split('.')[0].split('-')
-    cell_id = '-'.join(cell_id)
+    cell_id = pathlib.Path(stat_path).name.split('.')[0]
     term_dict = {
-        'Total pairs': f'TotalPairs',
-        'Aligned concordantly 1 time': f'UniqueMappedPairs',
-        'Aligned discordantly 1 time': f'discordantlyUniqueMappedPairs',
-        'Aligned 1 time': f'UniqueMappedReads',
+        'Total pairs': f'ReadPairsMappedInPE',
+        'Aligned concordantly or discordantly 0 time':
+            f'PEUnmappableReadPairs',
+        'Aligned concordantly 1 time': f'PEUniqueMappedReadPairs',
+        'Aligned concordantly >1 times': f'PEMultiMappedReadPairs',
+        'Aligned discordantly 1 time': f'PEDiscordantlyUniqueMappedReadPairs',
+        'Total unpaired reads': f'ReadsMappedInSE',
+        'Aligned 0 time': f'SEUnmappableReads',
+        'Aligned 1 time': f'SEUniqueMappedReads',
+        'Aligned >1 times': f'SEMultiMappedReads',
     }
 
     with open(stat_path) as rep:
@@ -25,41 +39,192 @@ def parse_hisat_report(stat_path):
             except ValueError:
                 continue  # more or less than 2 after split
             try:
-                report_dict[term_dict[start]] = rest.strip().split(' ')[0].strip('%')
+                report_dict[term_dict[start]] = rest.strip().split(
+                    ' ')[0].strip('%')
             except KeyError:
                 pass
-        mappingrate = (int(report_dict[f'UniqueMappedPairs']) * 2 + int(
-            report_dict[f'discordantlyUniqueMappedPairs']) * 2 + int(report_dict[f'UniqueMappedReads'])) / (
-                                  int(report_dict[f'TotalPairs']) * 2)
-        report_dict[f'MappingRate'] = round(mappingrate, 2)
+
+        report_dict = pd.Series(report_dict).astype(int)
+        total_reads = report_dict[f'ReadPairsMappedInPE'] * 2 + report_dict[
+            'ReadsMappedInSE']
+        unique_mapped_reads = report_dict[f'PEUniqueMappedReadPairs'] * 2 + \
+                              report_dict[f'PEDiscordantlyUniqueMappedReadPairs'] * 2 + \
+                              report_dict[f'SEUniqueMappedReads']
+        report_dict['UniqueMappedReads'] = unique_mapped_reads
+        report_dict[f'UniqueMappingRate'] = round(unique_mapped_reads /
+                                                  total_reads * 100)
+        multi_mapped_reads = report_dict[f'PEMultiMappedReadPairs'] * 2 + \
+                             report_dict[f'SEMultiMappedReads']
+        report_dict['MultiMappedReads'] = multi_mapped_reads
+        report_dict[f'MultiMappingRate'] = round(multi_mapped_reads /
+                                                 total_reads * 100)
+        report_dict[f'OverallMappingRate'] = round(
+            (unique_mapped_reads + multi_mapped_reads) / total_reads * 100)
     return pd.Series(report_dict, name=cell_id)
 
 
-def parse_deduplicate_stat(stat_path):
-    *cell_id, read_type = pathlib.Path(stat_path).name.split('.')[0].split('-')
-    cell_id = '-'.join(cell_id)
+def cell_parser_picard_dedup_stat(stat_path):
+    stat_path = pathlib.Path(stat_path)
+    cell_id, *other_parts = stat_path.name.split('.')
     try:
-        dedup_result_series = pd.read_csv(stat_path, comment='#', sep='\t').T[0]
-        rename_dict = {
-            'UNPAIRED_READS_EXAMINED': f'FilteredReads',
-            'READ_PAIRS_EXAMINED': f'FilteredPairs',
-            'UNPAIRED_READ_DUPLICATES': f'DuplicatedReads',
-            'READ_PAIR_DUPLICATES': f'DuplicatedPairs',
-            'PERCENT_DUPLICATION': f'DuplicationRate'
-        }
-        dedup_result_series = dedup_result_series.loc[rename_dict.keys()].rename(rename_dict)
+        record = pd.read_csv(stat_path, comment='#', sep='\t').T[0]
+        record['FinalReads'] = int(record['UNPAIRED_READS_EXAMINED']) - \
+                               int(record['UNPAIRED_READ_DUPLICATES']) + \
+                               (int(record['READ_PAIRS_EXAMINED']) - int(record['READ_PAIR_DUPLICATES'])) * 2
+        record['DuplicatedReads'] = int(record['UNPAIRED_READ_DUPLICATES']) + \
+                                    int(record['READ_PAIR_DUPLICATES']) * 2
+        record['PCRDuplicationRate'] = record['FinalReads'] / \
+                                       (record['FinalReads'] + record['DuplicatedReads'])
+        record['PCRDuplicationRate'] = int(
+            (1 - record['PCRDuplicationRate']) * 100)
 
-        dedup_result_series[f'FinalHisat3nReads'] = int(dedup_result_series[f'FilteredReads']) - int(
-            dedup_result_series[f'DuplicatedReads']) + \
-                                                    (int(dedup_result_series[f'FilteredPairs']) - int(
-                                                        dedup_result_series[f'DuplicatedPairs'])) * 2
-        dedup_result_series.name = cell_id
+        record.name = cell_id
     except pd.errors.EmptyDataError:
         # if a BAM file is empty, picard matrix is also empty
-        dedup_result_series = pd.Series({f'FilteredReads': 0,
-                                         f'DuplicatedReads': 0,
-                                         f'FilteredPairs': 0,
-                                         f'DuplicatedPairs': 0,
-                                         f'FinalHisat3nReads': 0,
-                                         f'DuplicationRate': 0}, name=cell_id)
-    return dedup_result_series
+        record = pd.Series(
+            {
+                k: 0
+                for p, k in COL_NAMES.keys()
+                if p == 'parse_picard_dedup_stat'
+            },
+            name=cell_id)
+    return record
+
+
+def cell_parser_cutadapt_trim_stats(path):
+    path = pathlib.Path(path)
+
+    cell_id = path.name.split('.')[0]
+    cell_records = pd.read_csv(path, sep='\t').T.squeeze()
+    cell_records.name = cell_id
+    return cell_records
+
+
+def cell_parser_allc_count(path):
+    path = pathlib.Path(path)
+    cell_id = path.name.split('.')[0]
+
+    allc_counts = pd.read_csv(path, index_col=0)
+
+    # remove contexts that contain "N"
+    allc_counts = allc_counts.loc[allc_counts.index.map(
+        lambda a: 'N' not in a)].copy()
+
+    # find out which position is the C
+    try:
+        assert allc_counts.index.map(lambda a: len(a)).unique().size == 1
+        c_pos = None
+        for i in range(0, len(allc_counts.index[0])):
+            if allc_counts.index.str[i].unique().size == 1:
+                c_pos = i
+        assert c_pos is not None
+        assert c_pos != len(allc_counts.index[0])
+    except AssertionError:
+        raise AssertionError(f'Do not understand the mC context in {path}')
+
+    # get mC context
+    mc_context = pd.Series(allc_counts.index.str[c_pos + 1] == 'G').map({
+        True: 'mCG', False: 'mCH'
+    })
+    if c_pos > 0:
+        # NOMe
+        nome_sites = pd.Series(allc_counts.index.str[c_pos - 1] == 'G').map({
+            True: 'G', False: 'H'
+        })
+        mc_context = nome_sites + mc_context
+    mc_context.index = allc_counts.index
+
+    # generate cell records
+    mc_context_sum = allc_counts.groupby(mc_context).sum()[['mc', 'cov']]
+
+    is_ccc = allc_counts.index.str[c_pos:].map(
+        lambda a: len(set(a)) == 1).values
+    if c_pos > 0:
+        is_ccc &= np.array(allc_counts.index.str[c_pos - 1] != 'G')
+
+    try:
+        ccc_mc, ccc_cov = np.ravel(allc_counts.loc[is_ccc, ['mc', 'cov']].values)
+    except ValueError:
+        ccc_mc, ccc_cov = 0, 0
+
+    mc_context_sum = pd.concat([
+        pd.DataFrame({
+            'mCCC': {
+                'mc': ccc_mc,
+                'cov': ccc_cov
+            }
+        }).T, mc_context_sum
+    ])
+    mc_context_sum = mc_context_sum.astype('O')
+    mc_context_sum['Frac'] = mc_context_sum['mc'] / (mc_context_sum['cov'] +
+                                                     0.00001)
+    mc_context_sum.rename(columns={'mc': 'mC', 'cov': 'Cov'}, inplace=True)
+
+    cell_records = {}
+    for (count_type, mc_type), count in mc_context_sum.unstack().items():
+        cell_records[f'{mc_type}{count_type}'] = count
+    cell_records = pd.Series(cell_records, name=cell_id, dtype='O')
+    return cell_records
+
+
+def parse_single_stats_set(path_pattern, parser, prefix=''):
+    """
+    Parse all the stats files in the path_pattern and return a dataframe
+    with each cell id as index and the stats as columns.
+
+    Parameters
+    ----------
+    path_pattern :
+        Path pattern to the stats files.
+    parser :
+        A function that takes a path and returns a pandas series for one cell.
+    prefix :
+        Prefix to add to the column names.
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+    detail_stats_dir = pathlib.Path('detail_stats/')
+    detail_stats_dir.mkdir(exist_ok=True)
+
+    stats_paths = list(pathlib.Path().glob(path_pattern))
+
+    records = []
+    for path in stats_paths:
+        try:
+            record = parser(path)
+            records.append(record)
+        except BaseException as e:
+            print(f'Got error when reading {path} with {parser}')
+            raise e
+    stats_df = pd.DataFrame(records)
+
+    # before rename, save raw stats into detail_stats/
+    stats_df.to_csv(f'detail_stats/{prefix}.{parser.__name__}.csv')
+
+    # rename columns
+    rename_dict = {}
+    rename_functions = set([k[0] for k in COL_NAMES.keys()])
+    if parser.__name__ not in rename_functions:
+        # do not rename function output if the function name not in COL_NAMES
+        return stats_df
+
+    for (parser_name, original_name), new_name in COL_NAMES.items():
+        if parser_name == parser.__name__:
+            if new_name == '':
+                rename_dict[original_name] = original_name
+            else:
+                rename_dict[original_name] = new_name
+    new_columns = stats_df.columns.map(rename_dict)
+    if new_columns.isna().sum() != 0:
+        print(
+            f'These columns are ignored because they do not listed'
+            f' in the COL_NAMES dict: {stats_df.columns[new_columns.isna()]}')
+    # remove columns marked as DELETE in COL_NAMES
+    stats_df.columns = new_columns
+    stats_df = stats_df.iloc[:, new_columns != 'DELETE'].copy()
+
+    # add prefix to stats_df columns
+    stats_df.columns = stats_df.columns.map(lambda a: prefix + a)
+    return stats_df

@@ -200,6 +200,7 @@ def select_mct_reads_normal(input_bam,
                     if (mc_frac < mc_rate_min_threshold) or (cov < cov_min_threshold):
                         continue
                 out_f.write(read)
+
     with open(str(output_bam)[:-4] + '.reads_mch_frac.csv', 'w') as stat_f:
         stat_f.write('mc_frac,cov,count\n')
         for (mc_frac, cov), count in read_profile_dict.items():
