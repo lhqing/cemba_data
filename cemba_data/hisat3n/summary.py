@@ -31,6 +31,21 @@ def snmc_summary():
                                 cell_parser_picard_dedup_stat, prefix='MultiAlign')
     all_stats.append(df)
 
+    # uniquely mapped dna reads selection
+    df = parse_single_stats_set('bam/*.hisat3n_dna.unique_align.deduped.dna_reads.reads_mch_frac.csv',
+                                cell_parser_reads_mc_frac_profile, prefix='UniqueAlign')
+    all_stats.append(df)
+
+    # multi mapped dna reads selection
+    df = parse_single_stats_set('bam/*.hisat3n_dna.multi_align.deduped.dna_reads.reads_mch_frac.csv',
+                                cell_parser_reads_mc_frac_profile, prefix='MultiAlign')
+    all_stats.append(df)
+
+    # uniquely mapped rna reads selection
+    df = parse_single_stats_set('bam/*.hisat3n_rna.unique_align.rna_reads.reads_mch_frac.csv',
+                                cell_parser_reads_mc_frac_profile)
+    all_stats.append(df)
+
     # allc count
     df = parse_single_stats_set(f'allc/*.allc.tsv.gz.count.csv',
                                 cell_parser_allc_count)
@@ -89,7 +104,6 @@ def snmct_summary():
     all_stats.to_csv(f'MappingSummary.csv.gz')
 
     # TODO
-    # 1. select DNA RNA summary
     # 2. feature count summary
     # 3. aggregate feature count this can be a separate func and call in snakefile
 

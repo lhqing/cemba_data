@@ -202,6 +202,12 @@ def select_mct_reads_normal(input_bam,
                 out_f.write(read)
 
     with open(str(output_bam)[:-4] + '.reads_mch_frac.csv', 'w') as stat_f:
+        # save parameters, so the stat parser can read from it
+        stat_f.write(f'#mode={mode}\n')
+        stat_f.write(f'#mc_rate_max_threshold={mc_rate_max_threshold}\n')
+        stat_f.write(f'#mc_rate_min_threshold={mc_rate_min_threshold}\n')
+        stat_f.write(f'#cov_min_threshold={cov_min_threshold}\n')
+
         stat_f.write('mc_frac,cov,count\n')
         for (mc_frac, cov), count in read_profile_dict.items():
             stat_f.write(f'{mc_frac},{cov},{count}\n')

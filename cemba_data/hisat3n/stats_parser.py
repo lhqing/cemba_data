@@ -3,7 +3,6 @@ Each cell_parser function takes a path from single cell and return a series name
 
 """
 
-
 import pathlib
 
 import numpy as np
@@ -228,3 +227,35 @@ def parse_single_stats_set(path_pattern, parser, prefix=''):
     # add prefix to stats_df columns
     stats_df.columns = stats_df.columns.map(lambda a: prefix + a)
     return stats_df
+
+
+def cell_parser_reads_mc_frac_profile(path):
+    # read parameters
+    params = {}
+    with open(path) as f:
+        for line in f:
+            if line.startswith('#'):
+                k, v = line.strip().split('=')
+                params[k[1:]] = v
+            else:
+                break
+
+    path = pathlib.Path(path)
+    cell_id = path.name.split('.')[0]
+    reads_profile = pd.read_csv(path, comment='#')
+    mode = params['mode'].upper()
+    if mode == 'DNA':
+        selected_reads = reads_profile[
+            (reads_profile['cov'] >= int(params['cov_min_threshold']))
+            & (reads_profile['mc_frac'] < float(params['mc_rate_max_threshold']))]
+    else:
+        selected_reads = reads_profile[
+            (reads_profile['cov'] >= int(params['cov_min_threshold']))
+            & (reads_profile['mc_frac'] > float(params['mc_rate_min_threshold']))]
+
+    selected_reads = selected_reads['count'].sum()
+    selected_ratio = selected_reads / reads_profile['count'].sum()
+    final_stat = pd.Series({f'Final{mode}Reads': selected_reads,
+                            f'Selected{mode}ReadsRatio': selected_ratio},
+                           dtype='O', name=cell_id)
+    return final_stat
