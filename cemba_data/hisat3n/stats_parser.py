@@ -42,6 +42,9 @@ def cell_parser_hisat_summary(stat_path):
                     ' ')[0].strip('%')
             except KeyError:
                 pass
+        for k in term_dict.keys():
+            if k not in report_dict:
+                report_dict[term_dict[k]] = 0
 
         report_dict = pd.Series(report_dict).astype(int)
         total_reads = report_dict[f'ReadPairsMappedInPE'] * 2 + report_dict[
@@ -51,14 +54,14 @@ def cell_parser_hisat_summary(stat_path):
                               report_dict[f'SEUniqueMappedReads']
         report_dict['UniqueMappedReads'] = unique_mapped_reads
         report_dict[f'UniqueMappingRate'] = round(unique_mapped_reads /
-                                                  total_reads * 100)
+                                                  (total_reads + 0.00001) * 100)
         multi_mapped_reads = report_dict[f'PEMultiMappedReadPairs'] * 2 + \
                              report_dict[f'SEMultiMappedReads']
         report_dict['MultiMappedReads'] = multi_mapped_reads
         report_dict[f'MultiMappingRate'] = round(multi_mapped_reads /
-                                                 total_reads * 100)
+                                                 (total_reads + 0.00001) * 100)
         report_dict[f'OverallMappingRate'] = round(
-            (unique_mapped_reads + multi_mapped_reads) / total_reads * 100)
+            (unique_mapped_reads + multi_mapped_reads) / (total_reads + 0.00001) * 100)
     return pd.Series(report_dict, name=cell_id)
 
 
@@ -104,6 +107,9 @@ def cell_parser_allc_count(path):
     cell_id = path.name.split('.')[0]
 
     allc_counts = pd.read_csv(path, index_col=0)
+
+    if allc_counts.empty:
+        return pd.Series([], dtype='O', name=cell_id)
 
     # remove contexts that contain "N"
     allc_counts = allc_counts.loc[allc_counts.index.map(
@@ -166,6 +172,38 @@ def cell_parser_allc_count(path):
     return cell_records
 
 
+def cell_parser_reads_mc_frac_profile(path):
+    # read parameters
+    params = {}
+    with open(path) as f:
+        for line in f:
+            if line.startswith('#'):
+                k, v = line.strip().split('=')
+                params[k[1:]] = v
+            else:
+                break
+
+    path = pathlib.Path(path)
+    cell_id = path.name.split('.')[0]
+    reads_profile = pd.read_csv(path, comment='#')
+    mode = params['mode'].upper()
+    if mode == 'DNA':
+        selected_reads = reads_profile[
+            (reads_profile['cov'] >= int(params['cov_min_threshold']))
+            & (reads_profile['mc_frac'] < float(params['mc_rate_max_threshold']))]
+    else:
+        selected_reads = reads_profile[
+            (reads_profile['cov'] >= int(params['cov_min_threshold']))
+            & (reads_profile['mc_frac'] > float(params['mc_rate_min_threshold']))]
+
+    selected_reads = selected_reads['count'].sum()
+    selected_ratio = selected_reads / (reads_profile['count'].sum() + 0.0001)
+    final_stat = pd.Series({f'Final{mode}Reads': selected_reads,
+                            f'Selected{mode}ReadsRatio': selected_ratio},
+                           dtype='O', name=cell_id)
+    return final_stat
+
+
 def parse_single_stats_set(path_pattern, parser, prefix=''):
     """
     Parse all the stats files in the path_pattern and return a dataframe
@@ -190,14 +228,21 @@ def parse_single_stats_set(path_pattern, parser, prefix=''):
     stats_paths = list(pathlib.Path().glob(path_pattern))
 
     records = []
+    empty_index = []
     for path in stats_paths:
         try:
             record = parser(path)
-            records.append(record)
+            if record.size == 0:
+                empty_index.append(record.name)
+            else:
+                records.append(record)
         except BaseException as e:
             print(f'Got error when reading {path} with {parser}')
             raise e
     stats_df = pd.DataFrame(records)
+    if len(empty_index) > 0:
+        use_index = pd.Index(stats_df.index.tolist() + empty_index)
+        stats_df = stats_df.reindex(use_index)  # still record empty entries, but values will be nan
 
     # before rename, save raw stats into detail_stats/
     stats_df.to_csv(f'detail_stats/{prefix}.{parser.__name__}.csv')
@@ -227,35 +272,3 @@ def parse_single_stats_set(path_pattern, parser, prefix=''):
     # add prefix to stats_df columns
     stats_df.columns = stats_df.columns.map(lambda a: prefix + a)
     return stats_df
-
-
-def cell_parser_reads_mc_frac_profile(path):
-    # read parameters
-    params = {}
-    with open(path) as f:
-        for line in f:
-            if line.startswith('#'):
-                k, v = line.strip().split('=')
-                params[k[1:]] = v
-            else:
-                break
-
-    path = pathlib.Path(path)
-    cell_id = path.name.split('.')[0]
-    reads_profile = pd.read_csv(path, comment='#')
-    mode = params['mode'].upper()
-    if mode == 'DNA':
-        selected_reads = reads_profile[
-            (reads_profile['cov'] >= int(params['cov_min_threshold']))
-            & (reads_profile['mc_frac'] < float(params['mc_rate_max_threshold']))]
-    else:
-        selected_reads = reads_profile[
-            (reads_profile['cov'] >= int(params['cov_min_threshold']))
-            & (reads_profile['mc_frac'] > float(params['mc_rate_min_threshold']))]
-
-    selected_reads = selected_reads['count'].sum()
-    selected_ratio = selected_reads / reads_profile['count'].sum()
-    final_stat = pd.Series({f'Final{mode}Reads': selected_reads,
-                            f'Selected{mode}ReadsRatio': selected_ratio},
-                           dtype='O', name=cell_id)
-    return final_stat
