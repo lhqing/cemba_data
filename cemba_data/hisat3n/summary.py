@@ -87,4 +87,10 @@ def snmct_summary():
     all_stats = pd.concat(all_stats, axis=1)
     all_stats.index.name = 'cell'
     all_stats.to_csv(f'MappingSummary.csv.gz')
+
+    # TODO
+    # 1. select DNA RNA summary
+    # 2. feature count summary
+    # 3. aggregate feature count this can be a separate func and call in snakefile
+
     return all_stats
