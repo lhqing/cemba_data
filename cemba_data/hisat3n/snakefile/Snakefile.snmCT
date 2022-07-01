@@ -56,11 +56,10 @@ rule summary:
         expand("allc_multi/{cell_id}.allc_multi.tsv.gz.count.csv", cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
                cell_id=CELL_IDS, mcg_context=mcg_context),
-    # TODO
-    # output:
-    #     "MappingSummary.csv.gz"
-    # run:
-    #     aggregate_hisat3n_snmct_summary()
+    output:
+        "MappingSummary.csv.gz"
+    run:
+        snmct_summary()
 
 # ==================================================
 # FASTQ Trimming

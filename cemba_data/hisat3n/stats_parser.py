@@ -89,6 +89,7 @@ def cell_parser_picard_dedup_stat(stat_path):
                 for p, k in COL_NAMES.keys()
                 if p == 'parse_picard_dedup_stat'
             },
+            dtype='int',
             name=cell_id)
     return record
 
