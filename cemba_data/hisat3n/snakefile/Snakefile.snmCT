@@ -51,6 +51,7 @@ rule summary:
         expand("rna_bam/{cell_id}.hisat3n_rna_summary.txt", cell_id=CELL_IDS),
         expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.reads_mch_frac.csv", cell_id=CELL_IDS),
         expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam.bai", cell_id=CELL_IDS),
+        expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv", cell_id=CELL_IDS),
         expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv.summary", cell_id=CELL_IDS),
         # allc
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),

@@ -69,12 +69,12 @@ def snmct_summary():
     all_stats.append(df)
 
     # uniquely mapped reads dedup
-    df = parse_single_stats_set(f'bam/*.unique_align.dna_reads.deduped.matrix.txt',
+    df = parse_single_stats_set(f'bam/*.unique_align.deduped.matrix.txt',
                                 cell_parser_picard_dedup_stat, prefix='DNAUniqueAlign')
     all_stats.append(df)
 
     # multi mapped reads dedup
-    df = parse_single_stats_set(f'bam/*.multi_align.dna_reads.deduped.matrix.txt',
+    df = parse_single_stats_set(f'bam/*.multi_align.deduped.matrix.txt',
                                 cell_parser_picard_dedup_stat, prefix='DNAMultiAlign')
     all_stats.append(df)
 
