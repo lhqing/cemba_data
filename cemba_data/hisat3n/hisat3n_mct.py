@@ -1,5 +1,7 @@
+import pathlib
 from collections import defaultdict
 
+import pandas as pd
 import pysam
 
 
@@ -211,4 +213,21 @@ def select_mct_reads_normal(input_bam,
         stat_f.write('mc_frac,cov,count\n')
         for (mc_frac, cov), count in read_profile_dict.items():
             stat_f.write(f'{mc_frac},{cov},{count}\n')
+    return
+
+
+def aggregate_feature_counts():
+    cell_datas = []
+
+    save_info = True
+    for path in pathlib.Path('rna_bam/').glob('*.feature_count.tsv'):
+        table = pd.read_csv(path, comment='#', sep='\t', index_col=0)
+        cell_data = table.iloc[:, -1].squeeze()
+        cell_data.name = cell_data.name.split(':')[-1]
+        cell_datas.append(cell_data)
+        if save_info:
+            table.iloc[:, :-1].to_csv('featureCounts.gene_info.csv.gz')
+            save_info = False
+
+    pd.DataFrame(cell_datas).to_csv('featureCounts.data.csv.gz')
     return

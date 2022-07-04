@@ -36,3 +36,19 @@ def separate_unique_and_multi_align_reads(in_bam_path,
             if unmappable_bam is not None:
                 unmappable_bam.close()
     return
+
+
+def convert_hisat_bam_strandness(in_bam_path, out_bam_path):
+    with pysam.AlignmentFile(in_bam_path) as in_bam, \
+            pysam.AlignmentFile(out_bam_path, header=in_bam.header, mode='wb') as out_bam:
+        for read in in_bam:
+            if read.get_tag('YZ') == '+':
+                read.is_forward = True
+                if read.is_paired:
+                    read.mate_is_forward = True
+            else:
+                read.is_forward = False
+                if read.is_paired:
+                    read.mate_is_forward = False
+            out_bam.write(read)
+    return

@@ -98,12 +98,16 @@ def snmct_summary():
                                 cell_parser_allc_count)
     all_stats.append(df)
 
+    # feature count
+    df = parse_single_stats_set(f'rna_bam/*.feature_count.tsv.summary',
+                                cell_parser_feature_count_summary)
+    all_stats.append(df)
+
     # concatenate all stats
     all_stats = pd.concat(all_stats, axis=1)
     all_stats.index.name = 'cell'
     all_stats.to_csv(f'MappingSummary.csv.gz')
 
     # TODO
-    # 1. feature count summary
     # 2. aggregate feature count this can be a separate func and call in snakefile
     return all_stats

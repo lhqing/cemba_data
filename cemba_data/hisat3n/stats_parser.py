@@ -17,16 +17,15 @@ def cell_parser_hisat_summary(stat_path):
     """
     cell_id = pathlib.Path(stat_path).name.split('.')[0]
     term_dict = {
-        'Total pairs': f'ReadPairsMappedInPE',
-        'Aligned concordantly or discordantly 0 time':
-            f'PEUnmappableReadPairs',
-        'Aligned concordantly 1 time': f'PEUniqueMappedReadPairs',
-        'Aligned concordantly >1 times': f'PEMultiMappedReadPairs',
-        'Aligned discordantly 1 time': f'PEDiscordantlyUniqueMappedReadPairs',
-        'Total unpaired reads': f'ReadsMappedInSE',
-        'Aligned 0 time': f'SEUnmappableReads',
-        'Aligned 1 time': f'SEUniqueMappedReads',
-        'Aligned >1 times': f'SEMultiMappedReads',
+        'Total pairs': 'ReadPairsMappedInPE',
+        'Aligned concordantly or discordantly 0 time': 'PEUnmappableReadPairs',
+        'Aligned concordantly 1 time': 'PEUniqueMappedReadPairs',
+        'Aligned concordantly >1 times': 'PEMultiMappedReadPairs',
+        'Aligned discordantly 1 time': 'PEDiscordantlyUniqueMappedReadPairs',
+        'Total unpaired reads': 'ReadsMappedInSE',
+        'Aligned 0 time': 'SEUnmappableReads',
+        'Aligned 1 time': 'SEUniqueMappedReads',
+        'Aligned >1 times': 'SEMultiMappedReads',
     }
 
     with open(stat_path) as rep:
@@ -42,9 +41,9 @@ def cell_parser_hisat_summary(stat_path):
                     ' ')[0].strip('%')
             except KeyError:
                 pass
-        for k in term_dict.keys():
-            if k not in report_dict:
-                report_dict[term_dict[k]] = 0
+        for v in term_dict.values():
+            if v not in report_dict:
+                report_dict[v] = 0
 
         report_dict = pd.Series(report_dict).astype(int)
         total_reads = report_dict[f'ReadPairsMappedInPE'] * 2 + report_dict[
@@ -203,6 +202,15 @@ def cell_parser_reads_mc_frac_profile(path):
                             f'Selected{mode}ReadsRatio': selected_ratio},
                            dtype='O', name=cell_id)
     return final_stat
+
+
+def cell_parser_feature_count_summary(path):
+    result = pd.read_csv(path, sep='\t', index_col=0).squeeze()
+    result.index.name = None
+    result.name = result.name.split(':')[-1]  # cell id
+    result['Unassigned_Total'] = result[result.index.str.startswith('Unassigned')].sum()
+    result['AssignedRNAReadsRate'] = result['Assigned'] / (result['Assigned'] + result['Unassigned_Total']) * 100
+    return result
 
 
 def parse_single_stats_set(path_pattern, parser, prefix=''):
