@@ -99,7 +99,7 @@ rule trim:
     output:
         R1=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
         R2=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
-        stats="fastq/{cell_id}.trimmed.stats.txt"
+        stats=temp("fastq/{cell_id}.trimmed.stats.txt")
     threads:
         1
     shell:
@@ -336,7 +336,7 @@ rule feature_count:
     input:
         'rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam'
     output:
-        tsv='rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv',
+        tsv=temp('rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv'),
         stats=temp('rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv.summary')
     threads:
         1

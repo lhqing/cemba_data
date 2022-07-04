@@ -59,5 +59,5 @@ COL_NAMES = {
     ('cell_parser_feature_count_summary', 'Unassigned_Overlapping_Length'): 'DELETE',
     ('cell_parser_feature_count_summary', 'Unassigned_Ambiguity'): 'DELETE',
     ('cell_parser_feature_count_summary', 'Unassigned_Total'): 'UnassignedRNAReads',
-    ('cell_parser_feature_count_summary', 'AssignedRNAReadsRatio'): 'AssignedRNAReadsRatio',
+    ('cell_parser_feature_count_summary', 'AssignedRNAReadsRate'): 'AssignedRNAReadsRate',
 }

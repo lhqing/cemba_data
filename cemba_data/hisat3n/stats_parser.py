@@ -206,10 +206,12 @@ def cell_parser_reads_mc_frac_profile(path):
 
 def cell_parser_feature_count_summary(path):
     result = pd.read_csv(path, sep='\t', index_col=0).squeeze()
+    all_reads = result.sum()
+
     result.index.name = None
     result.name = result.name.split(':')[-1]  # cell id
     result['Unassigned_Total'] = result[result.index.str.startswith('Unassigned')].sum()
-    result['AssignedRNAReadsRate'] = result['Assigned'] / (result['Assigned'] + result['Unassigned_Total']) * 100
+    result['AssignedRNAReadsRate'] = int(result['Assigned'] / all_reads * 100)
     return result
 
 
@@ -279,5 +281,5 @@ def parse_single_stats_set(path_pattern, parser, prefix=''):
     stats_df = stats_df.iloc[:, new_columns != 'DELETE'].copy()
 
     # add prefix to stats_df columns
-    stats_df.columns = stats_df.columns.map(lambda a: prefix + a)
+    stats_df.columns = stats_df.columns.map(lambda a: prefix + str(a))
     return stats_df
