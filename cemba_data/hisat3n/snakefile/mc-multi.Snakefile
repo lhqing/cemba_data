@@ -22,11 +22,10 @@ config, config_dict = read_mapping_config()
 # fastq table and cell IDs
 fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
-
 # print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
 
 mcg_context = 'CGN' if int(config.num_upstr_bases) == 0 else 'HCGN'
-repeat_index_flag = "--repeat" if config.hisat3n_index_type == 'repeat' else "--no-repeat-index"
+repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' else "--no-repeat-index"
 
 
 # ==================================================
@@ -42,23 +41,16 @@ rule summary:
         # dna mapping
         expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.reads_mch_frac.csv", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.bam.bai", cell_id=CELL_IDS),
-        # rna mapping
-        expand("rna_bam/{cell_id}.hisat3n_rna_summary.txt", cell_id=CELL_IDS),
-        expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.reads_mch_frac.csv", cell_id=CELL_IDS),
-        expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam.bai", cell_id=CELL_IDS),
-        expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv", cell_id=CELL_IDS),
-        expand("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv.summary", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt", cell_id=CELL_IDS),
         # allc
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
+        expand("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv", cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
                cell_id=CELL_IDS, mcg_context=mcg_context),
     output:
         "MappingSummary.csv.gz"
     run:
-        snmct_summary()
-        aggregate_feature_counts()
+        snmc_summary()
 
         # cleanup
         shell("rm -rf bam/temp")
@@ -106,31 +98,6 @@ rule trim:
     shell:
         "cutadapt "
         "-a R1Adapter={config.r1_adapter} "
-        "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
-        "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
-        "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
-        "-a N6_rc=GTACTCTGCGTTGATACCACTGCTT "
-        "-a 3PpolyT=TTTTTTTTTTTTTTTX "
-        "-a 3PpolyA=AAAAAAAAAAAAAAAX "
-        "-a polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
-        "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
-        "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
-        "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
-        "-A R2Adapter={config.r2_adapter} "
-        "-A TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
-        "-A TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
-        "-A N6=AAGCAGTGGTATCAACGCAGAGTAC "
-        "-A N6_rc=GTACTCTGCGTTGATACCACTGCTT "
-        "-A 3PpolyT=TTTTTTTTTTTTTTTX "
-        "-A 3PpolyA=AAAAAAAAAAAAAAAX "
-        "-A polyTLong=TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT "
-        "-A polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
-        "-A ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
-        "-A ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
-        "-g 5PpolyT=XTTTTTTTTTTTTTTT "
-        "-g 5PpolyA=XAAAAAAAAAAAAAAA "
-        "-G 5PpolyT=XTTTTTTTTTTTTTTT "
-        "-G 5PpolyA=XAAAAAAAAAAAAAAA "
         "--report=minimal "
         "-O 6 "
         "-q 20 "
@@ -165,7 +132,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         mem_mb=8000
     shell:
         "hisat-3n "
-        "{config.hisat_dna_reference} "
+        "{config.hisat3n_dna_reference} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -180,10 +147,10 @@ rule hisat_3n_pairend_mapping_dna_mode:
         "--threads {threads} "
         "| "
         "samtools view "
-        "-b -q 10 -o {output.bam}"  # -q 10 will filter out multi-aligned reads
+        "-b -q 1 -o {output.bam}"
 
 
-rule sort_dna_bam:
+rule sort_bam:
     input:
         "bam/{cell_id}.hisat3n_dna.unsort.bam"
     output:
@@ -200,7 +167,7 @@ rule convert_bam_strandness:
     input:
         bam="bam/{cell_id}.hisat3n_dna.bam"
     output:
-        bam=temp("bam/{cell_id}.hisat3n_dna.unique_align.bam")
+        bam=temp("bam/{cell_id}.hisat3n_dna.stranded.bam")
     threads:
         1
     run:
@@ -208,12 +175,32 @@ rule convert_bam_strandness:
                                      out_bam_path=output.bam)
 
 
+# Separate unique aligned reads and multi-aligned reads with length > 30
+# TODO: make sure how to separate multi-align reads? or reads map to repeat regions in the genome?
+# TODO right now, we are just using mapq == 1 as multi-align reads, but this might not be right
+rule split_unique_and_multi_align_bam_dna:
+    input:
+        bam="bam/{cell_id}.hisat3n_dna.stranded.bam"
+    output:
+        unique=temp("bam/{cell_id}.hisat3n_dna.unique_align.bam"),
+        multi=temp("bam/{cell_id}.hisat3n_dna.multi_align.bam")
+    run:
+        separate_unique_and_multi_align_reads(
+            in_bam_path=input.bam,
+            out_unique_path=output.unique,
+            out_multi_path=output.multi,
+            out_unmappable_path=None,
+            mapq_cutoff=10,
+            qlen_cutoff=30
+        )
+
+
 # remove PCR duplicates
 rule dedup_unique_bam:
     input:
         "bam/{cell_id}.hisat3n_dna.unique_align.bam"
     output:
-        bam=temp("bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam"),
+        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam",
         stats=temp("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt")
     resources:
         mem_mb=1000
@@ -224,129 +211,37 @@ rule dedup_unique_bam:
         "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
 
 
-rule select_unique_bam_dna_reads:
+rule dedup_multi_bam:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam"
+        "bam/{cell_id}.hisat3n_dna.multi_align.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.bam",
-        stats=temp("bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.reads_mch_frac.csv")
+        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam",
+        stats=temp("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt")
     resources:
-        mem_mb=100
-    run:
-        select_mct_reads_normal(
-            input_bam=input.bam,
-            output_bam=output.bam,
-            mode='dna',
-            mc_rate_max_threshold=0.5,
-            cov_min_threshold=3,
-            nome=False
-        )
+        mem_mb=1000
+    threads:
+        2
+    shell:
+        "picard MarkDuplicates I={input} O={output.bam} M={output.stats} "
+        "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
 
 
 rule index_unique_bam_dna_reads:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.bam"
+        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam"
     output:
-        bai="bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.bam.bai"
+        bai="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam.bai"
     shell:
         "samtools index {input.bam}"
 
 
-# ==================================================
-# HISAT-3N RNA Mapping
-# ==================================================
-
-
-# Paired-end Hisat3n mapping using RNA mode
-rule hisat_3n_pairend_mapping_rna_mode:
+rule index_multi_bam_dna_reads:
     input:
-        R1="fastq/{cell_id}-R1.trimmed.fq.gz",
-        R2="fastq/{cell_id}-R2.trimmed.fq.gz"
+        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam"
     output:
-        bam="rna_bam/{cell_id}.hisat3n_rna.unsort.bam",
-        stats=temp("rna_bam/{cell_id}.hisat3n_rna_summary.txt")
-    threads:
-        8
-    resources:
-        mem_mb=8000
-    shell:
-        "hisat-3n "
-        "-x {config.hisat_rna_reference} "
-        "-q "
-        "-1 {input.R1} "
-        "-2 {input.R2} "
-        "--base-change C,T "
-        "{repeat_index_flag} "
-        "-t "
-        "--new-summary "
-        "--summary-file {output.stats} "
-        "--threads {threads} "
-        "| "
-        "samtools addreplacerg "  # add read group @RG to the reads in order to use featuerCounts
-        "-r '@RG\tID:{wildcards.cell_id}' -u -o - -"
-        "| "
-        "samtools view "
-        "-b -q 10 -o {output.bam}"  # -q 10 will filter out multi-aligned reads
-
-
-rule sort_rna_bam:
-    input:
-        "rna_bam/{cell_id}.hisat3n_rna.unsort.bam"
-    output:
-        temp("rna_bam/{cell_id}.hisat3n_rna.bam")
-    resources:
-        mem_mb=1000
-    threads:
-        1
-    shell:
-        "samtools sort -O BAM -o {output} {input}"
-
-
-# skip dedup step for RNA reads
-
-
-rule select_unique_bam_rna_reads:
-    input:
-        bam="rna_bam/{cell_id}.hisat3n_rna.bam"
-    output:
-        bam="rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam",
-        stats=temp("rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.reads_mch_frac.csv")
-    resources:
-        mem_mb=100
-    run:
-        select_mct_reads_normal(
-            input_bam=input.bam,
-            output_bam=output.bam,
-            mode='rna',
-            mc_rate_min_threshold=0.9,
-            cov_min_threshold=3,
-            nome=False
-        )
-
-
-rule index_unique_bam_rna_reads:
-    input:
-        bam="rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam"
-    output:
-        bai="rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam.bai"
+        bai="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam.bai"
     shell:
         "samtools index {input.bam}"
-
-
-rule feature_count:
-    input:
-        'rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.bam'
-    output:
-        tsv=temp('rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv'),
-        stats=temp('rna_bam/{cell_id}.hisat3n_rna.unique_align.rna_reads.feature_count.tsv.summary')
-    threads:
-        1
-    resources:
-        mem_mb=1000
-    shell:
-        'featureCounts -t {config.feature_type} -g {config.id_type} ' \
-        '-a {config.gtf_path} -o {output.tsv} --byReadGroup -T {threads} {input}'
-
 
 
 # ==================================================
@@ -357,7 +252,8 @@ rule feature_count:
 # generate ALLC
 rule unique_reads_allc:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.dna_reads.bam"
+        bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam",
+        bai="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam.bai"
     output:
         allc="allc/{cell_id}.allc.tsv.gz",
         stats=temp("allc/{cell_id}.allc.tsv.gz.count.csv")
@@ -370,7 +266,6 @@ rule unique_reads_allc:
         '--bam_path {input.bam} '
         '--reference_fasta {config.reference_fasta} '
         '--output_path {output.allc} '
-        '--cpu {threads} '
         '--num_upstr_bases {config.num_upstr_bases} '
         '--num_downstr_bases {config.num_downstr_bases} '
         '--compress_level {config.compress_level} '
@@ -396,4 +291,28 @@ rule unique_reads_cgn_extraction:
         '--allc_path  {input} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {config.chrom_sizes_file} '
+        '--chrom_size_path {config.chrom_size_path} '
+
+
+# generate ALLC
+rule multi_reads_allc:
+    input:
+        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam",
+        bai="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam.bai"
+    output:
+        allc="allc-multi/{cell_id}.allc_multi.tsv.gz",
+        stats=temp("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv")
+    threads:
+        1.5
+    resources:
+        mem_mb=500
+    shell:
+        'allcools bam-to-allc '
+        '--bam_path {input.bam} '
+        '--reference_fasta {config.reference_fasta} '
+        '--output_path {output.allc} '
+        '--num_upstr_bases {config.num_upstr_bases} '
+        '--num_downstr_bases {config.num_downstr_bases} '
+        '--compress_level {config.compress_level} '
+        '--save_count_df '
+        '--min_mapq 0 '  # for multi-mapped reads, skip mapq filter

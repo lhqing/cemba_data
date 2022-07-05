@@ -13,6 +13,7 @@ import cemba_data
 from .fastq_dataframe import make_fastq_dataframe
 from ..mapping.pipelines import make_snakefile, prepare_run, validate_mapping_config
 from ..utilities import snakemake, get_configuration
+from ..hisat3n import make_snakefile_hisat3n
 
 # logger
 log = logging.getLogger(__name__)
@@ -424,7 +425,7 @@ def _reformat_v2_single(output_dir):
 SUPPORTED_TECHNOLOGY = ['mc', 'mct', 'm3c']
 
 
-def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
+def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu, aligner):
     cpu = int(cpu)
     merge_cpu = min(48, cpu)
     demultiplex_cpu = min(32, cpu)
@@ -439,11 +440,13 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
         (output_dir / 'stats').mkdir()
 
     config = get_configuration(config_path)
-    new_config_path = output_dir / 'mapping_config.ini'
+    suffix = pathlib.Path(config_path).name.split('.')[-1]
+    new_config_path = output_dir / f'mapping_config.{suffix}'
     subprocess.run(f'cp {config_path} {new_config_path}',
                    shell=True,
                    check=True)
     barcode_version = config['barcode_version']
+
     # validate config file first before demultiplex
     validate_mapping_config(output_dir)
 
@@ -459,12 +462,18 @@ def demultiplex_pipeline(fastq_pattern, output_dir, config_path, cpu):
         print('Reformat directories to separate multiplex groups')
         _reformat_v2_single(output_dir=output_dir)
     _skip_abnormal_fastq_pairs(output_dir=output_dir)
-    make_snakefile(output_dir=output_dir)
 
-    # this is just a convenient step, so I fix the parameters here
-    # users should change the resulting batch submission
-    # or generate by themselves if they want different setting.
-    prepare_run(output_dir)
+    if aligner.lower() == 'bismark':
+        make_snakefile(output_dir=output_dir)
+
+        # this is just a convenient step, so I fix the parameters here
+        # users should change the resulting batch submission
+        # or generate by themselves if they want different setting.
+        prepare_run(output_dir)
+    elif aligner.lower() in ('hisat3n', 'hisat-3n', 'hisat_3n', 'hisat'):
+        make_snakefile_hisat3n(output_dir=output_dir)
+    else:
+        ValueError(f'Unsupported aligner {aligner}, aligner must be either "hisat3n" or "bismark"')
     return
 
 
@@ -472,6 +481,11 @@ def update_snakemake(output_dir):
     """When mapping_config.ini is updated, or the output_dir path changed,
     use this function to update snakefile and snakemake commands."""
     output_dir = pathlib.Path(output_dir).absolute()
-    make_snakefile(output_dir=output_dir)
-    prepare_run(output_dir)
+
+    if pathlib.Path(output_dir / 'snakemake/hisat3n').exists():
+        # hisat3n pipeline
+        make_snakefile_hisat3n(output_dir=output_dir)
+    else:
+        make_snakefile(output_dir=output_dir)
+        prepare_run(output_dir)
     return

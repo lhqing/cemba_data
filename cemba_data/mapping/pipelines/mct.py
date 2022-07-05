@@ -30,6 +30,9 @@ def mct_config_str(config):
         'r1_adapter': 'AGATCGGAAGAGCACACGTCTGAAC',
         'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
         'bismark_reference': 'required',
+        'hisat3n_dna_reference': 'required',
+        'hisat3n_rna_reference': 'required',
+        'hisat3n_repeat_index_type': 'no-repeat',
         'reference_fasta': 'required',
         'star_reference': 'required',
         'gtf_path': 'required',
@@ -37,6 +40,9 @@ def mct_config_str(config):
         'id_type': 'gene_id',
         'nome_flag_str': 'required'
     }
+    if 'hisat3n_dna_reference' in config:
+        del str_parameters['bismark_reference']
+        del str_parameters['star_reference']
 
     typed_config = {}
     for k, default in int_parameters.items():

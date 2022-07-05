@@ -312,6 +312,14 @@ def demultiplex_register_subparser(subparser):
         help="Number of cores to use. Note that the demultiplex step will only use at most 32 cores, "
              "the merge lane step will use the number of cores you provided."
     )
+
+    parser_req.add_argument(
+        "--aligner",
+        type=str,
+        required=True,
+        choices=['bismark', 'hisat3n'],
+        help="Choice of aligner and corresponding mapping pipelines."
+    )
     return
 
 
@@ -359,9 +367,24 @@ def print_default_config_register_subparser(subparser):
     parser.add_argument(
         "--bismark_ref",
         type=str,
-        required=True,
+        required=False,
         help="Path to the bismark reference"
     )
+
+    parser.add_argument(
+        "--hisat3n_dna_ref",
+        type=str,
+        required=False,
+        help="Path to the hisat-3n DNA reference"
+    )
+
+    parser.add_argument(
+        "--hisat3n_rna_ref",
+        type=str,
+        required=False,
+        help="Path to the hisat-3n RNA reference"
+    )
+
 
     parser.add_argument(
         "--genome_fasta",

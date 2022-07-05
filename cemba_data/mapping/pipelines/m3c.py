@@ -27,11 +27,15 @@ def m3c_config_str(config):
         'r1_adapter': 'AGATCGGAAGAGCACACGTCTGAAC',
         'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
         'bismark_reference': 'required',
+        'hisat3n_dna_reference': 'required',
+        'hisat3n_repeat_index_type': 'no-repeat',
         'reference_fasta': 'required',
         'mc_stat_feature': 'CHN CGN CCC',
         'mc_stat_alias': 'mCH mCG mCCC',
         'chrom_size_path': 'required'
     }
+    if 'hisat3n_dna_reference' in config:
+        del str_parameters['bismark_reference']
 
     typed_config = {}
     for k, default in int_parameters.items():

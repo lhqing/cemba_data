@@ -1,4 +1,8 @@
 import pysam
+import pathlib
+import cemba_data
+import subprocess
+from ..utilities import get_configuration
 
 
 def separate_unique_and_multi_align_reads(in_bam_path,
@@ -51,4 +55,39 @@ def convert_hisat_bam_strandness(in_bam_path, out_bam_path):
                 if read.is_paired:
                     read.mate_is_forward = False
             out_bam.write(read)
+    return
+
+
+def make_snakefile_hisat3n(output_dir):
+    output_dir = pathlib.Path(output_dir)
+
+    mapping_config_name = list(output_dir.glob('mapping_config.*'))[0].name
+
+    config = get_configuration(output_dir / mapping_config_name)
+    try:
+        mode = config['mode']
+    except KeyError:
+        raise KeyError('mode not found in the config file.')
+
+    mapping_job_dirs = [p for p in output_dir.glob('*') if p.is_dir()]
+
+    snakemake_dir = output_dir / 'snakemake'
+    snakemake_dir.mkdir(exist_ok=True)
+    stats_dir = output_dir / 'stats'
+    stats_dir.mkdir(exist_ok=True)
+
+    package_dir = cemba_data.__path__[0]
+    snakefile_path = f'{package_dir}/hisat3n/snakefile/{mode.lower()}.Snakefile'
+    if not pathlib.Path(snakefile_path).exists():
+        print('Possible snakefile templates:')
+        for p in pathlib.Path(f'{package_dir}/hisat3n/snakefile/').glob('Snakefile.*'):
+            print(p)
+        raise ValueError(f'Mode {mode} not supported, because Snakefile {snakefile_path} not found.')
+
+    for p in mapping_job_dirs:
+        subprocess.run(['cp', f'{output_dir}/{mapping_config_name}', f'{p}/{mapping_config_name}'], check=True)
+        subprocess.run(['cp', snakefile_path, f'{p}/Snakefile'], check=True)
+
+    # leave a flag to indicate using hisat-3n pipeline
+    subprocess.run(['touch', f'{output_dir}/snakemake/hisat3n'], check=True)
     return

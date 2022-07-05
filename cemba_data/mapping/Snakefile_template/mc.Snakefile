@@ -197,4 +197,4 @@ rule cgn_extraction:
         '--allc_path  {input} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {chrom_sizes_file} '
+        '--chrom_size_path {chrom_size_path} '

@@ -211,7 +211,7 @@ def cell_parser_feature_count_summary(path):
     result.index.name = None
     result.name = result.name.split(':')[-1]  # cell id
     result['Unassigned_Total'] = result[result.index.str.startswith('Unassigned')].sum()
-    result['AssignedRNAReadsRate'] = int(result['Assigned'] / all_reads * 100)
+    result['AssignedRNAReadsRate'] = int(result['Assigned'] / (all_reads + 0.00001) * 100)
     return result
 
 

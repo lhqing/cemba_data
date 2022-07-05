@@ -26,7 +26,7 @@ CELL_IDS = fastq_table.index.tolist()
 # print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
 
 mcg_context = 'CGN' if int(config.num_upstr_bases) == 0 else 'HCGN'
-repeat_index_flag = "--repeat" if config.hisat3n_index_type == 'repeat' else "--no-repeat-index"
+repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' else "--no-repeat-index"
 
 
 # ==================================================
@@ -169,7 +169,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         mem_mb=8000
     shell:
         "hisat-3n "
-        "{config.hisat_dna_reference} "
+        "{config.hisat3n_dna_reference} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -338,7 +338,7 @@ rule hisat_3n_pairend_mapping_rna_mode:
         mem_mb=8000
     shell:
         "hisat-3n "
-        "-x {config.hisat_rna_reference} "
+        "-x {config.hisat3n_rna_reference} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -463,7 +463,7 @@ rule unique_reads_cgn_extraction:
         '--allc_path  {input} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {config.chrom_sizes_file} '
+        '--chrom_size_path {config.chrom_size_path} '
 
 
 # generate ALLC

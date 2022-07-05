@@ -36,6 +36,9 @@ def _4m_config_str(config):
         'bismark_reference': 'required',
         'reference_fasta': 'required',
         'star_reference': 'required',
+        'hisat3n_dna_reference': 'required',
+        'hisat3n_rna_reference': 'required',
+        'hisat3n_repeat_index_type': 'no-repeat',
         'gtf_path': 'required',
         'feature_type': 'gene',
         'id_type': 'gene_id',
@@ -44,6 +47,9 @@ def _4m_config_str(config):
         'chrom_size_path': 'required',
         'nome_flag_str': '--nome'
     }
+    if 'hisat3n_dna_reference' in config:
+        del str_parameters['bismark_reference']
+        del str_parameters['star_reference']
 
     typed_config = {}
     for k, default in int_parameters.items():
