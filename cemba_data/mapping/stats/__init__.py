@@ -135,3 +135,5 @@ def final_summary(output_dir, cleanup=True, notebook=None):
         for path in path_to_remove:
             subprocess.run(['rm', '-rf', str(path)], check=True)
     return
+
+

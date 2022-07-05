@@ -69,7 +69,8 @@ def make_snakefile_hisat3n(output_dir):
     except KeyError:
         raise KeyError('mode not found in the config file.')
 
-    mapping_job_dirs = [p for p in output_dir.glob('*') if p.is_dir()]
+    skip_dirs = ['stats', 'snakemake', 'scool']
+    mapping_job_dirs = [p for p in output_dir.glob('*') if p.is_dir() and (p.name not in skip_dirs)]
 
     snakemake_dir = output_dir / 'snakemake'
     snakemake_dir.mkdir(exist_ok=True)
