@@ -153,7 +153,7 @@ rule sort_bam:
     input:
         "bam/{cell_id}.hisat3n_dna.unsort.bam"
     output:
-        temp("bam/{cell_id}.hisat3n_dna.bam")
+        temp("bam/{cell_id}.hisat3n_dna.unique_align.bam")
     resources:
         mem_mb=1000
     threads:
@@ -162,22 +162,10 @@ rule sort_bam:
         "samtools sort -O BAM -o {output} {input}"
 
 
-rule convert_bam_strandness:
-    input:
-        bam="bam/{cell_id}.hisat3n_dna.bam"
-    output:
-        bam=temp("bam/{cell_id}.hisat3n_dna.stranded.bam")
-    threads:
-        1
-    run:
-        convert_hisat_bam_strandness(in_bam_path=input.bam,
-                                     out_bam_path=output.bam)
-
-
 # remove PCR duplicates
 rule dedup_unique_bam:
     input:
-        "bam/{cell_id}.hisat3n_dna.stranded.bam"
+        "bam/{cell_id}.hisat3n_dna.unique_align.bam"
     output:
         bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam",
         stats=temp("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt")
@@ -224,7 +212,8 @@ rule unique_reads_allc:
         '--num_upstr_bases {config.num_upstr_bases} '
         '--num_downstr_bases {config.num_downstr_bases} '
         '--compress_level {config.compress_level} '
-        '--save_count_df'
+        '--save_count_df '
+        '--convert_bam_strandness '
 
 
 # CGN extraction from ALLC

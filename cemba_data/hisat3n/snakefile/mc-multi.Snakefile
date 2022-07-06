@@ -163,24 +163,12 @@ rule sort_bam:
         "samtools sort -O BAM -o {output} {input}"
 
 
-rule convert_bam_strandness:
-    input:
-        bam="bam/{cell_id}.hisat3n_dna.bam"
-    output:
-        bam=temp("bam/{cell_id}.hisat3n_dna.stranded.bam")
-    threads:
-        1
-    run:
-        convert_hisat_bam_strandness(in_bam_path=input.bam,
-                                     out_bam_path=output.bam)
-
-
 # Separate unique aligned reads and multi-aligned reads with length > 30
 # TODO: make sure how to separate multi-align reads? or reads map to repeat regions in the genome?
 # TODO right now, we are just using mapq == 1 as multi-align reads, but this might not be right
 rule split_unique_and_multi_align_bam_dna:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.stranded.bam"
+        bam="bam/{cell_id}.hisat3n_dna.bam"
     output:
         unique=temp("bam/{cell_id}.hisat3n_dna.unique_align.bam"),
         multi=temp("bam/{cell_id}.hisat3n_dna.multi_align.bam")
@@ -269,7 +257,8 @@ rule unique_reads_allc:
         '--num_upstr_bases {config.num_upstr_bases} '
         '--num_downstr_bases {config.num_downstr_bases} '
         '--compress_level {config.compress_level} '
-        '--save_count_df'
+        '--save_count_df '
+        '--convert_bam_strandness '
 
 
 # CGN extraction from ALLC
@@ -316,3 +305,4 @@ rule multi_reads_allc:
         '--compress_level {config.compress_level} '
         '--save_count_df '
         '--min_mapq 0 '  # for multi-mapped reads, skip mapq filter
+        '--convert_bam_strandness '
