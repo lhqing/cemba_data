@@ -183,6 +183,13 @@ def cell_parser_reads_mc_frac_profile(path):
             else:
                 break
 
+    params['mc_rate_max_threshold'] = float(params['mc_rate_max_threshold'])
+    if params['mc_rate_max_threshold'] <= 1:
+        params['mc_rate_max_threshold'] *= 100
+    params['mc_rate_min_threshold'] = float(params['mc_rate_min_threshold'])
+    if params['mc_rate_min_threshold'] <= 1:
+        params['mc_rate_min_threshold'] *= 100
+
     path = pathlib.Path(path)
     cell_id = path.name.split('.')[0]
     reads_profile = pd.read_csv(path, comment='#')
