@@ -183,6 +183,8 @@ def cell_parser_reads_mc_frac_profile(path):
             else:
                 break
 
+    params['cov_min_threshold'] = int(params['cov_min_threshold'])
+    # the mc_frac col in stats file is in %
     params['mc_rate_max_threshold'] = float(params['mc_rate_max_threshold'])
     if params['mc_rate_max_threshold'] <= 1:
         params['mc_rate_max_threshold'] *= 100
@@ -196,12 +198,12 @@ def cell_parser_reads_mc_frac_profile(path):
     mode = params['mode'].upper()
     if mode == 'DNA':
         selected_reads = reads_profile[
-            (reads_profile['cov'] >= int(params['cov_min_threshold']))
-            & (reads_profile['mc_frac'] < float(params['mc_rate_max_threshold']))]
+            (reads_profile['cov'] >= params['cov_min_threshold'])
+            & (reads_profile['mc_frac'] < params['mc_rate_max_threshold'])]
     else:
         selected_reads = reads_profile[
-            (reads_profile['cov'] >= int(params['cov_min_threshold']))
-            & (reads_profile['mc_frac'] > float(params['mc_rate_min_threshold']))]
+            (reads_profile['cov'] >= params['cov_min_threshold'])
+            & (reads_profile['mc_frac'] > params['mc_rate_min_threshold'])]
 
     selected_reads = selected_reads['count'].sum()
     selected_ratio = selected_reads / (reads_profile['count'].sum() + 0.0001)
