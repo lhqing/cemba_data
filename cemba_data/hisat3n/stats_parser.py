@@ -185,12 +185,18 @@ def cell_parser_reads_mc_frac_profile(path):
 
     params['cov_min_threshold'] = int(params['cov_min_threshold'])
     # the mc_frac col in stats file is in %
-    params['mc_rate_max_threshold'] = float(params['mc_rate_max_threshold'])
-    if params['mc_rate_max_threshold'] <= 1:
-        params['mc_rate_max_threshold'] *= 100
-    params['mc_rate_min_threshold'] = float(params['mc_rate_min_threshold'])
-    if params['mc_rate_min_threshold'] <= 1:
-        params['mc_rate_min_threshold'] *= 100
+    try:
+        params['mc_rate_max_threshold'] = float(params['mc_rate_max_threshold'])
+        if params['mc_rate_max_threshold'] <= 1:
+            params['mc_rate_max_threshold'] *= 100
+    except ValueError:
+        pass
+    try:
+        params['mc_rate_min_threshold'] = float(params['mc_rate_min_threshold'])
+        if params['mc_rate_min_threshold'] <= 1:
+            params['mc_rate_min_threshold'] *= 100
+    except ValueError:
+        pass
 
     path = pathlib.Path(path)
     cell_id = path.name.split('.')[0]
