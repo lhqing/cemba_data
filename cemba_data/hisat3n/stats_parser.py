@@ -205,11 +205,11 @@ def cell_parser_reads_mc_frac_profile(path):
     if mode == 'DNA':
         selected_reads = reads_profile[
             (reads_profile['cov'] >= params['cov_min_threshold'])
-            & (reads_profile['mc_frac'] < params['mc_rate_max_threshold'])]
+            & (reads_profile['mc_frac'] <= params['mc_rate_max_threshold'])]
     else:
         selected_reads = reads_profile[
             (reads_profile['cov'] >= params['cov_min_threshold'])
-            & (reads_profile['mc_frac'] > params['mc_rate_min_threshold'])]
+            & (reads_profile['mc_frac'] >= params['mc_rate_min_threshold'])]
 
     selected_reads = selected_reads['count'].sum()
     selected_ratio = selected_reads / (reads_profile['count'].sum() + 0.0001)

@@ -47,7 +47,7 @@ def summary_rna_mapping(output_dir):
 def summarize_select_dna_reads(output_dir,
                                config):
     bam_dir = pathlib.Path(output_dir) / 'bam'
-    mc_rate_max_threshold = float(config['mc_rate_max_threshold'])
+    mc_rate_max_threshold = float(config['mc_rate_max_threshold']) * 100
     cov_min_threshold = float(config['dna_cov_min_threshold'])
 
     records = []
