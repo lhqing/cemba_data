@@ -98,6 +98,7 @@ rule trim:
     shell:
         "cutadapt "
         "-a R1Adapter={config.r1_adapter} "
+        "-A R2Adapter={config.r2_adapter} "
         "--report=minimal "
         "-O 6 "
         "-q 20 "
@@ -136,7 +137,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
-        # "--directional-mapping "  # this can speed up 2X as the snmC reads are directional
+        "--directional-mapping-reverse "  # this can speed up 2X as the snmC reads are directional
         "--base-change C,T "
         "{repeat_index_flag} "
         "--no-spliced-alignment "  # this is important for DNA mapping
