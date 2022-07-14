@@ -288,73 +288,6 @@ def split_read_internal_subparser(subparser):
     )
 
 
-def split_reads_new_internal_subparser(subparser):
-    parser = subparser.add_parser('m3c-split-reads-new',
-                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Split unmapped reads for remap in snm3C-seq data")
-
-    parser_req = parser.add_argument_group("Required inputs")
-
-    parser_req.add_argument(
-        "--fastq_path",
-        type=str,
-        required=True,
-        help="Input fastq path"
-    )
-
-    parser_req.add_argument(
-        "--output_path",
-        type=str,
-        required=True,
-        help="Output fastq path"
-    )
-
-    parser_req.add_argument(
-        "--read_type",
-        type=str,
-        required=True,
-        choices=['R1', 'R2'],
-        help="Read type, R1 or R2"
-    )
-
-    parser_req.add_argument(
-        "--min_length",
-        type=int,
-        default=30,
-        help="Minimum size of the middle part"
-    )
-
-
-def process_3c_bam_internal_subparser(subparser):
-    parser = subparser.add_parser('process-3c-bam',
-                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                  help="Process split reads 3C bam file to get non-overlap "
-                                       "read parts for ALLC and contacts for 3C")
-
-    parser_req = parser.add_argument_group("Required inputs")
-
-    parser_req.add_argument(
-        "--bam_path",
-        type=str,
-        required=True,
-        help="Input bam path"
-    )
-
-    parser_req.add_argument(
-        "--bam_prefix",
-        type=str,
-        required=True,
-        help="Output prefix for bam part"
-    )
-
-    parser_req.add_argument(
-        "--contact_prefix",
-        type=str,
-        required=True,
-        help="Output prefix for contact table part"
-    )
-
-
 def generate_contacts_internal_subparser(subparser):
     parser = subparser.add_parser('generate-contacts',
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -637,8 +570,6 @@ def dmrseq_internal_subparser(subparser):
     return
 
 
-
-
 def internal_main():
     parser = argparse.ArgumentParser(description=DESCRIPTION,
                                      epilog=EPILOG,
@@ -687,10 +618,6 @@ def internal_main():
         from .mapping.stats import mapping_stats as func
     elif cur_command == 'm3c-split-reads':
         from .mapping.m3c import split_fastq_reads as func
-    elif cur_command == 'm3c-split-reads-new':
-        from .mapping.m3c.splite_reads_new import split_reads as func
-    elif cur_command == 'process-3c-bam':
-        from .mapping.m3c.process_bam_new import process_3c_bam as func
     elif cur_command == 'generate-contacts':
         from .mapping.m3c import generate_contacts as func
     elif cur_command == 'dss-two':

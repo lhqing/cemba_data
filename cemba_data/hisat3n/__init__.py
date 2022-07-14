@@ -5,3 +5,7 @@ from .hisat3n_general import \
 from .utilities import validate_cwd_fastq_paths, read_mapping_config
 from .hisat3n_mct import select_mct_reads_normal, aggregate_feature_counts
 from .summary import snmc_summary, snmct_summary
+from .hisat3n_m3c import \
+    split_hisat3n_unmapped_reads, \
+    call_chromatin_contacts, \
+    remove_overlap_read_parts

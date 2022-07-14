@@ -5,23 +5,73 @@ import subprocess
 from ..utilities import get_configuration
 
 
+def bam_read_to_fastq_read(read):
+    if read.is_read1:
+        read_type = '1'
+    else:
+        read_type = '2'
+
+    fastq_record = f"@{read.qname}_{read_type}\n" \
+                   f"{read.query_sequence}\n" \
+                   f"+\n" \
+                   f"{read.qual}\n"
+    return fastq_record
+
+
 def separate_unique_and_multi_align_reads(in_bam_path,
                                           out_unique_path,
                                           out_multi_path,
                                           out_unmappable_path=None,
+                                          unmappable_format='auto',
                                           mapq_cutoff=10,
                                           qlen_cutoff=30):
-    # TODO: make sure how to separate multi-align reads? or reads map to repeat regions in the genome?
-    # TODO right now, we are just using mapq == 1 as multi-align reads, but this might not be right
+    """
+    Separate unique aligned, multi-aligned, and unaligned reads from hisat-3n bam file.
+
+    Parameters
+    ----------
+    in_bam_path
+        Path to hisat-3n bam file.
+    out_unique_path
+        Path to output unique aligned bam file.
+    out_multi_path
+        Path to output multi-aligned bam file.
+    out_unmappable_path
+        Path to output unmappable file.
+    unmappable_format
+        Format of unmappable file, only "bam" and "fastq" supported.
+    mapq_cutoff
+        MAPQ cutoff for uniquely aligned reads,
+        note that for hisat-3n, unique aligned reads always have MAPQ=60
+    qlen_cutoff
+        read length cutoff for any reads
+    Returns
+    -------
+    None
+    """
+    if out_unmappable_path is not None:
+        if unmappable_format == 'auto':
+            if out_unmappable_path.endswith('.bam'):
+                unmappable_format = 'bam'
+            elif out_unmappable_path.endswith('.fastq'):
+                unmappable_format = 'fastq'
+            else:
+                raise ValueError(f'Unmappable format {unmappable_format} not supported.')
+        else:
+            if unmappable_format not in ['bam', 'fastq']:
+                raise ValueError(f'Unmappable format {unmappable_format} not supported.')
 
     with pysam.AlignmentFile(in_bam_path, index_filename=None) as bam:
         header = bam.header
         with pysam.AlignmentFile(out_unique_path, header=header, mode='wb') as unique_bam, \
                 pysam.AlignmentFile(out_multi_path, header=header, mode='wb') as multi_bam:
             if out_unmappable_path is not None:
-                unmappable_bam = pysam.AlignmentFile(out_unmappable_path, header=header, mode='wb')
+                if unmappable_format == 'bam':
+                    unmappable_file = pysam.AlignmentFile(out_unmappable_path, header=header, mode='wb')
+                else:
+                    unmappable_file = open(out_unmappable_path, 'w')
             else:
-                unmappable_bam = None
+                unmappable_file = None
 
             for read in bam:
                 # skip reads that are too short
@@ -34,11 +84,14 @@ def separate_unique_and_multi_align_reads(in_bam_path,
                     multi_bam.write(read)
                 else:
                     # unmappable reads
-                    if unmappable_bam is not None:
-                        unmappable_bam.write(read)
+                    if unmappable_file is not None:
+                        if unmappable_format == 'bam':
+                            unmappable_file.write(read)
+                        else:
+                            unmappable_file.write(bam_read_to_fastq_read(read))
 
-            if unmappable_bam is not None:
-                unmappable_bam.close()
+            if unmappable_file is not None:
+                unmappable_file.close()
     return
 
 
