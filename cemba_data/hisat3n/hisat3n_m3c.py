@@ -550,6 +550,7 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
 
 
 def call_chromatin_contacts(bam_path: str,
+                            contact_prefix: str,
                             dedup_contact: bool = True,
                             save_hic_format: bool = True):
     """
@@ -559,6 +560,8 @@ def call_chromatin_contacts(bam_path: str,
     ----------
     bam_path : str
         Path to 3C bam file.
+    contact_prefix: str
+        Prefix of output contact file.
     dedup_contact : bool, optional
         Whether to deduplicate contacts.
     save_hic_format : bool, optional
@@ -568,8 +571,6 @@ def call_chromatin_contacts(bam_path: str,
     -------
 
     """
-    contact_prefix = re.sub('.bam$', '', bam_path)
-
     with pysam.AlignmentFile(bam_path) as bam, \
             ContactWriter(contact_prefix) as out_contacts:
         count = 0

@@ -41,8 +41,9 @@ rule summary:
         # dna mapping
         expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.split_reads.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv", cell_id=CELL_IDS),
         expand("bam/{cell_id}.hisat3n_dna.all_reads.deduped.matrix.txt", cell_id=CELL_IDS),
+        # 3C contacts
+        expand("hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv", cell_id=CELL_IDS),
         # allc
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
@@ -264,12 +265,14 @@ rule call_chromatin_contacts:
     input:
         bam="bam/{cell_id}.hisat3n_dna.all_reads.name_sort.bam"
     output:
-        contacts="bam/{cell_id}.hisat3n_dna.all_reads.raw_contacts.tsv",
-        stats="bam/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv"
+        stats="hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv"
+    params:
+        contact_prefix=lambda wildcards: f"hic/{wildcards.cell_id}.hisat3n_dna.all_reads",
     threads:
         1
     run:
         call_chromatin_contacts(bam_path=input.bam,
+                                contact_prefix=params.contact_prefix,
                                 dedup_contact=True,
                                 save_hic_format=True)
 
