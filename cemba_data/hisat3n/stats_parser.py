@@ -230,6 +230,27 @@ def cell_parser_feature_count_summary(path):
     return result
 
 
+def cell_parser_call_chromatin_contacts(path):
+    path = pathlib.Path(path)
+    contact_stats = pd.read_csv(
+        path,
+        header=None,
+        index_col=0).squeeze()
+    contact_stats.name = path.name.split('.')[0]
+
+    # add some calculated columns
+    contact_stats['TotalCisContacts'] = contact_stats[contact_stats.index.str.startswith('cis')].sum()
+    contact_stats['TotalTransContacts'] = contact_stats[contact_stats.index.str.startswith('trans')].sum()
+    contact_stats['TotalMultiContacts'] = contact_stats[contact_stats.index.str.endswith('_multi')].sum()
+    contact_stats['CisContactsRatio'] = contact_stats['TotalCisContacts'] / \
+                                        (contact_stats['mapped_frag'] + 0.00001)
+    contact_stats['TransContactsRatio'] = contact_stats['TotalTransContacts'] / \
+                                          (contact_stats['mapped_frag'] + 0.00001)
+    contact_stats['MultiContactsRatio'] = contact_stats['TotalMultiContacts'] / \
+                                          (contact_stats['mapped_frag'] + 0.00001)
+    return contact_stats
+
+
 def parse_single_stats_set(path_pattern, parser, prefix=''):
     """
     Parse all the stats files in the path_pattern and return a dataframe

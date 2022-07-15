@@ -40,7 +40,7 @@ rule summary:
         expand("fastq/{cell_id}.trimmed.stats.txt", cell_id=CELL_IDS),
         # dna mapping
         expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.split_reads.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna_split_reads_summary.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.hisat3n_dna.all_reads.deduped.matrix.txt", cell_id=CELL_IDS),
         # 3C contacts
         expand("hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv", cell_id=CELL_IDS),
@@ -48,10 +48,10 @@ rule summary:
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
                cell_id=CELL_IDS, mcg_context=mcg_context),
-    #output:
-    #    "MappingSummary.csv.gz"
-    #run:
-    #    snmc_summary()
+    output:
+        "MappingSummary.csv.gz"
+    run:
+        snm3c_summary()
 
 
 # ==================================================
@@ -118,7 +118,7 @@ rule trim:
 
 
 # Paired-end Hisat3n mapping using DNA mode
-rule hisat_3n_pairend_mapping_dna_mode:
+rule hisat_3n_pair_end_mapping_dna_mode:
     input:
         R1="fastq/{cell_id}-R1.trimmed.fq.gz",
         R2="fastq/{cell_id}-R2.trimmed.fq.gz"
@@ -156,14 +156,14 @@ rule separate_unmapped_reads:
     output:
         unique_bam="bam/{cell_id}.hisat3n_dna.unique_aligned.bam",
         multi_bam="bam/{cell_id}.hisat3n_dna.multi_aligned.bam",
-        unmapped_reads="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
+        unmapped_fastq="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
     threads:
         1
     run:
         separate_unique_and_multi_align_reads(in_bam_path=input.bam,
                                               out_unique_path=output.unique_bam,
                                               out_multi_path=output.multi_bam,
-                                              out_unmappable_path=output.unmapped_reads,
+                                              out_unmappable_path=output.unmapped_fastq,
                                               unmappable_format='fastq',
                                               mapq_cutoff=10,
                                               qlen_cutoff=30)
@@ -174,7 +174,7 @@ rule split_unmapped_reads:
     input:
         unmapped_reads="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
     output:
-        split_reads="bam/{cell_id}.hisat3n_dna.unmapped.split.fastq"
+        split_reads="bam/{cell_id}.hisat3n_dna.split_reads.fastq"
     threads:
         1
     run:
@@ -184,19 +184,22 @@ rule split_unmapped_reads:
 
 
 # remap the split reads in SE mode
+# Aligned reads FLAG and MAPQ possibilities:
+# - [0, 60], uniquely mapped to forward strand
+# - [16, 60], uniquely mapped to reverse strand
 rule hisat_3n_single_end_mapping_dna_mode:
     input:
-        split_reads="bam/{cell_id}.hisat3n_dna.unmapped.split.fastq"
+        fastq="bam/{cell_id}.hisat3n_dna.split_reads.fastq"
     output:
         bam="bam/{cell_id}.hisat3n_dna.split_reads.bam",
-        stats="bam/{cell_id}.split_reads.hisat3n_dna_summary.txt"
+        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.txt"
     threads:
         8
     shell:
         "hisat-3n "
         "{config.hisat3n_dna_reference} "
         "-q "
-        "-U {input.split_reads} "
+        "-U {input.fastq} "
         "--directional-mapping-reverse "  # this can speed up 2X as the snmC reads are directional
         "--base-change C,T "
         "{repeat_index_flag} "
@@ -216,7 +219,7 @@ rule sort_split_reads_by_name:
     input:
         bam="bam/{cell_id}.hisat3n_dna.split_reads.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.sort.bam"
+        bam="bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam"
     threads:
         1
     shell:
@@ -226,7 +229,7 @@ rule sort_split_reads_by_name:
 # remove overlap read parts from the split alignment bam file
 rule remove_overlap_read_parts:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.sort.bam"
+        bam="bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam"
     output:
         bam="bam/{cell_id}.hisat3n_dna.split_reads.no_overlap.bam"
     threads:
@@ -273,7 +276,7 @@ rule call_chromatin_contacts:
     run:
         call_chromatin_contacts(bam_path=input.bam,
                                 contact_prefix=params.contact_prefix,
-                                dedup_contact=True,
+                                save_raw=False,
                                 save_hic_format=True)
 
 
@@ -328,6 +331,7 @@ rule unique_reads_allc:
         bai="bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam.bai"
     output:
         allc="allc/{cell_id}.allc.tsv.gz",
+        tbi="allc/{cell_id}.allc.tsv.gz.tbi",
         stats="allc/{cell_id}.allc.tsv.gz.count.csv"
     threads:
         1.5
@@ -348,7 +352,8 @@ rule unique_reads_allc:
 # CGN extraction from ALLC
 rule unique_reads_cgn_extraction:
     input:
-        "allc/{cell_id}.allc.tsv.gz",
+        allc="allc/{cell_id}.allc.tsv.gz",
+        tbi="allc/{cell_id}.allc.tsv.gz.tbi"
     output:
         allc="allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz",
         tbi="allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
@@ -361,7 +366,7 @@ rule unique_reads_cgn_extraction:
     shell:
         'allcools extract-allc '
         '--strandness merge '
-        '--allc_path  {input} '
+        '--allc_path  {input.allc} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
         '--chrom_size_path {config.chrom_size_path} '

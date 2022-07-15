@@ -428,7 +428,17 @@ def _extract_contact_info(reads, span=1000):
 class ContactWriter:
     def __init__(self, output_prefix):
         self.output_path = f'{output_prefix}.raw_contacts.tsv'
-        self.counter = defaultdict(int)
+        # all possible
+        self.counter = {'cis': 0,
+                        'ciscut': 0,
+                        'cis_multi': 0,
+                        'ciscut_multi': 0,
+                        'trans': 0,
+                        'transcut': 0,
+                        'trans_multi': 0,
+                        'transcut_multi': 0,
+                        'chimeric': 0,
+                        'no': 0}
         self.cur_read_pair = 0
 
     def __enter__(self):
@@ -476,7 +486,7 @@ def _dedup_chrom_df(chrom_df):
     return chrom_df
 
 
-def _dedup_contacts(output_prefix):
+def _dedup_contacts(output_prefix, save_raw=False):
     """Deduplicate contacts by chromosome and position"""
     input_path = f'{output_prefix}.raw_contacts.tsv'
     output_path = f'{output_prefix}.dedup_contacts.tsv.gz'
@@ -484,14 +494,20 @@ def _dedup_contacts(output_prefix):
     contacts = pd.read_csv(input_path, sep='\t')
     contacts = contacts.sort_values(
         by=['chrom1', 'chrom2', 'start1', 'start2', 'end1', 'end2'])
+    input_contacts = contacts.shape[0]
 
     total_dedup = []
     for _, chrom_df in contacts.groupby(['chrom1', 'chrom2']):
         total_dedup.append(_dedup_chrom_df(chrom_df))
     total_dedup = pd.concat(total_dedup)
     total_dedup.to_csv(output_path, sep='\t', index=False)
-    subprocess.run(shlex.split(f'rm -f {input_path}'), check=True)
-    return
+
+    if not save_raw:
+        subprocess.run(shlex.split(f'rm -f {input_path}'), check=True)
+
+    dedup_contacts = total_dedup.shape[0]
+    dup_rate = (input_contacts - dedup_contacts) / input_contacts
+    return dedup_contacts, dup_rate
 
 
 def _contact_to_hic_format(output_prefix):
@@ -514,7 +530,15 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
         cur_read_pair_name = None
         cur_read_parts = []
         for read in bam:
+            # read_pair_name is the original read fragment name in fastq
+            # others are in the form of {read_type}_{read_slice_start}_{read_slice_end}
             read_pair_name, others = read.qname.split('_')
+
+            # put back the normal read name, this will allow following steps to understand read name correctly
+            # e.g. in picard RemoveDuplicateReads
+            read.qname = read_pair_name
+
+            # put others information into read tags and read type
             read_type, start, stop = others.split(':')
             read.is_read1 = read_type == '1'
             read.is_read2 = not read.is_read1
@@ -551,7 +575,7 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
 
 def call_chromatin_contacts(bam_path: str,
                             contact_prefix: str,
-                            dedup_contact: bool = True,
+                            save_raw: bool = False,
                             save_hic_format: bool = True):
     """
     Process 3C bam file and generate contact file.
@@ -562,8 +586,8 @@ def call_chromatin_contacts(bam_path: str,
         Path to 3C bam file.
     contact_prefix: str
         Prefix of output contact file.
-    dedup_contact : bool, optional
-        Whether to deduplicate contacts.
+    save_raw: bool
+        If true, the raw contact file before deduplication will be saved.
     save_hic_format : bool, optional
         Whether to save the contact in hic format.
 
@@ -599,9 +623,8 @@ def call_chromatin_contacts(bam_path: str,
             results = _extract_contact_info(cur_read_parts, span=1000)
             out_contacts.write(results)
 
-    if dedup_contact:
-        # dedup contacts
-        _dedup_contacts(contact_prefix)
+    # dedup contacts
+    dedup_contacts, dup_rate = _dedup_contacts(contact_prefix, save_raw=save_raw)
 
     if save_hic_format:
         # save hic format
@@ -610,5 +633,7 @@ def call_chromatin_contacts(bam_path: str,
     # save counts
     stat = out_contacts.counter
     stat['mapped_frag'] = count
+    stat['dedup_frag'] = dedup_contacts
+    stat['dup_rate'] = dup_rate
     pd.Series(stat).to_csv(f'{contact_prefix}.contact_stats.csv', header=False)
     return
