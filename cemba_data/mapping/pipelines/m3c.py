@@ -36,6 +36,9 @@ def m3c_config_str(config):
     }
     if 'hisat3n_dna_reference' in config:
         del str_parameters['bismark_reference']
+    else:
+        del str_parameters['hisat3n_dna_reference']
+        del str_parameters['hisat3n_repeat_index_type']
 
     typed_config = {}
     for k, default in int_parameters.items():

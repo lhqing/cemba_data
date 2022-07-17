@@ -1,7 +1,6 @@
 import re
 import shlex
 import subprocess
-from collections import defaultdict
 from itertools import combinations
 
 import dnaio
@@ -363,7 +362,7 @@ def _two_read_contact_type(read_1, read_2):
         return 'cis' if cis else 'trans'
 
 
-def _extract_contact_info(reads, span=1000):
+def _extract_contact_info(reads, span=2500):
     """
     Extract chromatin contacts from a list of aligned reads
 
@@ -576,7 +575,8 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
 def call_chromatin_contacts(bam_path: str,
                             contact_prefix: str,
                             save_raw: bool = False,
-                            save_hic_format: bool = True):
+                            save_hic_format: bool = True,
+                            span=2500):
     """
     Process 3C bam file and generate contact file.
 
@@ -590,6 +590,9 @@ def call_chromatin_contacts(bam_path: str,
         If true, the raw contact file before deduplication will be saved.
     save_hic_format : bool, optional
         Whether to save the contact in hic format.
+    span : int, optional
+        The minimum span of the contact. The default is 2500. If the genome coordinates of two reads
+        closer than this span, they will be considered as the same fragment.
 
     Returns
     -------
@@ -613,14 +616,14 @@ def call_chromatin_contacts(bam_path: str,
                 if len(cur_read_parts) > 0:
                     # process the previous read pair
                     count += 1
-                    results = _extract_contact_info(cur_read_parts, span=1000)
+                    results = _extract_contact_info(cur_read_parts, span=span)
                     out_contacts.write(results)
                 # initiate the next pair
                 cur_read_pair_name = read_pair_name
                 cur_read_parts = [read]
         if len(cur_read_parts) > 0:
             # process the last read pair
-            results = _extract_contact_info(cur_read_parts, span=1000)
+            results = _extract_contact_info(cur_read_parts, span=span)
             out_contacts.write(results)
 
     # dedup contacts
