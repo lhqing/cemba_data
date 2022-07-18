@@ -138,6 +138,7 @@ rule trim:
         "-u -{config.r1_right_cut} "
         "-U {config.r2_left_cut} "
         "-U -{config.r2_right_cut} "
+        "-Z "
         "-m 30:30 "
         "--pair-filter 'both' "
         "-o {output.R1} "

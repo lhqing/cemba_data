@@ -15,7 +15,7 @@ from cemba_data.hisat3n import *
 
 # read mapping config and put all variables into the locals()
 config, config_dict = read_mapping_config()
-# print('Usings these mapping parameters:')
+# print('Using these mapping parameters:')
 # for _k, _v in config_dict.items():
 #     print(f'{_k} = {_v}')
 
@@ -40,7 +40,8 @@ rule summary:
         expand("fastq/{cell_id}.trimmed.stats.txt", cell_id=CELL_IDS),
         # dna mapping
         expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna_split_reads_summary.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna_split_reads_summary.R1.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna_split_reads_summary.R2.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.hisat3n_dna.all_reads.deduped.matrix.txt", cell_id=CELL_IDS),
         # 3C contacts
         expand("hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv", cell_id=CELL_IDS),
@@ -104,6 +105,7 @@ rule trim:
         "-u -{config.r1_right_cut} "
         "-U {config.r2_left_cut} "
         "-U -{config.r2_right_cut} "
+        "-Z "
         "-m 30:30 "
         "--pair-filter 'both' "
         "-o {output.R1} "
@@ -174,12 +176,15 @@ rule split_unmapped_reads:
     input:
         unmapped_reads="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
     output:
-        split_reads="bam/{cell_id}.hisat3n_dna.split_reads.fastq"
+        split_r1="bam/{cell_id}.hisat3n_dna.split_reads.R1.fastq",
+        split_r2="bam/{cell_id}.hisat3n_dna.split_reads.R2.fastq",
+    params:
+        output_prefix=lambda wildcards: f"bam/{wildcards.cell_id}.hisat3n_dna.split_reads"
     threads:
         1
     run:
         split_hisat3n_unmapped_reads(fastq_path=input.unmapped_reads,
-                                     output_path=output.split_reads,
+                                     output_prefix=params.output_prefix,
                                      min_length=30)
 
 
@@ -187,12 +192,12 @@ rule split_unmapped_reads:
 # Aligned reads FLAG and MAPQ possibilities:
 # - [0, 60], uniquely mapped to forward strand
 # - [16, 60], uniquely mapped to reverse strand
-rule hisat_3n_single_end_mapping_dna_mode:
+rule hisat_3n_single_end_r1_mapping_dna_mode:
     input:
-        fastq="bam/{cell_id}.hisat3n_dna.split_reads.fastq"
+        fastq="bam/{cell_id}.hisat3n_dna.split_reads.R1.fastq"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.bam",
-        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.txt"
+        bam="bam/{cell_id}.hisat3n_dna.split_reads.R1.bam",
+        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.R1.txt"
     threads:
         8
     shell:
@@ -200,7 +205,34 @@ rule hisat_3n_single_end_mapping_dna_mode:
         "{config.hisat3n_dna_reference} "
         "-q "
         "-U {input.fastq} "
-        "--directional-mapping-reverse "  # this can speed up 2X as the snmC reads are directional
+        "--directional-mapping-reverse "  # map R1 in pbat mode
+        "--base-change C,T "
+        "{repeat_index_flag} "
+        "--no-spliced-alignment "  # this is important for DNA mapping
+        "--no-temp-splicesite "
+        "-t "
+        "--new-summary "
+        "--summary-file {output.stats} "
+        "--threads {threads} "
+        "| "
+        "samtools view "
+        "-b -q 10 -o {output.bam}"  # only take the unique aligned reads
+
+
+rule hisat_3n_single_end_r2_mapping_dna_mode:
+    input:
+        fastq="bam/{cell_id}.hisat3n_dna.split_reads.R2.fastq"
+    output:
+        bam="bam/{cell_id}.hisat3n_dna.split_reads.R2.bam",
+        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.R2.txt"
+    threads:
+        8
+    shell:
+        "hisat-3n "
+        "{config.hisat3n_dna_reference} "
+        "-q "
+        "-U {input.fastq} "
+        "--directional-mapping "  # map R2 in normal mode
         "--base-change C,T "
         "{repeat_index_flag} "
         "--no-spliced-alignment "  # this is important for DNA mapping
@@ -215,15 +247,16 @@ rule hisat_3n_single_end_mapping_dna_mode:
 
 
 # sort split reads bam file by read name
-rule sort_split_reads_by_name:
+rule merge_and_sort_split_reads_by_name:
     input:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.bam"
+        r1_bam="bam/{cell_id}.hisat3n_dna.split_reads.R1.bam",
+        r2_bam="bam/{cell_id}.hisat3n_dna.split_reads.R2.bam"
     output:
         bam="bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam"
     threads:
         1
     shell:
-        "samtools sort -n -o {output.bam} {input.bam}"
+        "samtools merge -o - {input.r1_bam} {input.r2_bam} | samtools sort -n -o {output.bam} -"
 
 
 # remove overlap read parts from the split alignment bam file

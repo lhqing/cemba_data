@@ -118,7 +118,7 @@ def _trim_site(read_and_slice, read_type):
     stop = read_slice.stop
 
     sequence = read.sequence
-    if read_type == 'R1':
+    if read_type[-1] == '1':
         if sequence[-3:] == 'ATC':
             # If 3' is DpnII or MboI site, clip it (from the left read)
             read = read[:-4]
@@ -127,7 +127,7 @@ def _trim_site(read_and_slice, read_type):
             # If 5' is NalIII site, clip it (from the right read)
             read = read[4:]
             start += 4
-    else:
+    elif read_type[-1] == '2':
         if sequence[-4:-1] == 'GAT':
             # If 3' is DpnII or MboI site, clip it (from the left read)
             read = read[:-4]
@@ -136,12 +136,14 @@ def _trim_site(read_and_slice, read_type):
             # If 5' is NalIII site, clip it (from the right read)
             read = read[4:]
             start += 4
+    else:
+        raise ValueError(f'read_type must be 1 or 2, got {read_type}')
     read.name += f':{start}:{stop}'
     return read, (start, stop)
 
 
 def split_hisat3n_unmapped_reads(fastq_path,
-                                 output_path,
+                                 output_prefix,
                                  min_length=30):
     """
     Split trimmed fastq file by all possible enzyme cut sites and save to a new fastq file
@@ -154,8 +156,9 @@ def split_hisat3n_unmapped_reads(fastq_path,
     ----------
     fastq_path
         Input fastq path
-    output_path
-        Output fastq path
+    output_prefix
+        Output fastq prefix, R1 and R2 will be saved as <output_prefix>.R1.fastq and <output_prefix>.R2.fastq
+        Because R1 and R2 need to be mapped separately in the SE mapping.
     min_length
         Minimum read length to keep
 
@@ -167,11 +170,16 @@ def split_hisat3n_unmapped_reads(fastq_path,
     r1_split_pattern = _make_split_pattern('R1')
     r2_split_pattern = _make_split_pattern('R2')
 
+    # fastq path
+    r1_path = f'{output_prefix}.R1.fastq'
+    r2_path = f'{output_prefix}.R2.fastq'
+
     with dnaio.open(fastq_path) as f, \
-            dnaio.open(output_path, mode='w') as f_out:
+            dnaio.open(r1_path, mode='w') as r1_out, \
+            dnaio.open(r2_path, mode='w') as r2_out:
         for read in f:
             # read type and split pattern
-            read_type = read.name.replace('_', ' ').split(' ')[1][0]
+            read_type = read.name[-1]
             split_pattern = r1_split_pattern if read_type == '1' else r2_split_pattern
 
             read_split_iter = _split_read_and_make_combination(
@@ -187,7 +195,10 @@ def split_hisat3n_unmapped_reads(fastq_path,
                     continue
                 else:
                     range_set.add(read_range)
-                    f_out.write(read_split)
+                    if read_type == '1':
+                        r1_out.write(read_split)
+                    else:
+                        r2_out.write(read_split)
     return
 
 
@@ -269,15 +280,21 @@ class ReadSplitOverlapGroup:
 def _remove_overlapped_split_read_parts(read_parts):
     """
     Due to the split read step, some read parts are overlapped.
-    This function first calculate the overlapped read part groups,
-    then select the longest read part from each group.
-    This step does not consider where the reads in each group map to,
-    it only considers the relevant relationship within the read coordinates using SS and SE tag.
+    This function uses a greedy approach to select one best read at a time
+    based on the reference_length + AS tag. It then removes other unselected read parts
+    that overlap with the best one based on SE and SS tag added during read split.
+    This process will be repeated until all read parts are selected or removed.
 
-    read_parts:
+    The score of reference_length + AS tag can provide information about the read length and alignment quality.
+    If a wrong sliced read is aligned with soft clipping in 5' or 3' end, its score will be lower with correctly
+    sliced read without soft clipping.
+
+    read_parts: (x means soft clip bases)
     R1 part 1: ----------------
-    R1 part 2:        -----------  # this will be removed
-    R1 part 3:                         -----------
+    R1 part 2:        ---------xxxx  # this will be removed
+    R1 part 3: ----------------xxxx  # this will be removed also due to soft clipping
+    R1 part 4:                         -----------
+
     R2 part 1: -----------
     R2 part 2:                -----------
 
@@ -297,27 +314,27 @@ def _remove_overlapped_split_read_parts(read_parts):
     -------
     final non-overlapping read parts
     """
-    # determine overlap read groups
-    read_groups = []
-    for read in read_parts:
-        added = False
-        for rg in read_groups:
-            # added will be True if read overlap with existing rg
-            added = rg.add_if_overlap(read)
-            if added:
-                break
-        if not added:
-            # no overlap to existing rg, create a new one
-            read_groups.append(ReadSplitOverlapGroup(read))
-
-    # select the longest alen read from each group
     final_reads = []
-    for group in read_groups:
-        longest_read = sorted(
-            group.reads,
-            key=lambda r: r.get_tag('SE') - r.get_tag('SS'),
-            reverse=True)[0]
-        final_reads.append(longest_read)
+    while len(read_parts) > 0:
+        # step 1. select one read with the highest overall alignment score: ref_len + AS,
+        # if read has soft clip or other mismatches, the AS will be negatively impact the score.
+        # therefore, wrong slice with artificial soft clipped flanking will not rank on top of correct slice
+        *other_reads, best_read = sorted(
+            read_parts,
+            key=lambda r: r.reference_length + r.get_tag("AS"))
+        best_ss = best_read.get_tag('SS')
+        best_se = best_read.get_tag('SE')
+
+        # step 2. remove reads that overlap with the best read based on SS SE tags
+        # reads with additional parts (usually unaligned and kept as soft clip) will be removed in this step
+        keep_reads = []
+        for read in other_reads:
+            if (read.get_tag('SS') >= best_se) or (read.get_tag('SE') <= best_ss):
+                keep_reads.append(read)
+
+        # step 3. save best read and update read_parts
+        read_parts = keep_reads
+        final_reads.append(best_read)
     return final_reads
 
 

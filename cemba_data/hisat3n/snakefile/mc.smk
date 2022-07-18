@@ -41,10 +41,8 @@ rule summary:
         # dna mapping
         expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
         expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt", cell_id=CELL_IDS),
         # allc
         expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
-        expand("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv", cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
                cell_id=CELL_IDS, mcg_context=mcg_context),
     output:
@@ -106,6 +104,7 @@ rule trim:
         "-u -{config.r1_right_cut} "
         "-U {config.r2_left_cut} "
         "-U -{config.r2_right_cut} "
+        "-Z "
         "-m 30:30 "
         "--pair-filter 'both' "
         "-o {output.R1} "
@@ -130,13 +129,14 @@ rule hisat_3n_pairend_mapping_dna_mode:
     threads:
         8
     resources:
-        mem_mb=8000
+        mem_mb=14000
     shell:
         "hisat-3n "
         "{config.hisat3n_dna_reference} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
+        "--unique-only "  # only save the unique mapped reads
         "--directional-mapping-reverse "  # this can speed up 2X as the snmC reads are directional
         "--base-change C,T "
         "{repeat_index_flag} "
@@ -148,40 +148,20 @@ rule hisat_3n_pairend_mapping_dna_mode:
         "--threads {threads} "
         "| "
         "samtools view "
-        "-b -q 1 -o {output.bam}"
+        "-b -q 10 -o {output.bam}"  # -q 10 will filter out multi-aligned reads
 
 
 rule sort_bam:
     input:
         "bam/{cell_id}.hisat3n_dna.unsort.bam"
     output:
-        temp("bam/{cell_id}.hisat3n_dna.bam")
+        temp("bam/{cell_id}.hisat3n_dna.unique_align.bam")
     resources:
         mem_mb=1000
     threads:
         1
     shell:
         "samtools sort -O BAM -o {output} {input}"
-
-
-# Separate unique aligned reads and multi-aligned reads with length > 30
-# TODO: make sure how to separate multi-align reads? or reads map to repeat regions in the genome?
-# TODO right now, we are just using mapq == 1 as multi-align reads, but this might not be right
-rule split_unique_and_multi_align_bam_dna:
-    input:
-        bam="bam/{cell_id}.hisat3n_dna.bam"
-    output:
-        unique=temp("bam/{cell_id}.hisat3n_dna.unique_align.bam"),
-        multi=temp("bam/{cell_id}.hisat3n_dna.multi_align.bam")
-    run:
-        separate_unique_and_multi_align_reads(
-            in_bam_path=input.bam,
-            out_unique_path=output.unique,
-            out_multi_path=output.multi,
-            out_unmappable_path=None,
-            mapq_cutoff=10,
-            qlen_cutoff=30
-        )
 
 
 # remove PCR duplicates
@@ -200,35 +180,11 @@ rule dedup_unique_bam:
         "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
 
 
-rule dedup_multi_bam:
-    input:
-        "bam/{cell_id}.hisat3n_dna.multi_align.bam"
-    output:
-        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam",
-        stats=temp("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt")
-    resources:
-        mem_mb=1000
-    threads:
-        2
-    shell:
-        "picard MarkDuplicates I={input} O={output.bam} M={output.stats} "
-        "REMOVE_DUPLICATES=true TMP_DIR=bam/temp/"
-
-
 rule index_unique_bam_dna_reads:
     input:
         bam="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam"
     output:
         bai="bam/{cell_id}.hisat3n_dna.unique_align.deduped.bam.bai"
-    shell:
-        "samtools index {input.bam}"
-
-
-rule index_multi_bam_dna_reads:
-    input:
-        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam"
-    output:
-        bai="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam.bai"
     shell:
         "samtools index {input.bam}"
 
@@ -282,28 +238,3 @@ rule unique_reads_cgn_extraction:
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
         '--chrom_size_path {config.chrom_size_path} '
-
-
-# generate ALLC
-rule multi_reads_allc:
-    input:
-        bam="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam",
-        bai="bam/{cell_id}.hisat3n_dna.multi_align.deduped.bam.bai"
-    output:
-        allc="allc-multi/{cell_id}.allc_multi.tsv.gz",
-        stats=temp("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv")
-    threads:
-        1.5
-    resources:
-        mem_mb=500
-    shell:
-        'allcools bam-to-allc '
-        '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
-        '--output_path {output.allc} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
-        '--save_count_df '
-        '--min_mapq 0 '  # for multi-mapped reads, skip mapq filter
-        '--convert_bam_strandness '
