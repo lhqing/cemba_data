@@ -188,17 +188,19 @@ def split_hisat3n_unmapped_reads(fastq_path,
             for i, read_and_slice in enumerate(read_split_iter):
                 # remove overlapping enzyme cut site
                 read_split, read_range = _trim_site(read_and_slice, read_type)
+                if len(read_split.sequence) < min_length:
+                    # because trim site further reduced some reads' length
+                    continue
                 if read_range in range_set:
                     # in some rare cases, the cut site is next to each other,
                     # trim site might cause duplicated ranges and therefore duplicated read names
                     # which is not allowed in the aligners
                     continue
+                range_set.add(read_range)
+                if read_type == '1':
+                    r1_out.write(read_split)
                 else:
-                    range_set.add(read_range)
-                    if read_type == '1':
-                        r1_out.write(read_split)
-                    else:
-                        r2_out.write(read_split)
+                    r2_out.write(read_split)
     return
 
 
@@ -277,6 +279,32 @@ class ReadSplitOverlapGroup:
             return False
 
 
+def _remove_overlapped_split_read_parts_single_read_type(read_parts):
+    """Deal with single read type, use this function inside _remove_overlapped_split_read_parts"""
+    final_reads = []
+    while len(read_parts) > 0:
+        # step 1. select one read with the highest overall alignment score: ref_len + AS,
+        # if read has soft clip or other mismatches, the AS will be negatively impact the score.
+        # therefore, wrong slice with artificial soft clipped flanking will not rank on top of correct slice
+        *other_reads, best_read = sorted(
+            read_parts,
+            key=lambda r: r.reference_length + r.get_tag("AS"))
+        best_ss = best_read.get_tag('SS')
+        best_se = best_read.get_tag('SE')
+
+        # step 2. remove reads that overlap with the best read based on SS SE tags
+        # reads with additional parts (usually unaligned and kept as soft clip) will be removed in this step
+        keep_reads = []
+        for read in other_reads:
+            if (read.get_tag('SS') >= best_se) or (read.get_tag('SE') <= best_ss):
+                keep_reads.append(read)
+
+        # step 3. save best read and update read_parts
+        read_parts = keep_reads
+        final_reads.append(best_read)
+    return final_reads
+
+
 def _remove_overlapped_split_read_parts(read_parts):
     """
     Due to the split read step, some read parts are overlapped.
@@ -314,31 +342,22 @@ def _remove_overlapped_split_read_parts(read_parts):
     -------
     final non-overlapping read parts
     """
+    r1_parts = []
+    r2_parts = []
+    for read in read_parts:
+        if read.is_read1:
+            r1_parts.append(read)
+        else:
+            r2_parts.append(read)
+
     final_reads = []
-    while len(read_parts) > 0:
-        # step 1. select one read with the highest overall alignment score: ref_len + AS,
-        # if read has soft clip or other mismatches, the AS will be negatively impact the score.
-        # therefore, wrong slice with artificial soft clipped flanking will not rank on top of correct slice
-        *other_reads, best_read = sorted(
-            read_parts,
-            key=lambda r: r.reference_length + r.get_tag("AS"))
-        best_ss = best_read.get_tag('SS')
-        best_se = best_read.get_tag('SE')
-
-        # step 2. remove reads that overlap with the best read based on SS SE tags
-        # reads with additional parts (usually unaligned and kept as soft clip) will be removed in this step
-        keep_reads = []
-        for read in other_reads:
-            if (read.get_tag('SS') >= best_se) or (read.get_tag('SE') <= best_ss):
-                keep_reads.append(read)
-
-        # step 3. save best read and update read_parts
-        read_parts = keep_reads
-        final_reads.append(best_read)
+    # select R1 and R2 parts separately
+    final_reads += _remove_overlapped_split_read_parts_single_read_type(r1_parts)
+    final_reads += _remove_overlapped_split_read_parts_single_read_type(r2_parts)
     return final_reads
 
 
-def _two_read_contact_type(read_1, read_2):
+def _two_read_contact_type(read_1, read_2, n_groups, reads):
     """
     Determine the contact type between two reads. The contact type includes:
     1. ciscut: the two reads are split from the same read at the cut site, and map to the same chromosome
@@ -354,11 +373,16 @@ def _two_read_contact_type(read_1, read_2):
         Read 1
     read_2
         Read 2
+    n_groups
+        Number of read groups
+    reads
+        All read parts from a pair of original reads, this is needed when determine chimeric contact type
+        in multi contacts case.
     Returns
     -------
     contact type str
     """
-    is_same_read = read_1.is_read1 == read_2.is_read1
+    is_same_read = read_1.get_tag('ST')[1] == read_2.get_tag('ST')[1]
     # determine if these two reads are split from one original read at the cut site
     if is_same_read:
         is_cutsite = (read_1.get_tag('SS') == read_2.get_tag('SE')) or \
@@ -374,7 +398,30 @@ def _two_read_contact_type(read_1, read_2):
         if is_cutsite:
             return 'ciscut' if cis else 'transcut'
         else:
-            return 'chimeric'
+            if n_groups > 2:
+                ss1 = read_1.get_tag("SS")
+                se1 = read_1.get_tag("SE")
+                ss2 = read_2.get_tag("SS")
+                se2 = read_2.get_tag("SE")
+                st = read_1.get_tag("ST")[1]
+                for read in reads:
+                    if read.get_tag("ST")[1] != st:
+                        continue
+                    ss = read.get_tag("SS")
+                    se = read.get_tag("SE")
+                    if ((ss == se1) and (se == ss2)) or ((ss == se2) and (se == ss1)):
+                        # sometimes, a single read can be separated into > 2 parts, but each part is still
+                        # cut at the enzyme site. And each part map to distal location.
+                        # for example,
+                        # part 1: chr11 17030146 17030195, SS:82  SE:131 ST:S2
+                        # part 2: chr4  74624619 74624658, SS:43  SE:82  ST:S2
+                        # part 3: chr1  45747948 45747992, SS:0   SE:43  ST:S2
+                        # to prevent part 1 and part 3 to be called as chimeric, we need to check if
+                        # part 2 can link 1 and 3 seamlessly.
+                        return 'not_a_contact'
+                return 'chimeric'
+            else:
+                return 'chimeric'
     else:
         return 'cis' if cis else 'trans'
 
@@ -421,7 +468,7 @@ def _extract_contact_info(reads, span=2500):
             # read_1 and read_2 are the two reads in different groups, not necessarily correspond to R1 or R2
             for read_1 in g1.reads:
                 for read_2 in g2.reads:
-                    contact_type = _two_read_contact_type(read_1, read_2)
+                    contact_type = _two_read_contact_type(read_1, read_2, n_groups, reads)
                     group_contacts[contact_type] = (read_1, read_2)
             # if g1 and g2 both containing multiple reads, we will only choose one contact type
             # to represent the relationship between the two groups
@@ -438,6 +485,10 @@ def _extract_contact_info(reads, span=2500):
                 results.append((group_contacts['cis'], 'cis' + multi))
             elif 'trans' in group_contacts:
                 results.append((group_contacts['trans'], 'trans' + multi))
+            elif 'not_a_contact' in group_contacts:
+                pass
+            else:
+                raise ValueError(f'group_contacts {group_contacts} seems abnormal.')
         return results
 
 
@@ -470,7 +521,10 @@ class ContactWriter:
 
     @classmethod
     def _read_to_string_contact(cls, read):
-        read_type = 1 if read.is_read1 else 2
+        if read.is_read1 or read.is_read2:
+            read_type = 1 if read.is_read1 else 2
+        else:
+            read_type = 1 if read.get_tag('ST')[1] == '1' else 2
         return f'{read.reference_name}\t{read.pos}\t{read.aend}\t' \
                f'{int(read.is_reverse)}\t{read.get_tag("SS")}\t{read.get_tag("SE")}\t{read_type}'
 
@@ -493,12 +547,22 @@ class ContactWriter:
 def _dedup_chrom_df(chrom_df):
     """Deduplicate contacts within the same chromosome"""
     # determine duplicated coords for each column
-    dup_judge = chrom_df[['start1', 'start2', 'end1', 'end2']].apply(lambda i: i.duplicated())
+    sorted_rows = chrom_df[['start1', 'end1']].sort_values(['start1', 'end1'])
+    # having one or twn end the same as the previous one
+    dup1 = (sorted_rows.values[1:] - sorted_rows.values[:-1] == 0).sum(axis=1) > 0
+    # first row always considered not dup
+    dup1_idx = sorted_rows.index[1:][dup1]
 
-    # if contact on both sides have one position (start or end) being the same,
+    sorted_rows = chrom_df[['start2', 'end2']].sort_values(['start2', 'end2'])
+    # having one or twn end the same as the previous one
+    dup2 = (sorted_rows.values[1:] - sorted_rows.values[:-1] == 0).sum(axis=1) > 0
+    # first row always considered not dup
+    dup2_idx = sorted_rows.index[1:][dup2]
+
+    # if contact have one or two ends being the same on both sides
     # it is considered as a duplicated contact
-    dup_call = (dup_judge['start1'] | dup_judge['end1']) & (dup_judge['start2'] | dup_judge['end2'])
-    chrom_df = chrom_df[~dup_call]
+    dup_judge = chrom_df.index.isin(dup1_idx.intersection(dup2_idx))
+    chrom_df = chrom_df[~dup_judge]
     return chrom_df
 
 
@@ -560,6 +624,8 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
             read.is_read2 = not read.is_read1
             read.set_tag('SS', int(start))  # SS is the start position of read slice
             read.set_tag('SE', int(stop))  # SE is the end position of read slice
+            # ST is the split read type, F means full read, S means split read
+            read.set_tag('ST', f'S{read_type}')
             if read_pair_name == cur_read_pair_name:
                 cur_read_parts.append(read)
             else:
@@ -625,6 +691,8 @@ def call_chromatin_contacts(bam_path: str,
             if not read.has_tag('SS'):
                 read.set_tag('SS', 0)
                 read.set_tag('SE', read.qlen)
+                # ST is the split read type, F means full read, S means split read
+                read.set_tag('ST', f'F{1 if read.is_read1 else 2}')
 
             if read_pair_name == cur_read_pair_name:
                 cur_read_parts.append(read)
@@ -657,3 +725,7 @@ def call_chromatin_contacts(bam_path: str,
     stat['dup_rate'] = dup_rate
     pd.Series(stat).to_csv(f'{contact_prefix}.contact_stats.csv', header=False)
     return
+
+# TODO save chimeric reads into bam file for ALLC
+# TODO put all read type info into flag, and fix whatever bug in picard
+# TODO print details for the first a few reads to let user check the correctness of the results
