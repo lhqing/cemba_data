@@ -1,4 +1,4 @@
-name: hisat3n_mapping
+name: mapping
 channels:
   - conda-forge
   - bioconda
