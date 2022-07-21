@@ -635,12 +635,6 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
                     count += 1
                     final_reads = _remove_overlapped_split_read_parts(cur_read_parts)
                     for final_read in final_reads:
-                        # need to put back the flag
-                        # otherwise picard will raise errors
-                        # dedup still perform at single read level
-                        # unless the flag can be properly set
-                        final_read.is_read1 = False
-                        final_read.is_read2 = False
                         out_bam.write(final_read)
                 # initiate the next pair
                 cur_read_pair_name = read_pair_name
@@ -649,8 +643,6 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
             # process the last read pair
             final_reads = _remove_overlapped_split_read_parts(cur_read_parts)
             for final_read in final_reads:
-                final_read.is_read1 = False
-                final_read.is_read2 = False
                 out_bam.write(final_read)
     return
 
@@ -725,7 +717,3 @@ def call_chromatin_contacts(bam_path: str,
     stat['dup_rate'] = dup_rate
     pd.Series(stat).to_csv(f'{contact_prefix}.contact_stats.csv', header=False)
     return
-
-# TODO save chimeric reads into bam file for ALLC
-# TODO put all read type info into flag, and fix whatever bug in picard
-# TODO print details for the first a few reads to let user check the correctness of the results

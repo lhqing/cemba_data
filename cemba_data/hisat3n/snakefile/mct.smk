@@ -222,7 +222,7 @@ rule select_unique_bam_dna_reads:
     resources:
         mem_mb=100
     run:
-        select_mct_reads_normal(
+        select_mct_reads(
             input_bam=input.bam,
             output_bam=output.bam,
             mode='dna',
@@ -303,7 +303,7 @@ rule select_unique_bam_rna_reads:
     resources:
         mem_mb=100
     run:
-        select_mct_reads_normal(
+        select_mct_reads(
             input_bam=input.bam,
             output_bam=output.bam,
             mode='rna',

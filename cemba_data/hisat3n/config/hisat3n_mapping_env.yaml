@@ -1,0 +1,23 @@
+name: hisat3n_mapping
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+ - python=3.8
+ - pip
+ - seaborn
+ - natsort
+ - yaml
+ - cutadapt
+ - samtools
+ - picard
+ - bedtools
+ - htslib>=1.9
+ - pysam
+ - pybedtools
+ - pyBigWig
+ - subread=2.0
+ - pip:
+    - allcools
+    - cemba_data

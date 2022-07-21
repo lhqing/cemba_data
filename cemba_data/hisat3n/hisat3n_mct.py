@@ -7,7 +7,7 @@ import pysam
 
 def _determine_reads_conversion(read):
     """
-    Determine HISAT-3N read conversion level
+    Determine HISAT-3N read conversion type
 
     Parameters
     ----------
@@ -21,6 +21,7 @@ def _determine_reads_conversion(read):
     # For HISAT-3N, use YZ tag
     # YZ:A:<A>: The value + or – indicate the read is mapped to REF-3N (+) or REF-RC-3N (-).
     # actually, for snmC, the + means G to A conversion; the - means C to T conversion.
+    # TODO: check if we can use R1 and R2 to determine the conversion, R1 is G to A, R2 is C to T
     yz_tag = read.get_tag('YZ')
     if yz_tag == '-':
         # G -> A
@@ -139,13 +140,13 @@ def _single_read_mch_level(read, nome=False, frac=False):
         return mch, cov, other_snp
 
 
-def select_mct_reads_normal(input_bam,
-                            output_bam,
-                            mode,
-                            mc_rate_max_threshold=None,
-                            mc_rate_min_threshold=None,
-                            cov_min_threshold=3,
-                            nome=False):
+def select_mct_reads(input_bam,
+                     output_bam,
+                     mode,
+                     mc_rate_max_threshold=None,
+                     mc_rate_min_threshold=None,
+                     cov_min_threshold=3,
+                     nome=False):
     """
     Select DNA reads with mCH fraction <= mc_rate_max_threshold and
     coverage >= cov_min_threshold from mCT bam file
