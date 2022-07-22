@@ -179,7 +179,8 @@ def _merge_lane(output_dir, cpu):
         output_paths = []
         for (cell_id, read_type), sub_df in cell_fastq_df.groupby(
                 ['cell_id', 'read_type']):
-            input_paths = list(sub_df['fastq_path'])
+            # sort input to make sure the fastq are in the same order
+            input_paths = sorted(sub_df['fastq_path'].tolist())
             output_path = fastq_dir / f'{cell_id}-{read_type}.fq.gz'
 
             snake_file_template = f"""

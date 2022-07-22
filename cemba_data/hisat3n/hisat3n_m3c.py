@@ -635,6 +635,9 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
                     count += 1
                     final_reads = _remove_overlapped_split_read_parts(cur_read_parts)
                     for final_read in final_reads:
+                        # clear r1 and r2 flag, otherwise picard will raise error
+                        final_read.is_read1 = False
+                        final_read.is_read2 = False
                         out_bam.write(final_read)
                 # initiate the next pair
                 cur_read_pair_name = read_pair_name
@@ -643,6 +646,9 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
             # process the last read pair
             final_reads = _remove_overlapped_split_read_parts(cur_read_parts)
             for final_read in final_reads:
+                # clear r1 and r2 flag, otherwise picard will raise error
+                final_read.is_read1 = False
+                final_read.is_read2 = False
                 out_bam.write(final_read)
     return
 

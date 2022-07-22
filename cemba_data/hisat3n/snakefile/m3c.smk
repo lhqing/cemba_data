@@ -1,3 +1,10 @@
+"""
+Snakemake pipeline for hisat-3n mapping of snm3C-seq data
+
+hg38 normal index uses ~9 GB of memory
+repeat index will use more memory
+"""
+
 # ==================================================
 # Import
 # ==================================================
@@ -26,6 +33,7 @@ DEFAULT_CONFIG = {
     'num_upstr_bases': 0,
     'num_downstr_bases': 2,
     'compress_level': 5,
+    'hisat3n_threads': 11,
 }
 REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
 
@@ -40,14 +48,9 @@ for k in REQUIRED_CONFIG:
 if len(missing_key) > 0:
     raise ValueError('Missing required config: {}'.format(missing_key))
 
-# print('Using these mapping parameters:')
-# for _k, _v in config_dict.items():
-#     print(f'{_k} = {_v}')
-
 # fastq table and cell IDs
 fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
-# print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
 
 try:
     mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
@@ -57,6 +60,7 @@ try:
     repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
 except KeyError:
     repeat_index_flag = "--no-repeat-index"
+
 
 # ==================================================
 # Mapping summary
@@ -99,6 +103,8 @@ rule sort_R1:
         temp("fastq/{cell_id}-R1_sort.fq")
     threads:
         1.5
+    resources:
+        sort_slot=1
     shell:
         'zcat {input} | paste - - - - | sort -k1,1 -t " " | tr "\t" "\n" > {output} '
 
@@ -110,18 +116,20 @@ rule sort_R2:
         temp("fastq/{cell_id}-R2_sort.fq")
     threads:
         1.5
+    resources:
+        sort_slot=1
     shell:
         'zcat {input} | paste - - - - | sort -k1,1 -t " " | tr "\t" "\n" > {output} '
 
 
 rule trim:
     input:
-        R1="fastq/{cell_id}-R1_sort.fq",
-        R2="fastq/{cell_id}-R2_sort.fq"
+        R1="fastq/{cell_id}-R1.fq.gz",
+        R2="fastq/{cell_id}-R2.fq.gz"
     output:
-        R1="fastq/{cell_id}-R1.trimmed.fq.gz",
-        R2="fastq/{cell_id}-R2.trimmed.fq.gz",
-        stats="fastq/{cell_id}.trimmed.stats.txt"
+        R1=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
+        R2=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
+        stats=temp("fastq/{cell_id}.trimmed.stats.txt")
     threads:
         1
     shell:
@@ -155,10 +163,10 @@ rule hisat_3n_pair_end_mapping_dna_mode:
         R1="fastq/{cell_id}-R1.trimmed.fq.gz",
         R2="fastq/{cell_id}-R2.trimmed.fq.gz"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.unsort.bam",
-        stats="bam/{cell_id}.hisat3n_dna_summary.txt"
+        bam=temp("bam/{cell_id}.hisat3n_dna.unsort.bam"),
+        stats=temp("bam/{cell_id}.hisat3n_dna_summary.txt")
     threads:
-        8
+        config['hisat3n_threads']
     resources:
         mem_mb=14000
     shell:
@@ -186,9 +194,9 @@ rule separate_unmapped_reads:
     input:
         bam="bam/{cell_id}.hisat3n_dna.unsort.bam"
     output:
-        unique_bam="bam/{cell_id}.hisat3n_dna.unique_aligned.bam",
-        multi_bam="bam/{cell_id}.hisat3n_dna.multi_aligned.bam",
-        unmapped_fastq="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
+        unique_bam=temp("bam/{cell_id}.hisat3n_dna.unique_aligned.bam"),
+        multi_bam=temp("bam/{cell_id}.hisat3n_dna.multi_aligned.bam"),
+        unmapped_fastq=temp("bam/{cell_id}.hisat3n_dna.unmapped.fastq")
     threads:
         1
     run:
@@ -198,7 +206,7 @@ rule separate_unmapped_reads:
                                               out_unmappable_path=output.unmapped_fastq,
                                               unmappable_format='fastq',
                                               mapq_cutoff=10,
-                                              qlen_cutoff=30)
+                                              qlen_cutoff=config['min_read_length'])
 
 
 # split unmapped reads
@@ -206,8 +214,8 @@ rule split_unmapped_reads:
     input:
         unmapped_reads="bam/{cell_id}.hisat3n_dna.unmapped.fastq"
     output:
-        split_r1="bam/{cell_id}.hisat3n_dna.split_reads.R1.fastq",
-        split_r2="bam/{cell_id}.hisat3n_dna.split_reads.R2.fastq",
+        split_r1=temp("bam/{cell_id}.hisat3n_dna.split_reads.R1.fastq"),
+        split_r2=temp("bam/{cell_id}.hisat3n_dna.split_reads.R2.fastq"),
     params:
         output_prefix=lambda wildcards: f"bam/{wildcards.cell_id}.hisat3n_dna.split_reads"
     threads:
@@ -226,10 +234,10 @@ rule hisat_3n_single_end_r1_mapping_dna_mode:
     input:
         fastq="bam/{cell_id}.hisat3n_dna.split_reads.R1.fastq"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.R1.bam",
-        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.R1.txt"
+        bam=temp("bam/{cell_id}.hisat3n_dna.split_reads.R1.bam"),
+        stats=temp("bam/{cell_id}.hisat3n_dna_split_reads_summary.R1.txt")
     threads:
-        8
+        config['hisat3n_threads']
     shell:
         "hisat-3n "
         "{config[hisat3n_dna_reference]} "
@@ -253,10 +261,10 @@ rule hisat_3n_single_end_r2_mapping_dna_mode:
     input:
         fastq="bam/{cell_id}.hisat3n_dna.split_reads.R2.fastq"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.R2.bam",
-        stats="bam/{cell_id}.hisat3n_dna_split_reads_summary.R2.txt"
+        bam=temp("bam/{cell_id}.hisat3n_dna.split_reads.R2.bam"),
+        stats=temp("bam/{cell_id}.hisat3n_dna_split_reads_summary.R2.txt")
     threads:
-        8
+        config['hisat3n_threads']
     shell:
         "hisat-3n "
         "{config[hisat3n_dna_reference]} "
@@ -282,7 +290,7 @@ rule merge_and_sort_split_reads_by_name:
         r1_bam="bam/{cell_id}.hisat3n_dna.split_reads.R1.bam",
         r2_bam="bam/{cell_id}.hisat3n_dna.split_reads.R2.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam"
+        bam=temp("bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam")
     threads:
         1
     shell:
@@ -294,7 +302,7 @@ rule remove_overlap_read_parts:
     input:
         bam="bam/{cell_id}.hisat3n_dna.split_reads.name_sort.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.split_reads.no_overlap.bam"
+        bam=temp("bam/{cell_id}.hisat3n_dna.split_reads.no_overlap.bam")
     threads:
         1
     run:
@@ -307,7 +315,7 @@ rule merge_original_and_split_bam:
         bam="bam/{cell_id}.hisat3n_dna.unique_aligned.bam",
         split_bam="bam/{cell_id}.hisat3n_dna.split_reads.no_overlap.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.all_reads.bam"
+        bam=temp("bam/{cell_id}.hisat3n_dna.all_reads.bam")
     threads:
         1
     shell:
@@ -331,7 +339,7 @@ rule call_chromatin_contacts:
     input:
         bam="bam/{cell_id}.hisat3n_dna.all_reads.name_sort.bam"
     output:
-        stats="hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv"
+        stats=temp("hic/{cell_id}.hisat3n_dna.all_reads.contact_stats.csv")
     params:
         contact_prefix=lambda wildcards: f"hic/{wildcards.cell_id}.hisat3n_dna.all_reads",
     threads:
@@ -347,7 +355,7 @@ rule sort_bam:
     input:
         bam="bam/{cell_id}.hisat3n_dna.all_reads.name_sort.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.all_reads.pos_sort.bam"
+        bam=temp("bam/{cell_id}.hisat3n_dna.all_reads.pos_sort.bam")
     resources:
         mem_mb=1000
     threads:
@@ -361,8 +369,8 @@ rule dedup_unique_bam:
     input:
         "bam/{cell_id}.hisat3n_dna.all_reads.pos_sort.bam"
     output:
-        bam="bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam",
-        stats="bam/{cell_id}.hisat3n_dna.all_reads.deduped.matrix.txt"
+        bam=temp("bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam"),
+        stats=temp("bam/{cell_id}.hisat3n_dna.all_reads.deduped.matrix.txt")
     resources:
         mem_mb=1000
     threads:
@@ -377,7 +385,7 @@ rule index_unique_bam_dna_reads:
     input:
         bam="bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam"
     output:
-        bai="bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam.bai"
+        bai=temp("bam/{cell_id}.hisat3n_dna.all_reads.deduped.bam.bai")
     shell:
         "samtools index {input.bam}"
 
@@ -395,7 +403,7 @@ rule unique_reads_allc:
     output:
         allc="allc/{cell_id}.allc.tsv.gz",
         tbi="allc/{cell_id}.allc.tsv.gz.tbi",
-        stats="allc/{cell_id}.allc.tsv.gz.count.csv"
+        stats=temp("allc/{cell_id}.allc.tsv.gz.count.csv")
     threads:
         1.5
     resources:

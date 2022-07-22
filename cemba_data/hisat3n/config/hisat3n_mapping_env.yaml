@@ -6,18 +6,19 @@ channels:
 dependencies:
  - python=3.8
  - pip
- - seaborn
- - natsort
- - yaml
- - cutadapt
- - samtools
- - picard
  - bedtools
+ - cutadapt
  - htslib>=1.9
- - pysam
+ - natsort
+ - picard
  - pybedtools
  - pyBigWig
+ - pysam
+ - samtools
+ - seaborn
+ - snakemake
  - subread=2.0
+ - yaml
  - pip:
     - allcools
     - cemba_data
