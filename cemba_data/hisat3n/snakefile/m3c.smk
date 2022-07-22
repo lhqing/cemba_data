@@ -14,7 +14,32 @@ from cemba_data.hisat3n import *
 
 
 # read mapping config and put all variables into the locals()
-config, config_dict = read_mapping_config()
+DEFAULT_CONFIG = {
+    'hisat3n_repeat_index_type': '',
+    'r1_adapter': 'AGATCGGAAGAGCACACGTCTGAAC',
+    'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
+    'r1_right_cut': 10,
+    'r2_right_cut': 10,
+    'r1_left_cut': 10,
+    'r2_left_cut': 10,
+    'min_read_length': 30,
+    'num_upstr_bases': 0,
+    'num_downstr_bases': 2,
+    'compress_level': 5,
+}
+REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
+
+for k, v in DEFAULT_CONFIG.items():
+    if k not in config:
+        config[k] = v
+
+missing_key = []
+for k in REQUIRED_CONFIG:
+    if k not in config:
+        missing_key.append(k)
+if len(missing_key) > 0:
+    raise ValueError('Missing required config: {}'.format(missing_key))
+
 # print('Using these mapping parameters:')
 # for _k, _v in config_dict.items():
 #     print(f'{_k} = {_v}')
@@ -24,9 +49,14 @@ fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
 # print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
 
-mcg_context = 'CGN' if int(config.num_upstr_bases) == 0 else 'HCGN'
-repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' else "--no-repeat-index"
-
+try:
+    mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
+except KeyError:
+    mcg_context = 'CGN'
+try:
+    repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
+except KeyError:
+    repeat_index_flag = "--no-repeat-index"
 
 # ==================================================
 # Mapping summary
@@ -96,17 +126,17 @@ rule trim:
         1
     shell:
         "cutadapt "
-        "-a R1Adapter={config.r1_adapter} "
-        "-A R2Adapter={config.r2_adapter} "
+        "-a R1Adapter={config[r1_adapter]} "
+        "-A R2Adapter={config[r2_adapter]} "
         "--report=minimal "
         "-O 6 "
         "-q 20 "
-        "-u {config.r1_left_cut} "
-        "-u -{config.r1_right_cut} "
-        "-U {config.r2_left_cut} "
-        "-U -{config.r2_right_cut} "
+        "-u {config[r1_left_cut]} "
+        "-u -{config[r1_right_cut]} "
+        "-U {config[r2_left_cut]} "
+        "-U -{config[r2_right_cut]} "
         "-Z "
-        "-m 30:30 "
+        "-m {config[min_read_length]}:{config[min_read_length]} "
         "--pair-filter 'both' "
         "-o {output.R1} "
         "-p {output.R2} "
@@ -133,7 +163,7 @@ rule hisat_3n_pair_end_mapping_dna_mode:
         mem_mb=14000
     shell:
         "hisat-3n "
-        "{config.hisat3n_dna_reference} "
+        "{config[hisat3n_dna_reference]} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -185,7 +215,7 @@ rule split_unmapped_reads:
     run:
         split_hisat3n_unmapped_reads(fastq_path=input.unmapped_reads,
                                      output_prefix=params.output_prefix,
-                                     min_length=30)
+                                     min_length=config['min_read_length'])
 
 
 # remap the split reads in SE mode
@@ -202,7 +232,7 @@ rule hisat_3n_single_end_r1_mapping_dna_mode:
         8
     shell:
         "hisat-3n "
-        "{config.hisat3n_dna_reference} "
+        "{config[hisat3n_dna_reference]} "
         "-q "
         "-U {input.fastq} "
         "--directional-mapping-reverse "  # map R1 in pbat mode
@@ -229,7 +259,7 @@ rule hisat_3n_single_end_r2_mapping_dna_mode:
         8
     shell:
         "hisat-3n "
-        "{config.hisat3n_dna_reference} "
+        "{config[hisat3n_dna_reference]} "
         "-q "
         "-U {input.fastq} "
         "--directional-mapping "  # map R2 in normal mode
@@ -373,11 +403,11 @@ rule unique_reads_allc:
     shell:
         'allcools bam-to-allc '
         '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
+        '--reference_fasta {config[reference_fasta]} '
         '--output_path {output.allc} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
+        '--num_upstr_bases {config[num_upstr_bases]} '
+        '--num_downstr_bases {config[num_downstr_bases]} '
+        '--compress_level {config[compress_level]} '
         '--save_count_df '
         '--convert_bam_strandness '
 
@@ -402,4 +432,4 @@ rule unique_reads_cgn_extraction:
         '--allc_path  {input.allc} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {config.chrom_size_path} '
+        '--chrom_size_path {config[chrom_size_path]} '

@@ -2,7 +2,6 @@ import pathlib
 import re
 import yaml
 import pandas as pd
-from collections import namedtuple
 
 from ..utilities import get_configuration
 
@@ -27,6 +26,9 @@ def read_mapping_config(cwd: str = '.'):
                 tried.append(path)
                 if pathlib.Path(path).exists():
                     yaml_path = path
+    default_path = f'~/mapping_config.yaml'
+    if pathlib.Path(default_path).exists():
+        yaml_path = default_path
 
     ini_path = None
     for name in ['config', 'mapping_config']:
@@ -37,17 +39,15 @@ def read_mapping_config(cwd: str = '.'):
                 ini_path = path
 
     if yaml_path is not None:
-        config_flat_dict = _read_yaml_config(yaml_path)
+        config = _read_yaml_config(yaml_path)
     elif ini_path is not None:
-        config_flat_dict = _read_ini_config(ini_path)
+        config = _read_ini_config(ini_path)
     else:
         tried_str = '\n'.join(tried)
         raise FileNotFoundError(f'No mapping config file found, '
                                 f'tried to search these paths but none exist: '
                                 f'{tried_str}')
-
-    config = namedtuple('config', config_flat_dict.keys())(*config_flat_dict.values())
-    return config, config_flat_dict
+    return config
 
 
 def validate_cwd_fastq_paths(cwd: str = '.'):
