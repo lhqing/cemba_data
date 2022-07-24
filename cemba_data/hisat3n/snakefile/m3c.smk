@@ -34,6 +34,10 @@ DEFAULT_CONFIG = {
     'num_downstr_bases': 2,
     'compress_level': 5,
     'hisat3n_threads': 11,
+    # the post_mapping_script can be used to generate dataset, run other process etc.
+    # it gets executed before the final summary function.
+    # the default command is just a placeholder that has no effect
+    'post_mapping_script': 'true',
 }
 REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
 
@@ -52,14 +56,10 @@ if len(missing_key) > 0:
 fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
 
-try:
-    mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
-except KeyError:
-    mcg_context = 'CGN'
-try:
-    repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
-except KeyError:
-    repeat_index_flag = "--no-repeat-index"
+
+
+mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
+repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
 
 
 # ==================================================
@@ -86,7 +86,14 @@ rule summary:
     output:
         "MappingSummary.csv.gz"
     run:
+        # execute any post-mapping script before generating the final summary
+        shell(config['post_mapping_script'])
+
+        # generate the final summary
         snm3c_summary()
+
+        # cleanup
+        shell("rm -rf bam/temp")
 
 
 # ==================================================
@@ -104,7 +111,7 @@ rule sort_R1:
     threads:
         1.5
     resources:
-        sort_slot=1
+        high_io_job=1
     shell:
         'zcat {input} | paste - - - - | sort -k1,1 -t " " | tr "\t" "\n" > {output} '
 
@@ -117,13 +124,14 @@ rule sort_R2:
     threads:
         1.5
     resources:
-        sort_slot=1
+        high_io_job=1
     shell:
         'zcat {input} | paste - - - - | sort -k1,1 -t " " | tr "\t" "\n" > {output} '
 
 
 rule trim:
     input:
+        # change to sort_R1 and sort_R2 output if the FASTQ name is disordered
         R1="fastq/{cell_id}-R1.fq.gz",
         R2="fastq/{cell_id}-R2.fq.gz"
     output:

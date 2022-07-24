@@ -21,14 +21,23 @@ def _determine_reads_conversion(read):
     # For HISAT-3N, use YZ tag
     # YZ:A:<A>: The value + or – indicate the read is mapped to REF-3N (+) or REF-RC-3N (-).
     # actually, for snmC, the + means G to A conversion; the - means C to T conversion.
-    # TODO: check if we can use R1 and R2 to determine the conversion, R1 is G to A, R2 is C to T
-    yz_tag = read.get_tag('YZ')
-    if yz_tag == '-':
-        # G -> A
-        return 'GA'
-    elif yz_tag == '+':
-        # C -> T
-        return 'CT'
+    # For HISAT2, just determine the read type
+    # R1 is C to T conversion, R2 is G to A conversion
+    try:
+        yz_tag = read.get_tag('YZ')
+        if yz_tag == '-':
+            # G -> A
+            return 'GA'
+        elif yz_tag == '+':
+            # C -> T
+            return 'CT'
+    except KeyError:
+        if read.is_read1:
+            return 'GA'
+        elif read.is_read2:
+            return 'CT'
+        else:
+            raise ValueError
     else:
         raise ValueError
 

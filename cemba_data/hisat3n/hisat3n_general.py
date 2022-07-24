@@ -123,7 +123,8 @@ def make_snakefile_hisat3n(output_dir):
         raise KeyError('mode not found in the config file.')
 
     skip_dirs = ['stats', 'snakemake', 'scool']
-    mapping_job_dirs = [p for p in output_dir.glob('*') if p.is_dir() and (p.name not in skip_dirs)]
+    mapping_job_dirs = [p for p in output_dir.glob('*')
+                        if p.is_dir() and (p.name not in skip_dirs)]
 
     snakemake_dir = output_dir / 'snakemake'
     snakemake_dir.mkdir(exist_ok=True)
@@ -131,15 +132,17 @@ def make_snakefile_hisat3n(output_dir):
     stats_dir.mkdir(exist_ok=True)
 
     package_dir = cemba_data.__path__[0]
-    snakefile_path = f'{package_dir}/hisat3n/snakefile/{mode.lower()}.Snakefile'
+    snakefile_path = f'{package_dir}/hisat3n/snakefile/{mode.lower()}.smk'
     if not pathlib.Path(snakefile_path).exists():
         print('Possible snakefile templates:')
-        for p in pathlib.Path(f'{package_dir}/hisat3n/snakefile/').glob('Snakefile.*'):
+        for p in pathlib.Path(f'{package_dir}/hisat3n/snakefile/').glob('*.smk'):
             print(p)
-        raise ValueError(f'Mode {mode} not supported, because Snakefile {snakefile_path} not found.')
+        raise ValueError(f'Mode {mode} not supported, '
+                         f'because Snakefile {snakefile_path} not found.')
 
     for p in mapping_job_dirs:
-        subprocess.run(['cp', f'{output_dir}/{mapping_config_name}', f'{p}/{mapping_config_name}'], check=True)
+        subprocess.run(['cp', f'{output_dir}/{mapping_config_name}',
+                        f'{p}/{mapping_config_name}'], check=True)
         subprocess.run(['cp', snakefile_path, f'{p}/Snakefile'], check=True)
 
     # leave a flag to indicate using hisat-3n pipeline

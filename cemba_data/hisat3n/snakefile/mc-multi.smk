@@ -14,18 +14,43 @@ from cemba_data.hisat3n import *
 
 
 # read mapping config and put all variables into the locals()
-config, config_dict = read_mapping_config()
-# print('Usings these mapping parameters:')
-# for _k, _v in config_dict.items():
-#     print(f'{_k} = {_v}')
+DEFAULT_CONFIG = {
+    'hisat3n_repeat_index_type': '',
+    'r1_adapter': 'AGATCGGAAGAGCACACGTCTGAAC',
+    'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
+    'r1_right_cut': 10,
+    'r2_right_cut': 10,
+    'r1_left_cut': 10,
+    'r2_left_cut': 10,
+    'min_read_length': 30,
+    'num_upstr_bases': 0,
+    'num_downstr_bases': 2,
+    'compress_level': 5,
+    'hisat3n_threads': 11,
+    # the post_mapping_script can be used to generate dataset, run other process etc.
+    # it gets executed before the final summary function.
+    # the default command is just a placeholder that has no effect
+    'post_mapping_script': 'true',
+}
+REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
+
+for k, v in DEFAULT_CONFIG.items():
+    if k not in config:
+        config[k] = v
+
+missing_key = []
+for k in REQUIRED_CONFIG:
+    if k not in config:
+        missing_key.append(k)
+if len(missing_key) > 0:
+    raise ValueError('Missing required config: {}'.format(missing_key))
 
 # fastq table and cell IDs
 fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
-# print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
 
-mcg_context = 'CGN' if int(config.num_upstr_bases) == 0 else 'HCGN'
-repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' else "--no-repeat-index"
+mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
+repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
 
 
 # ==================================================
@@ -37,19 +62,22 @@ repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' e
 rule summary:
     input:
         # fastq trim
-        expand("fastq/{cell_id}.trimmed.stats.txt", cell_id=CELL_IDS),
+        expand("fastq/{cell_id}.trimmed.stats.txt",cell_id=CELL_IDS),
         # dna mapping
-        expand("bam/{cell_id}.hisat3n_dna_summary.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt", cell_id=CELL_IDS),
-        expand("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt", cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna_summary.txt",cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna.unique_align.deduped.matrix.txt",cell_id=CELL_IDS),
+        expand("bam/{cell_id}.hisat3n_dna.multi_align.deduped.matrix.txt",cell_id=CELL_IDS),
         # allc
-        expand("allc/{cell_id}.allc.tsv.gz.count.csv", cell_id=CELL_IDS),
-        expand("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv", cell_id=CELL_IDS),
+        expand("allc/{cell_id}.allc.tsv.gz.count.csv",cell_id=CELL_IDS),
+        expand("allc-multi/{cell_id}.allc_multi.tsv.gz.count.csv",cell_id=CELL_IDS),
         expand("allc-{mcg_context}/{cell_id}.{mcg_context}-Merge.allc.tsv.gz.tbi",
-               cell_id=CELL_IDS, mcg_context=mcg_context),
+            cell_id=CELL_IDS,mcg_context=mcg_context),
     output:
         "MappingSummary.csv.gz"
     run:
+        # execute any post-mapping script before generating the final summary
+        shell(config['post_mapping_script'])
+
         snmc_summary()
 
         # cleanup
@@ -87,8 +115,9 @@ rule sort_R2:
 
 rule trim:
     input:
-        R1="fastq/{cell_id}-R1_sort.fq",
-        R2="fastq/{cell_id}-R2_sort.fq"
+        # change to sort_R1 and sort_R2 output if the FASTQ name is disordered
+        R1="fastq/{cell_id}-R1.fq.gz",
+        R2="fastq/{cell_id}-R2.fq.gz"
     output:
         R1=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
         R2=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
@@ -97,17 +126,17 @@ rule trim:
         1
     shell:
         "cutadapt "
-        "-a R1Adapter={config.r1_adapter} "
-        "-A R2Adapter={config.r2_adapter} "
+        "-a R1Adapter={config[r1_adapter]} "
+        "-A R2Adapter={config[r2_adapter]} "
         "--report=minimal "
         "-O 6 "
         "-q 20 "
-        "-u {config.r1_left_cut} "
-        "-u -{config.r1_right_cut} "
-        "-U {config.r2_left_cut} "
-        "-U -{config.r2_right_cut} "
+        "-u {config[r1_left_cut]} "
+        "-u -{config[r1_right_cut]} "
+        "-U {config[r2_left_cut]} "
+        "-U -{config[r2_right_cut]} "
         "-Z "
-        "-m 30:30 "
+        "-m {config[min_read_length]}:30 "
         "--pair-filter 'both' "
         "-o {output.R1} "
         "-p {output.R2} "
@@ -134,7 +163,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         mem_mb=8000
     shell:
         "hisat-3n "
-        "{config.hisat3n_dna_reference} "
+        "{config[hisat3n_dna_reference]} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -254,11 +283,11 @@ rule unique_reads_allc:
     shell:
         'allcools bam-to-allc '
         '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
+        '--reference_fasta {config[reference_fasta]} '
         '--output_path {output.allc} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
+        '--num_upstr_bases {config[num_upstr_bases]} '
+        '--num_downstr_bases {config[num_downstr_bases]} '
+        '--compress_level {config[compress_level]} '
         '--save_count_df '
         '--convert_bam_strandness '
 
@@ -282,7 +311,7 @@ rule unique_reads_cgn_extraction:
         '--allc_path  {input} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {config.chrom_size_path} '
+        '--chrom_size_path {config[chrom_size_path]} '
 
 
 # generate ALLC
@@ -300,11 +329,11 @@ rule multi_reads_allc:
     shell:
         'allcools bam-to-allc '
         '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
+        '--reference_fasta {config[reference_fasta]} '
         '--output_path {output.allc} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
+        '--num_upstr_bases {config[num_upstr_bases]} '
+        '--num_downstr_bases {config[num_downstr_bases]} '
+        '--compress_level {config[compress_level]} '
         '--save_count_df '
         '--min_mapq 0 '  # for multi-mapped reads, skip mapq filter
         '--convert_bam_strandness '

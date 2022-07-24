@@ -43,10 +43,7 @@ def read_mapping_config(cwd: str = '.'):
     elif ini_path is not None:
         config = _read_ini_config(ini_path)
     else:
-        tried_str = '\n'.join(tried)
-        raise FileNotFoundError(f'No mapping config file found, '
-                                f'tried to search these paths but none exist: '
-                                f'{tried_str}')
+        config = {}
     return config
 
 

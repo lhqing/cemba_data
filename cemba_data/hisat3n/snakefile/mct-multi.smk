@@ -14,10 +14,42 @@ from cemba_data.hisat3n import *
 
 
 # read mapping config and put all variables into the locals()
-config, config_dict = read_mapping_config()
-# print('Usings these mapping parameters:')
-# for _k, _v in config_dict.items():
-#     print(f'{_k} = {_v}')
+DEFAULT_CONFIG = {
+    'hisat3n_repeat_index_type': '',
+    'r1_adapter': 'AGATCGGAAGAGCACACGTCTGAAC',
+    'r2_adapter': 'AGATCGGAAGAGCGTCGTGTAGGGA',
+    'r1_right_cut': 10,
+    'r2_right_cut': 10,
+    'r1_left_cut': 10,
+    'r2_left_cut': 10,
+    'min_read_length': 30,
+    'num_upstr_bases': 0,
+    'num_downstr_bases': 2,
+    'compress_level': 5,
+    'hisat3n_threads': 11,
+    # the post_mapping_script can be used to generate dataset, run other process etc.
+    # it gets executed before the final summary function.
+    # the default command is just a placeholder that has no effect
+    'post_mapping_script': 'true',
+}
+REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
+
+for k, v in DEFAULT_CONFIG.items():
+    if k not in config:
+        config[k] = v
+
+missing_key = []
+for k in REQUIRED_CONFIG:
+    if k not in config:
+        missing_key.append(k)
+if len(missing_key) > 0:
+    raise ValueError('Missing required config: {}'.format(missing_key))
+
+# read mapping config and put all variables into the locals()
+local_config = read_mapping_config()
+for k, v in local_config.items():
+    if k not in config:
+        config[k] = v
 
 # fastq table and cell IDs
 fastq_table = validate_cwd_fastq_paths()
@@ -99,8 +131,9 @@ rule sort_R2:
 
 rule trim:
     input:
-        R1="fastq/{cell_id}-R1_sort.fq",
-        R2="fastq/{cell_id}-R2_sort.fq"
+        # change to sort_R1 and sort_R2 output if the FASTQ name is disordered
+        R1="fastq/{cell_id}-R1.fq.gz",
+        R2="fastq/{cell_id}-R2.fq.gz"
     output:
         R1=temp("fastq/{cell_id}-R1.trimmed.fq.gz"),
         R2=temp("fastq/{cell_id}-R2.trimmed.fq.gz"),
