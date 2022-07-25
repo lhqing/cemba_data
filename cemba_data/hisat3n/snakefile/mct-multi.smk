@@ -32,7 +32,14 @@ DEFAULT_CONFIG = {
     # the default command is just a placeholder that has no effect
     'post_mapping_script': 'true',
 }
-REQUIRED_CONFIG = ['hisat3n_dna_reference', 'reference_fasta', 'chrom_size_path']
+REQUIRED_CONFIG = ['hisat_dna_reference', 'hisat_rna_reference', 'reference_fasta', 'chrom_size_path']
+
+local_config = read_mapping_config()
+DEFAULT_CONFIG.update(local_config)
+if 'hisat3n_dna_reference' in DEFAULT_CONFIG:
+    DEFAULT_CONFIG['hisat_dna_reference'] = DEFAULT_CONFIG['hisat3n_dna_reference']
+if 'hisat3n_rna_reference' in DEFAULT_CONFIG:
+    DEFAULT_CONFIG['hisat_rna_reference'] = DEFAULT_CONFIG['hisat3n_rna_reference']
 
 for k, v in DEFAULT_CONFIG.items():
     if k not in config:
@@ -45,20 +52,12 @@ for k in REQUIRED_CONFIG:
 if len(missing_key) > 0:
     raise ValueError('Missing required config: {}'.format(missing_key))
 
-# read mapping config and put all variables into the locals()
-local_config = read_mapping_config()
-for k, v in local_config.items():
-    if k not in config:
-        config[k] = v
-
 # fastq table and cell IDs
 fastq_table = validate_cwd_fastq_paths()
 CELL_IDS = fastq_table.index.tolist()
 
-# print(f"Found {len(CELL_IDS)} FASTQ pairs in fastq/ .")
-
-mcg_context = 'CGN' if int(config.num_upstr_bases) == 0 else 'HCGN'
-repeat_index_flag = "--repeat" if config.hisat3n_repeat_index_type == 'repeat' else "--no-repeat-index"
+mcg_context = 'CGN' if int(config['num_upstr_bases']) == 0 else 'HCGN'
+repeat_index_flag = "--repeat" if config['hisat3n_repeat_index_type'] == 'repeat' else "--no-repeat-index"
 
 
 # ==================================================
@@ -93,8 +92,11 @@ rule summary:
     output:
         "MappingSummary.csv.gz"
     run:
-        snmct_summary()
+        # execute any post-mapping script before generating the final summary
+        shell(config['post_mapping_script'])
+
         aggregate_feature_counts()
+        snmct_summary()
 
         # cleanup
         shell("rm -rf bam/temp")
@@ -142,7 +144,7 @@ rule trim:
         1
     shell:
         "cutadapt "
-        "-a R1Adapter={config.r1_adapter} "
+        "-a R1Adapter={config[r1_adapter]} "
         "-a TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
         "-a TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
         "-a N6=AAGCAGTGGTATCAACGCAGAGTAC "
@@ -153,7 +155,7 @@ rule trim:
         "-a polyALong=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "
         "-a ISPCR_F=AAGCAGTGGTATCAACGCAGAGT "
         "-a ISPCR_R=ACTCTGCGTTGATACCACTGCTT "
-        "-A R2Adapter={config.r2_adapter} "
+        "-A R2Adapter={config[r2_adapter]} "
         "-A TSO=AAGCAGTGGTATCAACGCAGAGTGAATGG "
         "-A TSO_rc=CCATTCACTCTGCGTTGATACCACTGCTT "
         "-A N6=AAGCAGTGGTATCAACGCAGAGTAC "
@@ -171,10 +173,10 @@ rule trim:
         "--report=minimal "
         "-O 6 "
         "-q 20 "
-        "-u {config.r1_left_cut} "
-        "-u -{config.r1_right_cut} "
-        "-U {config.r2_left_cut} "
-        "-U -{config.r2_right_cut} "
+        "-u {config[r1_left_cut]} "
+        "-u -{config[r1_right_cut]} "
+        "-U {config[r2_left_cut]} "
+        "-U -{config[r2_right_cut]} "
         "-Z "
         "-m 30:30 "
         "--pair-filter 'both' "
@@ -203,7 +205,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         mem_mb=8000
     shell:
         "hisat-3n "
-        "{config.hisat3n_dna_reference} "
+        "{config[hisat_dna_reference]} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
@@ -359,13 +361,11 @@ rule hisat_3n_pairend_mapping_rna_mode:
     resources:
         mem_mb=8000
     shell:
-        "hisat-3n "
-        "-x {config.hisat3n_rna_reference} "
+        "hisat2 "
+        "-x {config[hisat_rna_reference]} "
         "-q "
         "-1 {input.R1} "
         "-2 {input.R2} "
-        "--base-change C,T "
-        "{repeat_index_flag} "
         "-t "
         "--new-summary "
         "--summary-file {output.stats} "
@@ -433,8 +433,8 @@ rule feature_count:
     resources:
         mem_mb=1000
     shell:
-        'featureCounts -t {config.feature_type} -g {config.id_type} ' \
-        '-a {config.gtf_path} -o {output.tsv} --byReadGroup -T {threads} {input}'
+        'featureCounts -t {config[feature_type]} -g {config[id_type]} ' \
+        '-a {config[gtf_path]} -o {output.tsv} --byReadGroup -T {threads} {input}'
 
 
 
@@ -457,12 +457,12 @@ rule unique_reads_allc:
     shell:
         'allcools bam-to-allc '
         '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
+        '--reference_fasta {config[reference_fasta]} '
         '--output_path {output.allc} '
         '--cpu {threads} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
+        '--num_upstr_bases {config[num_upstr_bases]} '
+        '--num_downstr_bases {config[num_downstr_bases]} '
+        '--compress_level {config[compress_level]} '
         '--save_count_df '
         '--convert_bam_strandness '
 
@@ -486,7 +486,7 @@ rule unique_reads_cgn_extraction:
         '--allc_path  {input} '
         '--output_prefix {params.prefix} '
         '--mc_contexts {mcg_context} '
-        '--chrom_size_path {config.chrom_size_path} '
+        '--chrom_size_path {config[chrom_size_path]} '
 
 
 # generate ALLC
@@ -503,12 +503,12 @@ rule multi_reads_allc:
     shell:
         'allcools bam-to-allc '
         '--bam_path {input.bam} '
-        '--reference_fasta {config.reference_fasta} '
+        '--reference_fasta {config[reference_fasta]} '
         '--output_path {output.allc} '
         '--cpu {threads} '
-        '--num_upstr_bases {config.num_upstr_bases} '
-        '--num_downstr_bases {config.num_downstr_bases} '
-        '--compress_level {config.compress_level} '
+        '--num_upstr_bases {config[num_upstr_bases]} '
+        '--num_downstr_bases {config[num_downstr_bases]} '
+        '--compress_level {config[compress_level]} '
         '--save_count_df '
         '--min_mapq 0 '  # for multi-mapped reads, skip mapq filter
         '--convert_bam_strandness '
