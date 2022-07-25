@@ -31,8 +31,10 @@ DEFAULT_CONFIG = {
     # it gets executed before the final summary function.
     # the default command is just a placeholder that has no effect
     'post_mapping_script': 'true',
+    'feature_type': 'gene',
+    'id_type': 'gene_id',
 }
-REQUIRED_CONFIG = ['hisat_dna_reference', 'hisat_rna_reference', 'reference_fasta', 'chrom_size_path']
+REQUIRED_CONFIG = ['hisat_dna_reference', 'hisat_rna_reference', 'gtf_path', 'reference_fasta', 'chrom_size_path']
 
 local_config = read_mapping_config()
 DEFAULT_CONFIG.update(local_config)
