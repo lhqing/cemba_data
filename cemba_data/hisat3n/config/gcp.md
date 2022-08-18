@@ -18,19 +18,41 @@ mkdir pkg
 cd pkg
 
 # use hisat3n_mapping_env.yaml
-
+wget https://raw.githubusercontent.com/lhqing/cemba_data/master/hisat3n_env.yml
+mamba env update -y hisat3n_env.yml
 
 # install hisat-3n
+git clone https://github.com/DaehwanKimLab/hisat2.git hisat-3n
+cd hisat-3n
+git checkout hisat-3n-dev-directional-mapping-reverse
+make
 
-# install 
-```
+echo 'export PATH=$HOME/pkg/hisat-3n:$PATH' >> ~/.bashrc
+source ~/.bashrc 
+echo 'export PATH=$HOME/pkg/hisat-3n:$PATH' >> ~/.zshrc 
+source ~/.zshrc
 
-## Create genome reference image
 
-```bash
+# make sure allcools and yap is upto date
+cd ~/pkg
+git clone https://github.com/lhqing/cemba_data.git
+cd cemba_data
+pip install -e .
+
+cd ~/pkg
+git clone https://github.com/lhqing/ALLCools.git
+cd ALLCoools
+pip install -e .
+
+## Create genome reference
+
 # add genome reference file
-# build reference index
-# save image to gcp
+# prepare and copy specific genome reference file to $HOME
+
+# prepare a $HOME/mapping.yaml file the records the path of required genome reference files
+
+# clean unnecessary cache files
+mamba clean -y -a
 ```
 
 ## Notes
@@ -54,4 +76,12 @@ yap-gcp validate_success source_path target_path
 check flag on both side, remove source if completed, archive target file, delete non-active data (FASTQ / BAM) after archive
 
 
-
+## Build hisat-3n index
+```bash
+# non-repeat index
+hisat-3n-build --base-change C,T genome.fa genome
+# repeat index
+hisat-3n-build --base-change T,C --repeat-index genome.fa genome
+# Build the repeat HISAT-3N integrated index with splice site information
+hisat-3n-build --base-change C,T --repeat-index --ss genome.ss --exon genome.exon genome.fa genome 
+```

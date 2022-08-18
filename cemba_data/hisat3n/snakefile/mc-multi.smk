@@ -195,8 +195,6 @@ rule sort_bam:
 
 
 # Separate unique aligned reads and multi-aligned reads with length > 30
-# TODO: make sure how to separate multi-align reads? or reads map to repeat regions in the genome?
-# TODO right now, we are just using mapq == 1 as multi-align reads, but this might not be right
 rule split_unique_and_multi_align_bam_dna:
     input:
         bam="bam/{cell_id}.hisat3n_dna.bam"
