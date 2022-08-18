@@ -3,8 +3,10 @@
 ## Create base image
 
 ```bash
+# init install system tools
 sudo yum install -y zsh tree wget screen git nfs-utils make gcc
 
+# install mambaforge
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
 sh Mambaforge-Linux-x86_64.sh -b -p $HOME/mambaforge
 rm -f Mambaforge-Linux-x86_64.sh
@@ -13,25 +15,24 @@ rm -f Mambaforge-Linux-x86_64.sh
 exec /bin/zsh
 mamba install -y gxx
 
-# Create mapping env
-mkdir pkg
-cd pkg
-
-# use hisat3n_mapping_env.yaml
+# Create mapping env hisat3n_env.yml
 wget https://raw.githubusercontent.com/lhqing/cemba_data/master/hisat3n_env.yml
-mamba env update -y hisat3n_env.yml
+mamba env update -y hisat3n_env.yml  # this should install things in the base env
+
+# Install packages
+mkdir -p ~/pkg
 
 # install hisat-3n
+cd ~/pkg
 git clone https://github.com/DaehwanKimLab/hisat2.git hisat-3n
 cd hisat-3n
 git checkout hisat-3n-dev-directional-mapping-reverse
 make
-
+# put hisat-3n in the PATH
 echo 'export PATH=$HOME/pkg/hisat-3n:$PATH' >> ~/.bashrc
 source ~/.bashrc 
 echo 'export PATH=$HOME/pkg/hisat-3n:$PATH' >> ~/.zshrc 
 source ~/.zshrc
-
 
 # make sure allcools and yap is upto date
 cd ~/pkg
@@ -55,26 +56,17 @@ pip install -e .
 mamba clean -y -a
 ```
 
-## Notes
-yap-gcp run
+## Actual mapping
 
-1. pipeline snakefile
-2. config yaml
-3. source path
-4. target path
+```bash
+mkdir -p ~/mapping
+cd ~/mapping
+gsutil cp gs://PATH/TO/FASTQ_DIR/fastq ./
+cp ~/pkg/cemba_data/hisat3n/snakefile/SNAKEFILE_YOU_WANT_TO_USE ./Snakefile
 
-
-yap-gcp make_file_list source path
-1. mkdir, update software
-2. gsutil cp filelist, create a flag if success
-3. validate copy flag, if success, run yap snakemake
-
-if mapping_summary exist, create and cp flag file to target and to source
-
-# on daemon, after cloud job gone, check
-yap-gcp validate_success source_path target_path
-check flag on both side, remove source if completed, archive target file, delete non-active data (FASTQ / BAM) after archive
-
+# run snakemake
+snakemake --configfile ~/mapping.yaml -j
+```
 
 ## Build hisat-3n index
 ```bash
