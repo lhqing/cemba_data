@@ -1,4 +1,4 @@
-# Setup GCP for mapping
+# Setup GCP image for mapping
 
 ## Create base image
 
@@ -9,13 +9,16 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforg
 sh Mambaforge-Linux-x86_64.sh -b -p $HOME/mambaforge
 rm -f Mambaforge-Linux-x86_64.sh
 ./mambaforge/bin/mamba init zsh
-mamba install -y gxx
+./mambaforge/bin/mamba init bash
 exec /bin/zsh
+mamba install -y gxx
 
 # Create mapping env
 mkdir pkg
 cd pkg
+
 # use hisat3n_mapping_env.yaml
+
 
 # install hisat-3n
 
