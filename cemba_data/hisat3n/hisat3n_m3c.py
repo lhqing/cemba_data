@@ -668,7 +668,8 @@ def remove_overlap_read_parts(in_bam_path, out_bam_path):
         for read in bam:
             # read_pair_name is the original read fragment name in fastq
             # others are in the form of {read_type}_{read_slice_start}_{read_slice_end}
-            read_pair_name, others = read.qname.split('_')
+            *read_pair_name, others = read.qname.split('_')
+            read_pair_name = '_'.join(read_pair_name)
 
             # put back the normal read name, this will allow following steps to understand read name correctly
             # e.g. in picard RemoveDuplicateReads
