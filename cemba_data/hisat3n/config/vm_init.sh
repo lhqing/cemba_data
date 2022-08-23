@@ -4,5 +4,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforg
 sh Mambaforge-Linux-x86_64.sh -b -p $HOME/mambaforge
 rm -f Mambaforge-Linux-x86_64.sh
 ./mambaforge/bin/mamba init zsh
+./mambaforge/bin/mamba init bash
+
 mamba install -y gxx
 exec /bin/zsh
