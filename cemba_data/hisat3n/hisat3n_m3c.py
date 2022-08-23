@@ -144,7 +144,8 @@ def _trim_site(read_and_slice, read_type):
 
 def split_hisat3n_unmapped_reads(fastq_path,
                                  output_prefix,
-                                 min_length=30):
+                                 min_length=30,
+                                 paired_end=True):
     """
     Split trimmed fastq file by all possible enzyme cut sites and save to a new fastq file
     Read name is modified, last two field separated by ":" indicate the span start and stop
@@ -161,11 +162,12 @@ def split_hisat3n_unmapped_reads(fastq_path,
         Because R1 and R2 need to be mapped separately in the SE mapping.
     min_length
         Minimum read length to keep
-
-    Returns
-    -------
-
+    paired_end
+        Whether the input fastq is paired-end or not
     """
+    if not paired_end:
+        return split_hisat3n_unmapped_reads_single_end(fastq_path, output_prefix, min_length=min_length)
+
     # split pattern
     r1_split_pattern = _make_split_pattern('R1')
     r2_split_pattern = _make_split_pattern('R2')
@@ -201,6 +203,60 @@ def split_hisat3n_unmapped_reads(fastq_path,
                     r1_out.write(read_split)
                 else:
                     r2_out.write(read_split)
+    return
+
+
+def split_hisat3n_unmapped_reads_single_end(fastq_path,
+                                            output_prefix,
+                                            min_length=30):
+    """
+    Split trimmed fastq file by all possible enzyme cut sites and save to a new fastq file
+    Read name is modified, last two field separated by ":" indicate the span start and stop
+    A single read might have multiple way of cut site combination, resulting in multiple overlapped reads.
+    These reads will all be aligned in single-end mapping, and the post-alignment process
+    will determine the unique way of cut site combination.
+
+    Parameters
+    ----------
+    fastq_path
+        Input fastq path
+    output_prefix
+        Output fastq prefix, R1 and R2 will be saved as <output_prefix>.R1.fastq and <output_prefix>.R2.fastq
+        Because R1 and R2 need to be mapped separately in the SE mapping.
+    min_length
+        Minimum read length to keep
+
+    Returns
+    -------
+
+    """
+    # split pattern
+    read_type = '1'
+    split_pattern = _make_split_pattern(f'R{read_type}')
+
+    # fastq path
+    out_path = f'{output_prefix}.fastq'
+
+    with dnaio.open(fastq_path) as f, \
+            dnaio.open(out_path, mode='w') as out:
+        for read in f:
+            # read type and split pattern
+            read_split_iter = _split_read_and_make_combination(
+                read=read, split_pattern=split_pattern, min_length=min_length)
+            range_set = set()
+            for i, read_and_slice in enumerate(read_split_iter):
+                # remove overlapping enzyme cut site
+                read_split, read_range = _trim_site(read_and_slice, read_type)
+                if len(read_split.sequence) < min_length:
+                    # because trim site further reduced some reads' length
+                    continue
+                if read_range in range_set:
+                    # in some rare cases, the cut site is next to each other,
+                    # trim site might cause duplicated ranges and therefore duplicated read names
+                    # which is not allowed in the aligners
+                    continue
+                range_set.add(read_range)
+                out.write(read_split)
     return
 
 
