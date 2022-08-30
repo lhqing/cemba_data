@@ -5,11 +5,12 @@ import subprocess
 from ..utilities import get_configuration
 
 
-def bam_read_to_fastq_read(read):
-    if read.is_read1:
-        read_type = '1'
-    else:
-        read_type = '2'
+def bam_read_to_fastq_read(read, read_type=None):
+    if read_type is None:
+        if read.is_read1:
+            read_type = '1'
+        else:
+            read_type = '2'
 
     fastq_record = f"@{read.qname}_{read_type}\n" \
                    f"{read.query_sequence}\n" \
@@ -24,7 +25,8 @@ def separate_unique_and_multi_align_reads(in_bam_path,
                                           out_unmappable_path=None,
                                           unmappable_format='auto',
                                           mapq_cutoff=10,
-                                          qlen_cutoff=30):
+                                          qlen_cutoff=30,
+                                          read_type=None):
     """
     Separate unique aligned, multi-aligned, and unaligned reads from hisat-3n bam file.
 
@@ -45,6 +47,8 @@ def separate_unique_and_multi_align_reads(in_bam_path,
         note that for hisat-3n, unique aligned reads always have MAPQ=60
     qlen_cutoff
         read length cutoff for any reads
+    read_type
+        read type, only None, "1" and "2" supported. If the BAM file is paired-end, use None.
     Returns
     -------
     None
@@ -88,7 +92,7 @@ def separate_unique_and_multi_align_reads(in_bam_path,
                         if unmappable_format == 'bam':
                             unmappable_file.write(read)
                         else:
-                            unmappable_file.write(bam_read_to_fastq_read(read))
+                            unmappable_file.write(bam_read_to_fastq_read(read, read_type=read_type))
 
             if unmappable_file is not None:
                 unmappable_file.close()

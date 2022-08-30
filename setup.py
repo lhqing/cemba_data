@@ -30,6 +30,7 @@ setup(
                       'pysam'],
     entry_points={
         'console_scripts': ['yap=cemba_data.__main__:main',
-                            'yap-internal=cemba_data._yap_internal_cli_:internal_main'],
+                            'yap-internal=cemba_data._yap_internal_cli_:internal_main',
+                            'yap-hisat3n=cemba_data.hisat3n.cli:main'],
     }
 )

@@ -17,7 +17,7 @@ mamba install -y gxx
 
 # Create mapping env hisat3n_env.yml
 wget https://raw.githubusercontent.com/lhqing/cemba_data/master/hisat3n_env.yml
-mamba env update -y hisat3n_env.yml  # this should install things in the base env
+mamba env update -f hisat3n_env.yml  # this should install things in the base env
 
 # Install packages
 mkdir -p ~/pkg

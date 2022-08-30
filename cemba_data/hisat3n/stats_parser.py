@@ -64,6 +64,48 @@ def cell_parser_hisat_summary(stat_path):
     return pd.Series(report_dict, name=cell_id)
 
 
+def cell_parser_hisat_se_summary(stat_path):
+    """
+    parse hisat3n summary file
+    """
+    cell_id = pathlib.Path(stat_path).name.split('.')[0]
+    term_dict = {
+        'Total reads': 'ReadsMappedInSE',
+        'Aligned 0 time': 'UnmappableReads',
+        'Aligned 1 time': 'UniqueMappedReads',
+        'Aligned >1 times': 'MultiMappedReads',
+    }
+
+    with open(stat_path) as rep:
+        report_dict = {}
+        for line in rep:
+            try:
+                start, rest = line.split(':')
+                start = start.strip()
+            except ValueError:
+                continue  # more or less than 2 after split
+            try:
+                report_dict[term_dict[start]] = rest.strip().split(
+                    ' ')[0].strip('%')
+            except KeyError:
+                pass
+        for v in term_dict.values():
+            if v not in report_dict:
+                report_dict[v] = 0
+
+        report_dict = pd.Series(report_dict).astype(int)
+        total_reads = report_dict['ReadsMappedInSE']
+        unique_mapped_reads = report_dict['UniqueMappedReads']
+        report_dict['UniqueMappingRate'] = round(unique_mapped_reads /
+                                                 (total_reads + 0.00001) * 100)
+        multi_mapped_reads = report_dict['MultiMappedReads']
+        report_dict[f'MultiMappingRate'] = round(multi_mapped_reads /
+                                                 (total_reads + 0.00001) * 100)
+        report_dict[f'OverallMappingRate'] = round(
+            (unique_mapped_reads + multi_mapped_reads) / (total_reads + 0.00001) * 100)
+    return pd.Series(report_dict, name=cell_id)
+
+
 def cell_parser_picard_dedup_stat(stat_path):
     stat_path = pathlib.Path(stat_path)
     cell_id, *other_parts = stat_path.name.split('.')

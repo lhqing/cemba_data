@@ -714,7 +714,8 @@ def call_chromatin_contacts(bam_path: str,
                             contact_prefix: str,
                             save_raw: bool = False,
                             save_hic_format: bool = True,
-                            span=2500):
+                            span=2500,
+                            qname_format='illumina'):
     """
     Process 3C bam file and generate contact file.
 
@@ -742,7 +743,10 @@ def call_chromatin_contacts(bam_path: str,
         cur_read_pair_name = None
         cur_read_parts = []
         for read in bam:
-            read_pair_name = read.qname.split('_')[0]
+            if qname_format == 'illumina':
+                read_pair_name = read.qname.split('_')[0]
+            else:
+                read_pair_name = read.qname
             if not read.has_tag('SS'):
                 read.set_tag('SS', 0)
                 read.set_tag('SE', read.qlen)
