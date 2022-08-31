@@ -732,6 +732,8 @@ def call_chromatin_contacts(bam_path: str,
     span : int, optional
         The minimum span of the contact. The default is 2500. If the genome coordinates of two reads
         closer than this span, they will be considered as the same fragment.
+    qname_format : str, optional
+        The format of the read name. The default is 'illumina'.
 
     Returns
     -------

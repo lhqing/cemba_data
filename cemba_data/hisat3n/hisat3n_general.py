@@ -26,6 +26,7 @@ def separate_unique_and_multi_align_reads(in_bam_path,
                                           unmappable_format='auto',
                                           mapq_cutoff=10,
                                           qlen_cutoff=30,
+                                          primary_only=True,
                                           read_type=None):
     """
     Separate unique aligned, multi-aligned, and unaligned reads from hisat-3n bam file.
@@ -47,6 +48,8 @@ def separate_unique_and_multi_align_reads(in_bam_path,
         note that for hisat-3n, unique aligned reads always have MAPQ=60
     qlen_cutoff
         read length cutoff for any reads
+    primary_only
+        If True, only primary alignments (FLAG 256) are considered for multi-aligned reads.
     read_type
         read type, only None, "1" and "2" supported. If the BAM file is paired-end, use None.
     Returns
@@ -85,6 +88,10 @@ def separate_unique_and_multi_align_reads(in_bam_path,
                 if read.mapq > mapq_cutoff:
                     unique_bam.write(read)
                 elif read.mapq > 0:
+                    if primary_only and read.is_secondary:
+                        # skip secondary alignments if primary_only is True,
+                        # read.is_secondary is True when FLAG contains 256.
+                        continue
                     multi_bam.write(read)
                 else:
                     # unmappable reads
