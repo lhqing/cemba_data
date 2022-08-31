@@ -158,7 +158,7 @@ rule hisat_3n_pairend_mapping_dna_mode:
         bam=temp("bam/{cell_id}.hisat3n_dna.unsort.bam"),
         stats=temp("bam/{cell_id}.hisat3n_dna_summary.txt")
     threads:
-        8
+        config['hisat3n_threads']
     resources:
         mem_mb=8000
     shell:
