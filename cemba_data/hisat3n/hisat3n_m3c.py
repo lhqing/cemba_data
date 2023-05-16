@@ -635,14 +635,18 @@ def _dedup_contacts(output_prefix, save_raw=False):
     total_dedup = []
     for _, chrom_df in contacts.groupby(['chrom1', 'chrom2']):
         total_dedup.append(_dedup_chrom_df(chrom_df))
-    total_dedup = pd.concat(total_dedup)
+    try:
+        total_dedup = pd.concat(total_dedup)
+    except ValueError:
+        # no dataframes in total_dedup
+        total_dedup = pd.DataFrame(columns=contacts.columns)
     total_dedup.to_csv(output_path, sep='\t', index=False)
 
     if not save_raw:
         subprocess.run(shlex.split(f'rm -f {input_path}'), check=True)
 
     dedup_contacts = total_dedup.shape[0]
-    dup_rate = (input_contacts - dedup_contacts) / input_contacts
+    dup_rate = (input_contacts - dedup_contacts) / (input_contacts + 0.00001)
     return dedup_contacts, dup_rate
 
 
