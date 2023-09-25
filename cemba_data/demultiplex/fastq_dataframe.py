@@ -26,7 +26,7 @@ def _parse_v1_fastq_path(path):
         try:
             assert plate_pos[0] in 'ABCDEFGH'
             assert int(plate_pos[1:]) in list(range(1, 13))
-            assert lane in {'L001', 'L002', 'L003', 'L004'}
+            assert lane in {'L001', 'L002', 'L003', 'L004', 'L005', 'L006', 'L007', 'L008'} # nova x has 8 lanes
             assert read_type in {'R1', 'R2'}
             assert plate1 != plate2
         except AssertionError:
@@ -58,7 +58,7 @@ def _parse_v2_fastq_path(path):
             assert primer_name[0] in 'ABCDEFGHIJKLMNOP'
             assert int(primer_name[1:]) in list(range(1, 25))
             assert int(multiplex_group) in list(range(1, 7))
-            assert lane in {'L001', 'L002', 'L003', 'L004'}
+            assert lane in {'L001', 'L002', 'L003', 'L004', 'L005', 'L006', 'L007', 'L008'} # nova x has 8 lanes
             assert read_type in {'R1', 'R2'}
         except AssertionError:
             raise ValueError
